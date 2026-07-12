@@ -1,0 +1,15 @@
+.defaultInput {
+  flex: 1;
+  height: 30px;
+  width: 100%;
+  min-height: 30px;
+  padding-left: 10px;
+  padding-right: 10px;
+  background-color: transparent;
+  color: #858585;
+  border: 1px solid #858585;
+  border-radius: 20px;
+  outline: none;
+  font-family: inherit;
+  font-size: 14px;
+}

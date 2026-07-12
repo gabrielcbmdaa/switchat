@@ -1,0 +1,28 @@
+.toolbarContainer {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 10px;
+  padding: 10px;
+}
+
+.btnToolbar {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 0px;
+  background-color: transparent;
+  color: #858585;
+  border: none;
+  width: 45px;
+  height: 45px;
+  border-radius: 20px;
+  cursor: pointer;
+  transition: background 0.5s;
+}
+
+.btnToolbar:hover {
+  background-color: #858585;
+  color: #191919;
+  border: none;
+}

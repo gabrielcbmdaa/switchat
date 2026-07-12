@@ -1,0 +1,8 @@
+.env
+client-backup/
+node_modules/
+.vscode
+.DS_Store
+copilot-instructions.md
+.secrets
+.pnpm-store/

@@ -1,0 +1,22 @@
+.defaultButton {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  background-color: transparent;
+  color: #858585;
+  border: 1px solid #858585;
+  border-radius: 20px;
+  cursor: pointer;
+  transition: background 0.5s;
+  flex-shrink: 0;
+  outline: none;
+}
+
+.defaultButton:hover {
+  background-color: #858585;
+  color: #191919;
+}
+
+.defaultButton:disabled {
+  cursor: not-allowed;
+}

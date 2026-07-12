@@ -1,0 +1,49 @@
+.accountViewContainer {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+  gap: 10px;
+  padding: 10px;
+}
+
+.authForm {
+  width: 100%;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.btnAuth {
+  background-color: transparent;
+  color: #858585;
+  border: none;
+  width: 100px;
+  margin: 2px;
+  padding: 10px;
+  border-radius: 20px;
+  transition: background 0.5s;
+  outline: none;
+}
+
+.btnAuth:focus {
+  background-color: #858585;
+  color: #000000;
+}
+
+.btnAuth:hover {
+  background-color: #858585;
+  color: #000000;
+}
+
+.buttonAuthContainer {
+  gap: 10px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  flex-direction: row;
+}

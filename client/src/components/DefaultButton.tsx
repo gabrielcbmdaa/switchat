@@ -1,0 +1,32 @@
+import styles from './DefaultButton.module.css';
+
+interface DefaultButtonProps {
+  onClick: () => void;
+  disabled?: boolean;
+  className?: string;
+  size?: number;     // Button size (width and height)
+  iconSize?: number; // SVG Icon size (width and height)
+  iconId?: string;   // custom icon ID, e.g. "icon-pencil"
+}
+
+export default function DefaultButton({
+  onClick,
+  disabled,
+  className = '',
+  size = 30,
+  iconSize = 22,
+  iconId = 'icon-confirm'
+}: DefaultButtonProps) {
+  return (
+    <button
+      className={`${styles.defaultButton} ${className}`}
+      onClick={onClick}
+      disabled={disabled}
+      style={{ width: size, height: size }}
+    >
+      <svg width={iconSize} height={iconSize} viewBox="0 0 24 24">
+        <use xlinkHref={`#${iconId}`} />
+      </svg>
+    </button>
+  );
+}

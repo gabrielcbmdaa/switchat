@@ -1,0 +1,44 @@
+#text {
+  overflow-x: hidden;
+}
+
+.sidebarContainer {
+  display: flex;
+  width: 100%;
+  height: 100%;
+  flex-direction: column;
+  overflow-y: auto;
+  padding: 10px;
+}
+
+.chatBtn {
+  display: flex;
+  align-items: center;
+  background-color: #191919;
+  color: #858585;
+  border: none;
+  padding: 4px;
+  border-radius: 20px;
+  font-size: 14px;
+  transition: background 0.5s;
+  text-align: start;
+  overflow-x: hidden;
+  white-space: nowrap;
+}
+
+.chatBtn:hover {
+  background-color: #858585;
+  color: #000000;
+  border: none;
+  padding: 4px;
+  border-radius: 30px;
+  transition: background 0.5s;
+}
+
+.point {
+  background-color: #858585;
+  min-width: 16px;
+  min-height: 16px;
+  margin-right: 4px;
+  border-radius: 100%;
+}

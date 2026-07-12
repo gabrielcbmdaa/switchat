@@ -1,0 +1,72 @@
+.messageWrapper {
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+    position: relative;
+}
+
+.userWrapper {
+    align-items: flex-end;
+}
+
+.geminiWrapper {
+    align-items: flex-start;
+}
+
+.messageBubble {
+    background-color: transparent;
+    color: #858585;
+    padding: 10px;
+    border-radius: 20px;
+    line-height: 1.5;
+    font-size: 14px;
+    word-break: break-word;
+    white-space: pre-wrap;
+}
+
+
+.messageBubble ol,
+.messageBubble ul {
+    padding-left: 1.5rem;
+}
+
+.userBubble {
+    max-width: 85%;
+}
+
+.geminiBubble {
+    max-width: 100%;
+}
+
+.messageActions {
+    display: flex;
+    flex-direction: row;
+    gap: 4px;
+    padding: 2px 4px;
+    opacity: 0;
+    transition: opacity 0.2s ease-in-out;
+}
+
+.messageWrapper:hover .messageActions {
+    opacity: 1;
+}
+
+.actionButton {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    background-color: transparent;
+    border: none;
+    border-radius: 20px;
+    color: #858585;
+    width: 28px;
+    height: 28px;
+    padding: 0;
+    cursor: pointer;
+    transition: background-color 0.2s ease, color 0.2s ease;
+}
+
+.actionButton:hover {
+    background-color: #858585;
+    color: #191919;
+}

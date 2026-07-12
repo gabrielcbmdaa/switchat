@@ -1,0 +1,13 @@
+{
+  "name": "switchat",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "start": "pnpm --filter server start",
+    "dev:client": "pnpm --filter client dev",
+    "dev:server": "pnpm --filter server start",
+    "dev": "pnpm --filter client --filter server --parallel dev",
+    "build": "pnpm --filter client build",
+    "lint": "pnpm --filter client lint"
+  }
+}

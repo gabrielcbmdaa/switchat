@@ -1,0 +1,290 @@
+.settingsViewContainer {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    flex-direction: column;
+    gap: 10px;
+    padding: 10px;
+}
+
+/* CHAGE TITLE SECTION */
+.changeTitleSection {
+    width: 100%;
+    display: flex;
+    justify-content: left;
+    align-items: center;
+    gap: 10px;
+}
+
+/* MODEL SECTION */
+.modelSection {
+    width: 100%;
+    display: flex;
+    justify-content: left;
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.providerContainer {
+    width: 100%;
+    display: flex;
+    justify-content: left;
+    align-items: center;
+    gap: 10px;
+    position: relative;
+    flex-wrap: wrap;
+}
+
+.apiKeyContainer {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: left;
+    gap: 10px;
+}
+
+.modelContainer {
+    width: 100%;
+    display: flex;
+    justify-content: left;
+    align-items: center;
+    gap: 10px;
+    position: relative;
+    flex-wrap: wrap;
+}
+
+.profileContainer {
+    width: 100%;
+    display: flex;
+    justify-content: left;
+    align-items: center;
+    gap: 10px;
+}
+
+.columnContainer {
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+    gap: 10px;
+}
+
+/* OTHERS */
+.modelSelect {
+    flex: 1;
+    border-radius: 20px;
+    background-color: transparent;
+    color: #858585;
+    border: 1px solid #858585;
+    height: 30px;
+    padding-left: 10px;
+    padding-right: 10px;
+    outline: none;
+}
+
+.btnModelSaveConfig {
+    background-color: transparent;
+    color: #858585;
+    border: 1px solid transparent;
+    width: 200px;
+    height: 30px;
+    padding: 5px;
+    border-radius: 20px;
+    transition: background 0.5s;
+    cursor: pointer;
+}
+
+.btnModelSaveConfig:hover {
+    background-color: #858585;
+    color: #000000;
+}
+
+/* COMBOBOX STYLES */
+.comboboxWrapper {
+    position: relative;
+    flex: 1;
+    display: flex;
+    align-items: center;
+}
+
+.comboboxWrapper input {
+    padding-right: 30px;
+    width: 100%;
+}
+
+.dropdownToggle {
+    position: absolute;
+    right: 10px;
+    background: none;
+    border: none;
+    color: #858585;
+    font-size: 10px;
+    cursor: pointer;
+    padding: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+    user-select: none;
+    transition: color 0.2s ease;
+}
+
+.dropdownToggle:hover {
+    color: #ffffff;
+}
+
+.dropdownList {
+    position: relative;
+    width: 100%;
+    max-height: 180px;
+    overflow-y: auto;
+    background-color: #191919;
+    border: 1px solid #858585;
+    border-radius: 20px;
+    padding: 6px 0;
+}
+
+.dropdownItem {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    cursor: pointer;
+}
+
+.modelName {
+    background-color: #191919;
+    display: flex;
+    flex: 1;
+    color: #858585;
+    font-size: 13px;
+    white-space: nowrap;
+    height: 30px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    align-items: center;
+    padding-left: 12px;
+    border-radius: 20px;
+    margin-left: 6px;
+}
+
+.modelName:hover {
+    background-color: #858585;
+    color: #191919;
+}
+
+.deleteModelBtn {
+    height: 30px;
+    width: 30px;
+    background-color: #191919;
+    border: none;
+    color: #858585;
+    font-size: 10px;
+    cursor: pointer;
+    margin-right: 6px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 20px;
+    transition: all 0.2s ease;
+}
+
+.deleteModelBtn:hover {
+    color: #191919;
+    background-color: #858585;
+}
+
+.noMatches {
+    display: flex;
+    height: 30px;
+    color: #858585;
+    font-size: 14px;
+    justify-content: center;
+    align-items: center;
+    font-style: italic;
+}
+
+.configLabel {
+    font-size: 14px;
+    font-weight: 500;
+    color: #858585;
+    user-select: none;
+}
+
+.reasoningContainer {
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+    gap: 12px;
+    margin-top: 15px;
+}
+
+.reasoningHeader {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    width: 100%;
+}
+
+.reasoningValueLabel {
+    font-size: 14px;
+    font-weight: 500;
+    width: 80px;
+    text-align: center;
+    color: #858585;
+    background-color: #191919;
+    padding: 3px 10px;
+    border-radius: 20px;
+    border: 1px solid #858585;
+    transition: all 0.2s ease;
+}
+
+.sliderWrapper {
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.reasoningSlider {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 100%;
+    height: 6px;
+    border-radius: 3px;
+    background: #858585;
+    outline: none;
+    cursor: pointer;
+    margin: 10px 0;
+    transition: background 0.2s ease;
+}
+
+.reasoningSlider::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    background: #191919;
+    border: 2px solid #858585;
+    cursor: pointer;
+    transition: transform 0.15s ease, background-color 0.15s ease, border-color 0.15s ease;
+}
+
+.reasoningSlider::-webkit-slider-thumb:active {
+    transform: scale(1.1);
+}
+
+.reasoningSlider::-moz-range-thumb {
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    background: #191919;
+    border: 2px solid #858585;
+    cursor: pointer;
+    transition: transform 0.15s ease, background-color 0.15s ease, border-color 0.15s ease;
+}
+
+.reasoningSlider::-moz-range-thumb:active {
+    transform: scale(1.1);
+}
