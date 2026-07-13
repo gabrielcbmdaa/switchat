@@ -23,7 +23,7 @@ export default function SettingView({ currentTitle, onRenameChat, currentModel, 
     const [apiKey, setApiKey] = useState(localStorage.getItem('geminiApiKey') || '');
     const [reasoningLevel, setReasoningLevel] = useState<number>(() => {
         const stored = localStorage.getItem('reasoningLevel');
-        const index = REASONING_LEVELS.indexOf(stored as any);
+        const index = REASONING_LEVELS.indexOf(stored as typeof REASONING_LEVELS[number]);
         return index !== -1 ? index : 0;
     });
 

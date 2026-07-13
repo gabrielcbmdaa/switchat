@@ -4,6 +4,25 @@ export function initResizer() {
 
     if (!resizer || !sidebarSection) return;
 
+    // Restaurar ancho guardado en localStorage si existe, validando los límites
+    const savedWidthStr = localStorage.getItem('sidebarWidth');
+    if (savedWidthStr) {
+        let savedWidth = parseInt(savedWidthStr, 10);
+        if (!isNaN(savedWidth)) {
+            const MIN_WIDTH = 300;
+            const MESSAGE_MIN_WIDTH = 400;
+            const resizerWidth = resizer.getBoundingClientRect().width || 3;
+            const MAX_WIDTH = window.innerWidth - MESSAGE_MIN_WIDTH - resizerWidth;
+
+            if (savedWidth < MIN_WIDTH) {
+                savedWidth = MIN_WIDTH;
+            } else if (savedWidth > MAX_WIDTH) {
+                savedWidth = MAX_WIDTH;
+            }
+            sidebarSection.style.width = `${savedWidth}px`;
+        }
+    }
+
     let xCoordinate = 0;
     let sidebarWidth = 0;
 
@@ -37,6 +56,10 @@ export function initResizer() {
     const mouseUpHandler = function () {
         document.removeEventListener('mousemove', mouseMoveHandler);
         document.removeEventListener('mouseup', mouseUpHandler);
+
+        // Guardar el ancho final en localStorage
+        const finalWidth = sidebarSection.getBoundingClientRect().width;
+        localStorage.setItem('sidebarWidth', `${finalWidth}`);
     };
 
     resizer.addEventListener('mousedown', function (e: MouseEvent) {
