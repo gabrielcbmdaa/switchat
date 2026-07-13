@@ -1,0 +1,35 @@
+name: Auto Deploy
+
+# When this script is triggered
+on:
+  push:
+    branches:
+      - main 
+
+# What actions is going to execute
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Run upgrade commands on the VPS via SSH
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          script: |
+            # 1. Enter in the root project folder
+            cd ~/switchat
+            
+            # 2. Code Update
+            git pull origin main
+            
+            #3. Install dependencies
+            pnpm install
+
+            #4. Build the project
+            pnpm build
+            
+            #5. Restart PM2 to apply changes
+            pm2 restart switchat
