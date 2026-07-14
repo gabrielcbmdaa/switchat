@@ -165,7 +165,6 @@ export async function fetchGeminiText(chatId: string, messagesHistory: Message[]
                 }
                 break;
             case 'google':
-            case 'gemini':
                 apiUrl = 'https://generativelanguage.googleapis.com/v1beta/openai/chat/completions';
                 apiKey = localStorage.getItem('geminiApiKey') || '';
                 if (!apiKey) {
@@ -179,6 +178,13 @@ export async function fetchGeminiText(chatId: string, messagesHistory: Message[]
             case 'ollama':
                 apiUrl = 'http://127.0.0.1:11434/v1/chat/completions';
                 apiKey = "ollama-key"; // Key dummy requerida por la especificación de OpenAI
+                break;
+            case 'anthropic':
+                apiUrl = 'https://api.anthropic.com/v1/chat/completions';
+                apiKey = localStorage.getItem('anthropicApiKey') || '';
+                if (!apiKey) {
+                    throw new Error("⚠️ Por favor, ve al menú **Config** y guarda tu Anthropic API Key para poder chatear.");
+                }
                 break;
             default:
                 throw new Error(`⚠️ El proveedor de IA "${providerLowerCase}" no está soportado.`);

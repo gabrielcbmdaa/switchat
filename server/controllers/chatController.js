@@ -37,7 +37,6 @@ exports.createMessage = async (req, res) => {
                 }
                 break;
             case 'google':
-            case 'gemini':
                 apiUrl = 'https://generativelanguage.googleapis.com/v1beta/openai/chat/completions';
                 apiKey = process.env.GOOGLE_API_KEY;
                 if (!apiKey) {
@@ -51,6 +50,13 @@ exports.createMessage = async (req, res) => {
             case 'ollama':
                 apiUrl = 'http://127.0.0.1:11434/v1/chat/completions';
                 apiKey = "ollama-key"; // Key dummy requerida por la especificación de OpenAI
+                break;
+            case 'anthropic':
+                apiUrl = 'https://api.anthropic.com/v1/chat/completions';
+                apiKey = process.env.ANTHROPIC_API_KEY;
+                if (!apiKey) {
+                    throw new Error("⚠️ API Key de Anthropic no fue encontrada.");
+                }
                 break;
             default:
                 throw new Error(`⚠️ El proveedor de IA "${providerLowerCase}" no está soportado.`);

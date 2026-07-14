@@ -5,8 +5,8 @@ import DefaultButton from "../components/DefaultButton";
 import { getLiveModels } from "../services/api";
 
 
-const REASONING_LEVELS = ['off', 'low', 'medium', 'high'] as const;
-const REASONING_LABELS = ['Off', 'Low', 'Medium', 'High'];
+const REASONING_LEVELS = ['0%', '20%', '40%', '60%', '80%', '100%'] as const;
+const REASONING_LABELS = ['0%', '20%', '40%', '60%', '80%', '100%'];
 
 interface SettingViewProps {
     currentTitle: string;
@@ -330,7 +330,7 @@ export default function SettingView({ currentTitle, onRenameChat, currentModel, 
                         id="reasoningInput"
                         type="range"
                         min="0"
-                        max="3"
+                        max="5"
                         step="1"
                         value={reasoningLevel}
                         onChange={(e) => handleReasoningChange(Number(e.target.value))}
