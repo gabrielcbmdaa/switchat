@@ -3,10 +3,7 @@ import styles from './SettingsView.module.css'
 import DefaultInput from "../components/DefaultInput";
 import DefaultButton from "../components/DefaultButton";
 import { getLiveModels } from "../services/api";
-
-
-const REASONING_LEVELS = ['0%', '20%', '40%', '60%', '80%', '100%'] as const;
-const REASONING_LABELS = ['0%', '20%', '40%', '60%', '80%', '100%'];
+import { getModelConfig } from "../config/models.config";
 
 interface SettingViewProps {
     currentTitle: string;
@@ -21,15 +18,36 @@ export default function SettingView({ currentTitle, onRenameChat, currentModel, 
     const [title, setTitle] = useState(currentTitle);
     const [prevTitle, setPrevTitle] = useState(currentTitle);
     const [apiKey, setApiKey] = useState(localStorage.getItem('geminiApiKey') || '');
+    // 1. Derivamos los niveles directamente del modelo actual (Estado Derivado)
+    const config = getModelConfig(currentModel);
+    const thinkingLevels = config ? ['off', ...config.thinkingLevels] : [];
+
+    const [prevModel, setPrevModel] = useState(currentModel);
     const [reasoningLevel, setReasoningLevel] = useState<number>(() => {
         const stored = localStorage.getItem('reasoningLevel');
-        const index = REASONING_LEVELS.indexOf(stored as typeof REASONING_LEVELS[number]);
-        return index !== -1 ? index : 0;
+        if (stored && thinkingLevels.includes(stored)) {
+            return thinkingLevels.indexOf(stored);
+        }
+        return 0;
     });
+
+    // 2. Si el modelo cambia, ajustamos el reasoningLevel durante el render (evita cascada de useEffect)
+    if (currentModel !== prevModel) {
+        setPrevModel(currentModel);
+        if (thinkingLevels.length > 0) {
+            const stored = localStorage.getItem('reasoningLevel');
+            if (stored && thinkingLevels.includes(stored)) {
+                setReasoningLevel(thinkingLevels.indexOf(stored));
+            } else {
+                setReasoningLevel(0);
+                localStorage.setItem('reasoningLevel', thinkingLevels[0]);
+            }
+        }
+    }
 
     const handleReasoningChange = (val: number) => {
         setReasoningLevel(val);
-        localStorage.setItem('reasoningLevel', REASONING_LEVELS[val]);
+        localStorage.setItem('reasoningLevel', thinkingLevels[val]);
     };
 
     const [savedModels, setSavedModels] = useState<string[]>(() => {
@@ -318,25 +336,27 @@ export default function SettingView({ currentTitle, onRenameChat, currentModel, 
                         onClick={handleConfirmApiKey}
                     />
                 </div>
-                {/* REASONING */}
-                <div className={styles.reasoningContainer}>
-                    <div className={styles.reasoningHeader}>
-                        <label className={styles.configLabel} htmlFor="reasoningInput">Reasoning</label>
-                        <span className={styles.reasoningValueLabel}>
-                            {REASONING_LABELS[reasoningLevel]}
-                        </span>
+                {/* REASONING — Solo se muestra si el modelo soporta thinking */}
+                {thinkingLevels.length > 0 && (
+                    <div className={styles.reasoningContainer}>
+                        <div className={styles.reasoningHeader}>
+                            <label className={styles.configLabel} htmlFor="reasoningInput">Reasoning</label>
+                            <span className={styles.reasoningValueLabel}>
+                                {thinkingLevels[reasoningLevel]}
+                            </span>
+                        </div>
+                        <input
+                            id="reasoningInput"
+                            type="range"
+                            min="0"
+                            max={thinkingLevels.length - 1}
+                            step="1"
+                            value={reasoningLevel}
+                            onChange={(e) => handleReasoningChange(Number(e.target.value))}
+                            className={styles.reasoningSlider}
+                        />
                     </div>
-                    <input
-                        id="reasoningInput"
-                        type="range"
-                        min="0"
-                        max="5"
-                        step="1"
-                        value={reasoningLevel}
-                        onChange={(e) => handleReasoningChange(Number(e.target.value))}
-                        className={styles.reasoningSlider}
-                    />
-                </div>
+                )}
             </div>
         </div>
     );
