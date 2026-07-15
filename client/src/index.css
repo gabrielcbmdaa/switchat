@@ -1,12 +1,19 @@
+/* GLOBAL STYLES */
 * {
   box-sizing: border-box;
   margin: 0;
   padding: 0;
   font-family: 'Space Grotesk', sans-serif;
   font-size: 14px;
-
 }
 
+
+::selection {
+  background-color: #858585;
+  color: #191919;
+}
+
+/* APP CONTAINER STYLES */
 #root {
   height: 100vh;
   width: 100vw;
@@ -48,15 +55,13 @@ body {
   height: 100%;
 }
 
+/* RESIZER STYLES */
 .resizer {
   width: 3px;
-  /* El grosor del área donde puedes hacer clic */
   min-width: 3px;
   border: none;
   cursor: col-resize;
-  /* Cambia el cursor a las flechas de cambio de tamaño */
   border-left: 1px solid #858585;
-  /* Un gris oscuro para que combine */
   transition: background-color 0.5s;
 }
 
@@ -64,38 +69,28 @@ body {
   background-color: #858585;
 }
 
-/* --- SCROLLBAR MINIMALISTA GLOBAL --- */
-
-/* Para Firefox */
+/* SCROLLBAR STYLE */
 * {
   scrollbar-width: thin;
   scrollbar-color: #858585 transparent;
 }
 
-/* Para navegadores basados en Webkit (Chrome, Safari, Edge) */
 ::-webkit-scrollbar {
   width: 6px;
-  /* Ancho de la barra vertical */
+
   height: 6px;
-  /* Alto de la barra horizontal */
 }
 
-/* El fondo por donde corre la barra */
 ::-webkit-scrollbar-track {
   background: transparent;
 }
 
-/* El botoncito que arrastras */
 ::-webkit-scrollbar-thumb {
   background: #858585;
-  /* Gris suave semi-transparente */
   border-radius: 10px;
-  /* Bordes totalmente redondeados */
   transition: background 0.3s ease;
 }
 
-/* Cuando pasas el mouse por encima del botoncito */
 ::-webkit-scrollbar-thumb:hover {
   background: #858585;
-  /* Se oscurece ligeramente */
 }
