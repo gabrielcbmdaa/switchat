@@ -45,22 +45,23 @@
    ```bash
    pnpm install
    ```
-4. Create a `.env` file in the root of the `server/` folder using the following format:
-   ```env
-   PORT=3000
-   MONGO_URI=your_mongodb_connection_string
-   JWT_SECRET=your_secret_word_for_signing_tokens
-   GOOGLE_API_KEY=your_google_ai_studio_api_key  # (Optional, for server-side requests)
-   OPENAI_API_KEY=your_openai_api_key            # (Optional, for server-side requests)
+4. Go to server folder:
+   ```bash
+   cd server
    ```
-5. Start and use:
+5. Create your environment file:
+   ```bash
+   cp .env.example .env
+   ```
+   *Open .env and configure it with your variables*
+6. Start and use:
    ```bash
    pnpm start
    ```
    The server will run on `http://localhost:3000`.
    Go to `http://localhost:3000/` in your browser to use the application.
 
-6. Start to develop:
+7. Start to develop:
    ```bash
    pnpm dev
    ```
@@ -157,3 +158,7 @@ graph TD
 ```
 
 ---
+
+## 📄 License
+
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
