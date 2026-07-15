@@ -15,3 +15,10 @@ export interface Chat {
   draft: string;
   messages: Message[];
 }
+
+export interface GeminiModel {
+  name: string;
+  displayName?: string;
+  supportedGenerationMethods: string[];
+  thinking?: boolean;
+}

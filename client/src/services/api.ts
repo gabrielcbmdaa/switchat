@@ -1,4 +1,4 @@
-import type { Chat, Message } from "../types";
+import type { Chat, Message, GeminiModel } from "../types";
 
 export const API_BACKEND_URL = '/api';
 
@@ -246,14 +246,9 @@ export async function loginOrRegister(email: string, password: string, isSignUp:
     return await response.json(); // Retorna el token o el mensaje de éxito
 }
 
-interface GeminiModel {
-    name: string;
-    displayName?: string;
-    supportedGenerationMethods: string[];
-}
 
 // 2. Cliente de Modelos de Google
-export async function getLiveModels(apiKey: string): Promise<{ value: string; label: string }[]> {
+export async function getLiveModels(apiKey: string): Promise<{ value: string; label: string; thinking?: boolean }[]> {
     const modelsAskUrl = `https://generativelanguage.googleapis.com/v1beta/models?key=${apiKey}`;
     const response = await fetch(modelsAskUrl);
 
@@ -267,6 +262,7 @@ export async function getLiveModels(apiKey: string): Promise<{ value: string; la
         .filter(m => m.supportedGenerationMethods.includes('generateContent'))
         .map(m => ({
             value: m.name.replace('models/', ''),
-            label: m.displayName || m.name.replace('models/', '')
+            label: m.displayName || m.name.replace('models/', ''),
+            thinking: m.thinking
         }));
 }

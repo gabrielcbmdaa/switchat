@@ -19,8 +19,19 @@ export default function SettingView({ currentTitle, onRenameChat, currentModel, 
     const [prevTitle, setPrevTitle] = useState(currentTitle);
     const [apiKey, setApiKey] = useState(localStorage.getItem('geminiApiKey') || '');
     // 1. Derivamos los niveles directamente del modelo actual (Estado Derivado)
+    // Usamos la tabla estática y agregamos fallback dinámico para modelos de la API
     const config = getModelConfig(currentModel);
-    const thinkingLevels = config ? ['off', ...config.thinkingLevels] : [];
+    let thinkingLevels: string[] = [];
+
+    if (config) {
+        thinkingLevels = ['off', ...config.thinkingLevels];
+    } else {
+        const apiThinkingModels = JSON.parse(localStorage.getItem('apiThinkingModels') || '[]');
+        if (apiThinkingModels.includes(currentModel.toLowerCase())) {
+            // Nivel genérico para modelos dinámicos que reportan soporte de thinking
+            thinkingLevels = ['off', 'low', 'medium', 'high'];
+        }
+    }
 
     const [prevModel, setPrevModel] = useState(currentModel);
     const [reasoningLevel, setReasoningLevel] = useState<number>(() => {
@@ -113,6 +124,12 @@ export default function SettingView({ currentTitle, onRenameChat, currentModel, 
             if (liveModels.length > 0) {
                 const firstModel = liveModels[0].value;
                 onModelChange(firstModel);
+
+                // Guardar la lista de modelos de la API que soportan thinking
+                const thinkingModelNames = liveModels
+                    .filter(m => m.thinking === true)
+                    .map(m => m.value.toLowerCase());
+                localStorage.setItem('apiThinkingModels', JSON.stringify(thinkingModelNames));
 
                 // Mezclar los modelos obtenidos en la lista local de modelos guardados
                 setSavedModels(prev => {
