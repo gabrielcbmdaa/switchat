@@ -1,4 +1,4 @@
-import type { Chat, Message, GeminiModel } from "../types";
+import type { Chat, Message, GeminiModel, ChatCompletionRequest } from "../types";
 
 export const API_BACKEND_URL = '/api';
 
@@ -127,7 +127,8 @@ export async function fetchChatResponse(chatId: string, messagesHistory: Message
                 content: messagesHistory[messagesHistory.length - 1].parts[0].text,
                 messages: messagesHistory,
                 model: modelLowerCase,
-                provider: providerLowerCase
+                provider: providerLowerCase,
+                reasoningLevel
             })
         });
 
@@ -206,7 +207,7 @@ export async function fetchChatResponse(chatId: string, messagesHistory: Message
             };
         });
 
-        const requestBody: any = {
+        const requestBody: ChatCompletionRequest = {
             model: modelLowerCase,
             messages: formattedMessages
         };

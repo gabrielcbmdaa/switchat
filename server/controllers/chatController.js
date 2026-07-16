@@ -5,7 +5,7 @@ exports.createMessage = async (req, res) => {
     try {
         // 1. Extraemos los datos que vienen del frontend
         const { chatId } = req.params;
-        const { content, messages, model, provider } = req.body;
+        const { content, messages, model, provider, reasoningLevel } = req.body;
 
         // Validación rápida
         if (!content || content.trim() === '') {
@@ -77,16 +77,24 @@ exports.createMessage = async (req, res) => {
             };
         });
 
+        const requestBody = {
+            model: modelLowerCase,
+            messages: formattedMessages
+        };
+        if (providerLowerCase === 'google' && reasoningLevel && reasoningLevel !== 'off') {
+            // OpenAI compatible layer accepts "low", "medium", "high"
+            // We map 'minimal' to 'low' to match the API specification
+            const effort = reasoningLevel === 'minimal' ? 'low' : reasoningLevel;
+            requestBody.reasoning_effort = effort;
+        }
+
         const response = await fetch(apiUrl, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
                 'Authorization': `Bearer ${apiKey}`
             },
-            body: JSON.stringify({
-                model: modelLowerCase,
-                messages: formattedMessages
-            })
+            body: JSON.stringify(requestBody)
         });
 
         // 5. MANEJO ROBUSTO DE ERRORES DE LA API DEL PROVEEDOR
