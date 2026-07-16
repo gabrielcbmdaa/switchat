@@ -11,7 +11,7 @@
   padding: 10px;
 }
 
-.chatBtn {
+.chatButton {
   display: flex;
   align-items: center;
   background-color: #191919;
@@ -20,19 +20,23 @@
   padding: 4px;
   border-radius: 20px;
   font-size: 14px;
-  transition: background 0.5s;
   text-align: start;
   overflow-x: hidden;
   white-space: nowrap;
+  cursor: pointer;
 }
 
-.chatBtn:hover {
+/* Fix hover effect: when hover over the button (not inside the button) */
+.chatButton:hover:not(:has(.buttonContainer:hover)) {
   background-color: #858585;
   color: #000000;
   border: none;
   padding: 4px;
   border-radius: 30px;
-  transition: background 0.5s;
+}
+
+.chatButton:hover .buttonContainer {
+  opacity: 1;
 }
 
 .point {
@@ -41,4 +45,26 @@
   min-height: 16px;
   margin-right: 4px;
   border-radius: 100%;
+}
+
+button.optionsButton {
+  border-radius: 100%;
+  color: #191919;
+  background-color: #858585;
+  border: none;
+}
+
+.buttonContainer {
+  display: flex;
+  flex-direction: row;
+  margin-left: auto;
+  gap: 2px;
+  opacity: 0;
+
+}
+
+button.optionsButton:hover {
+  color: #191919;
+  border: none;
+  background-color: #858585;
 }

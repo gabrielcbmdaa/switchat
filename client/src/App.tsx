@@ -274,14 +274,16 @@ export default function App() {
     }
   }
 
-  function handleDeleteChat() {
-    if (!activeChatId) return;
-    const updatedChats = chatList.filter(chat => chat.id !== activeChatId);
-    const newActiveId = updatedChats.length > 0 ? updatedChats[0].id : '';
+  function handleDeleteChat(chatId: string) {
+    if (!chatId) return;
+    const updatedChats = chatList.filter(chat => chat.id !== chatId);
+    const newActiveId = chatId === activeChatId
+      ? (updatedChats.length > 0 ? updatedChats[0].id : '')
+      : activeChatId;
     setChatList(updatedChats);
     setActiveChatId(newActiveId);
     saveToLocalDisk(updatedChats, newActiveId);
-    deleteChatFromServer(activeChatId, token);
+    deleteChatFromServer(chatId, token);
   }
 
   function handleDeleteMessage(messageIndex: number) {
@@ -360,6 +362,7 @@ export default function App() {
             activeChatId={activeChatId}
             onChatClick={handleSelectChat}
             onCreateNewChat={handleCreateNewChat}
+            onDeleteChat={handleDeleteChat}
           />
         );
       default:
@@ -378,7 +381,6 @@ export default function App() {
           {renderMainContent()}
           <Toolbar
             onNavChats={() => setCurrentView('chats')}
-            onDeleteChat={handleDeleteChat}
             onNavConfig={() => setCurrentView('settings')}
             onNavAccount={() => setCurrentView('account')}
           />

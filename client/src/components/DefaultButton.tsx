@@ -1,7 +1,8 @@
+import React from 'react';
 import styles from './DefaultButton.module.css';
 
 interface DefaultButtonProps {
-  onClick: () => void;
+  onClick: (e: React.MouseEvent<HTMLButtonElement>) => void;
   disabled?: boolean;
   className?: string;
   size?: number;     // Button size (width and height)
