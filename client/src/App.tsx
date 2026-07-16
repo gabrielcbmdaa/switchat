@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import type { Chat, Message } from './types';
 import { loadLocalChats, loadLocalActiveChatId, saveToLocalDisk, getTutorialChat } from './utils/storage';
-import { loadChatsFromServer, fetchGeminiText, saveChatToServer, syncChatDraftToServer, deleteChatFromServer, deleteMessageFromServer, fetchChatMessagesFromServer } from './services/api';
+import { loadChatsFromServer, fetchChatResponse, saveChatToServer, syncChatDraftToServer, deleteChatFromServer, deleteMessageFromServer, fetchChatMessagesFromServer } from './services/api';
 import Sidebar from './components/Sidebar';
 import { SvgIcons } from './components/SvgIcons';
 import { initResizer } from './utils/resizer';
@@ -243,7 +243,7 @@ export default function App() {
     // 4. Llamamos a la API
     try {
       // Le pasamos los mensajes originales (sin el "pensando") a la API
-      const response = await fetchGeminiText(activeChatId, [...currentChat.messages, userMessage], model, token, provider);
+      const response = await fetchChatResponse(activeChatId, [...currentChat.messages, userMessage], model, token, provider);
 
       // Reemplazamos el mensaje "pensando" por la respuesta real, incluyendo los _id de MongoDB
       updatedMessages = [

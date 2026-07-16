@@ -109,9 +109,10 @@ export async function syncChatDraftToServer(chat: Chat, token: string | null) {
     }
 }
 
-export async function fetchGeminiText(chatId: string, messagesHistory: Message[], model: string, token: string | null, provider: string): Promise<{ text: string, userMessageId?: string, aiMessageId?: string }> {
+export async function fetchChatResponse(chatId: string, messagesHistory: Message[], model: string, token: string | null, provider: string): Promise<{ text: string, userMessageId?: string, aiMessageId?: string }> {
     const modelLowerCase = model.toLowerCase();
     const providerLowerCase = provider.toLowerCase();
+    const reasoningLevel = localStorage.getItem('reasoningLevel') || 'off';
     // ==========================================
     // RUTA A: CON SERVIDOR (USUARIO AUTENTICADO)
     // ==========================================
@@ -205,16 +206,27 @@ export async function fetchGeminiText(chatId: string, messagesHistory: Message[]
             };
         });
 
+        const requestBody: any = {
+            model: modelLowerCase,
+            messages: formattedMessages
+        };
+
+        if (providerLowerCase === 'google') {
+            if (reasoningLevel !== 'off') {
+                // OpenAI y su compatibilidad soporta "low", "medium", "high".
+                // Mapeamos 'minimal' a 'low' para cumplir con la especificación de la API.
+                const effort = reasoningLevel === 'minimal' ? 'low' : reasoningLevel;
+                requestBody.reasoning_effort = effort;
+            }
+        }
+
         const response = await fetch(apiUrl, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
                 'Authorization': `Bearer ${apiKey}`
             },
-            body: JSON.stringify({
-                model: modelLowerCase,
-                messages: formattedMessages
-            })
+            body: JSON.stringify(requestBody)
         });
 
         if (!response.ok) {
