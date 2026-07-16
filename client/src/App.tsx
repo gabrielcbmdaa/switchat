@@ -308,23 +308,23 @@ export default function App() {
     }
   }
 
-  function handleRenameChat(newTitle: string) {
-    if (!activeChatId) return;
+  function handleReTitleChat(chatId: string, newTitle: string) {
     const trimmedTitle = newTitle.trim();
     if (!trimmedTitle) return;
-    if (currentChat?.title === trimmedTitle) return;
+    const targetChat = chatList.find((chat) => chat.id === chatId);
+    if (targetChat?.title === trimmedTitle) return;
     const updatedChats = chatList.map((chat) => {
-      if (chat.id === activeChatId) {
-        return { ...chat, title: newTitle };
+      if (chat.id === chatId) {
+        return { ...chat, title: trimmedTitle };
       }
       return chat;
     });
     setChatList(updatedChats);
     saveToLocalDisk(updatedChats, activeChatId);
-    const renamedChat = updatedChats.find((chat) => chat.id === activeChatId);
+    const retitledChat = updatedChats.find((chat) => chat.id === chatId);
 
-    if (renamedChat && token) {
-      saveChatToServer(renamedChat, token);
+    if (retitledChat && token) {
+      saveChatToServer(retitledChat, token);
     }
   }
 
@@ -341,8 +341,6 @@ export default function App() {
       case 'settings':
         return (
           <SettingView
-            currentTitle={currentChat?.title || ''}
-            onRenameChat={handleRenameChat}
             currentModel={model}
             currentProvider={provider}
             onModelChange={(newModel) => {
@@ -363,6 +361,7 @@ export default function App() {
             onChatClick={handleSelectChat}
             onCreateNewChat={handleCreateNewChat}
             onDeleteChat={handleDeleteChat}
+            onReTitleChat={handleReTitleChat}
           />
         );
       default:

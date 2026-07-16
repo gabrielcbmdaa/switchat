@@ -10,9 +10,10 @@ interface SidebarProps {
     onChatClick: (chatId: string) => void; // Función para cambiar de chat
     onCreateNewChat: () => void;           // Función para crear un chat
     onDeleteChat: (chatId: string) => void; // Función para borrar un chat
+    onReTitleChat: (chatId: string, newTitle: string) => void; // Función para renombrar un chat
 }
 
-export default function Sidebar({ chatList, activeChatId, onChatClick, onCreateNewChat, onDeleteChat }: SidebarProps) {
+export default function Sidebar({ chatList, activeChatId, onChatClick, onCreateNewChat, onDeleteChat, onReTitleChat }: SidebarProps) {
     // Estado para rastrear qué chat está esperando confirmación de borrado
     const [confirmingDeleteId, setConfirmingDeleteId] = useState<string | null>(null);
 
@@ -33,6 +34,19 @@ export default function Sidebar({ chatList, activeChatId, onChatClick, onCreateN
 
         return () => clearTimeout(timer);
     }, [confirmingDeleteId]);
+
+    // Función para confirmar la edición del título
+    const confirmEdit = () => {
+        if (!editingChatId) return;
+
+        const trimmed = editTitle.trim();
+        if (trimmed) {
+            // Solo renombramos si el título no está vacío
+            onReTitleChat(editingChatId, trimmed);
+        }
+        // Siempre salimos del modo edición (si estaba vacío, no se guardó)
+        setEditingChatId(null);
+    };
 
     // La función que decide qué hace el botón de basura
     const handleDeleteClick = (e: React.MouseEvent<HTMLButtonElement>, chatId: string) => {
@@ -68,13 +82,20 @@ export default function Sidebar({ chatList, activeChatId, onChatClick, onCreateN
                     >
                         {/* Si es el activo, dibujamos el puntito usando el operador && */}
                         {isActive && <div className={styles.point}></div>}
-                        {/* Renderizado condicional: si estamos editando este chat, mostramos un input */}
                         {editingChatId === chat.id ? (
                             <input
                                 type="text"
                                 value={editTitle}
                                 onChange={(e) => setEditTitle(e.target.value)}
                                 onClick={(e) => e.stopPropagation()}
+                                onBlur={confirmEdit}
+                                onKeyDown={(e) => {
+                                    if (e.key === 'Enter') {
+                                        confirmEdit();
+                                    } else if (e.key === 'Escape') {
+                                        setEditingChatId(null);
+                                    }
+                                }}
                                 autoFocus
                             />
                         ) : (
@@ -86,8 +107,8 @@ export default function Sidebar({ chatList, activeChatId, onChatClick, onCreateN
                                 onClick={(e) => {
                                     e.stopPropagation();
                                     if (editingChatId === chat.id) {
-                                        // Si estamos editando, confirmamos (por ahora solo salimos del modo edición)
-                                        setEditingChatId(null);
+                                        // Si estamos editando, confirmamos y guardamos el título
+                                        confirmEdit();
                                     } else {
                                         // Si no estamos editando, activamos el modo edición
                                         setEditingChatId(chat.id);

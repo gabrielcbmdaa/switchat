@@ -6,17 +6,13 @@ import { getLiveModels } from "../services/api";
 import { getModelConfig } from "../config/models.config";
 
 interface SettingViewProps {
-    currentTitle: string;
     currentModel: string;
     currentProvider: string;
-    onRenameChat: (newTitle: string) => void;
     onModelChange: (model: string) => void;
     onProviderChange: (provider: string) => void;
 }
 
-export default function SettingView({ currentTitle, onRenameChat, currentModel, currentProvider, onModelChange, onProviderChange }: SettingViewProps) {
-    const [title, setTitle] = useState(currentTitle);
-    const [prevTitle, setPrevTitle] = useState(currentTitle);
+export default function SettingView({ currentModel, currentProvider, onModelChange, onProviderChange }: SettingViewProps) {
     const [apiKey, setApiKey] = useState(localStorage.getItem('geminiApiKey') || '');
     // 1. Derivamos los niveles directamente del modelo actual (Estado Derivado)
     // Usamos la tabla estática y agregamos fallback dinámico para modelos de la API
@@ -107,10 +103,7 @@ export default function SettingView({ currentTitle, onRenameChat, currentModel, 
         };
     }, []);
 
-    if (currentTitle !== prevTitle) {
-        setTitle(currentTitle);
-        setPrevTitle(currentTitle);
-    }
+
 
     // Lógica para buscar modelos en vivo desde la API de Google
     const handleConfirmApiKey = async () => {
@@ -194,22 +187,6 @@ export default function SettingView({ currentTitle, onRenameChat, currentModel, 
 
     return (
         <div className={styles.settingsViewContainer}>
-            {/* CHANGE TITLE SECTION */}
-            <div className={styles.changeTitleSection}>
-                <label htmlFor="titleInput" className={styles.configLabel}>Chat Name</label>
-                <DefaultInput
-                    id="titleInput"
-                    type="text"
-                    maxLength={26}
-                    value={title}
-                    onChange={(e) => setTitle(e.target.value)}
-                    required
-                />
-                <DefaultButton
-                    onClick={() => onRenameChat(title.trim())}
-                    disabled={!title.trim()}
-                />
-            </div>
             {/* MODEL SECTION */}
             <div className={styles.modelSection}>
                 {/* PROVIDER */}
