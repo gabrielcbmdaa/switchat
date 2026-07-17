@@ -84,6 +84,8 @@ export default function Sidebar({ chatList, activeChatId, onChatClick, onCreateN
                         {isActive && <div className={styles.point}></div>}
                         {editingChatId === chat.id ? (
                             <input
+                                id={`edit-chat-${chat.id}`}
+                                name="chatTitle"
                                 type="text"
                                 value={editTitle}
                                 onChange={(e) => setEditTitle(e.target.value)}
@@ -104,6 +106,12 @@ export default function Sidebar({ chatList, activeChatId, onChatClick, onCreateN
                         <div className={styles.buttonContainer}>
                             <DefaultButton
                                 className={styles.optionsButton}
+                                onMouseDown={(e) => {
+                                    if (editingChatId === chat.id) {
+                                        // Previene que el input dispare su onBlur antes de procesar este clic
+                                        e.preventDefault();
+                                    }
+                                }}
                                 onClick={(e) => {
                                     e.stopPropagation();
                                     if (editingChatId === chat.id) {
