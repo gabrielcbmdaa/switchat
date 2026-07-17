@@ -82,27 +82,29 @@ export default function Sidebar({ chatList, activeChatId, onChatClick, onCreateN
                     >
                         {/* Si es el activo, dibujamos el puntito usando el operador && */}
                         {isActive && <div className={styles.point}></div>}
-                        {editingChatId === chat.id ? (
-                            <input
-                                id={`edit-chat-${chat.id}`}
-                                name="chatTitle"
-                                type="text"
-                                value={editTitle}
-                                onChange={(e) => setEditTitle(e.target.value)}
-                                onClick={(e) => e.stopPropagation()}
-                                onBlur={confirmEdit}
-                                onKeyDown={(e) => {
-                                    if (e.key === 'Enter') {
-                                        confirmEdit();
-                                    } else if (e.key === 'Escape') {
-                                        setEditingChatId(null);
-                                    }
-                                }}
-                                autoFocus
-                            />
-                        ) : (
-                            chat.title
-                        )}
+                        <div className={styles.titleContainer}>
+                            {editingChatId === chat.id ? (
+                                <input
+                                    id={`edit-chat-${chat.id}`}
+                                    name="chatTitle"
+                                    type="text"
+                                    value={editTitle}
+                                    onChange={(e) => setEditTitle(e.target.value)}
+                                    onClick={(e) => e.stopPropagation()}
+                                    onBlur={confirmEdit}
+                                    onKeyDown={(e) => {
+                                        if (e.key === 'Enter') {
+                                            confirmEdit();
+                                        } else if (e.key === 'Escape') {
+                                            setEditingChatId(null);
+                                        }
+                                    }}
+                                    autoFocus
+                                />
+                            ) : (
+                                chat.title
+                            )}
+                        </div>
                         <div className={styles.buttonContainer}>
                             <DefaultButton
                                 className={styles.optionsButton}

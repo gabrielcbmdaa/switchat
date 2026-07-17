@@ -60,7 +60,16 @@ button.optionsButton {
   margin-left: auto;
   gap: 2px;
   opacity: 0;
+  flex-shrink: 0;
+}
 
+.titleContainer {
+  flex-grow: 1;
+  flex-shrink: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  margin-right: 8px;
 }
 
 button.optionsButton:hover {
