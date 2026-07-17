@@ -5,31 +5,30 @@ import styles from './AccountView.module.css'
 import DefaultInput from '../components/DefaultInput';
 
 interface ConfigViewProps {
-    token: string | null;
-    onAuthSuccess: (newToken: string) => void;
+    isAuthenticated: boolean;
+    onAuthSuccess: () => void;
     onLogoutAction: () => void;
 }
 
-export default function ConfigView({ token, onAuthSuccess, onLogoutAction }: ConfigViewProps) {
+export default function ConfigView({ isAuthenticated, onAuthSuccess, onLogoutAction }: ConfigViewProps) {
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
     const logoutButtonRef = useRef<HTMLButtonElement>(null);
 
     // Enfocar automáticamente el botón de cerrar sesión cuando se muestra
     useEffect(() => {
-        if (token && logoutButtonRef.current) {
+        if (isAuthenticated && logoutButtonRef.current) {
             logoutButtonRef.current.focus();
         }
-    }, [token]);
+    }, [isAuthenticated]);
 
     const handleAuth = async (isSignUp: boolean) => {
         try {
-            const data = await loginOrRegister(email, password, isSignUp);
+            await loginOrRegister(email, password, isSignUp); // 👈 Ya no guardamos la respuesta en una variable 'data'
             if (isSignUp) {
                 alert("¡Registro exitoso! Ya puedes ingresar.");
-            } else if (data.token) {
-                localStorage.setItem('userToken', data.token);
-                onAuthSuccess(data.token);
+            } else {
+                onAuthSuccess();
             }
         } catch (err: unknown) {
             const errorMessage = err instanceof Error ? err.message : String(err);
@@ -40,7 +39,7 @@ export default function ConfigView({ token, onAuthSuccess, onLogoutAction }: Con
     return (
         <div className={styles.accountViewContainer}>
             {/* --- SECCIÓN 1: CUENTA --- */}
-            {!token ? (
+            {!isAuthenticated ? (
                 <form
                     className={styles.authForm}
                     onSubmit={(e) => {

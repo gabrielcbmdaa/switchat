@@ -2,16 +2,14 @@ import type { Chat, Message, GeminiModel, ChatCompletionRequest } from "../types
 
 export const API_BACKEND_URL = '/api';
 
-export async function saveChatToServer(updatedChat: Chat, token: string | null) {
-    if (!token) return;
-
+export async function saveChatToServer(updatedChat: Chat) {
     try {
         const response = await fetch(`${API_BACKEND_URL}/chats`, {
             method: 'POST',
             headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${token}`
+                'Content-Type': 'application/json'
             },
+            credentials: 'include', // 👈 Para enviar la cookie de sesión
             body: JSON.stringify(updatedChat)
         });
         return response.ok;
@@ -21,13 +19,11 @@ export async function saveChatToServer(updatedChat: Chat, token: string | null) 
     }
 }
 
-export async function loadChatsFromServer(token: string) {
-    if (!token) return null;
-
+export async function loadChatsFromServer() {
     try {
         const response = await fetch(`${API_BACKEND_URL}/chats`, {
             method: 'GET',
-            headers: { 'Authorization': `Bearer ${token}` }
+            credentials: 'include' // 👈 Para enviar la cookie de sesión
         });
         if (!response.ok) throw new Error('Could not fetch chats');
         return await response.json(); // Retornamos los datos directamente
@@ -38,9 +34,7 @@ export async function loadChatsFromServer(token: string) {
     }
 }
 
-export async function fetchChatMessagesFromServer(chatId: string, token: string | null, limit: number = 6, before?: string) {
-    if (!token) return null;
-
+export async function fetchChatMessagesFromServer(chatId: string, limit: number = 6, before?: string) {
     try {
         let url = `${API_BACKEND_URL}/chats/${chatId}/messages?limit=${limit}`;
         if (before) {
@@ -48,7 +42,7 @@ export async function fetchChatMessagesFromServer(chatId: string, token: string 
         }
         const response = await fetch(url, {
             method: 'GET',
-            headers: { 'Authorization': `Bearer ${token}` }
+            credentials: 'include' // 👈 Para enviar la cookie de sesión
         });
         if (!response.ok) throw new Error('Could not fetch messages');
         return await response.json();
@@ -59,12 +53,11 @@ export async function fetchChatMessagesFromServer(chatId: string, token: string 
     }
 }
 
-export async function deleteChatFromServer(chatId: string, token: string | null) {
-    if (!token) return false;
+export async function deleteChatFromServer(chatId: string) {
     try {
         const response = await fetch(`${API_BACKEND_URL}/chats/${chatId}`, {
             method: 'DELETE',
-            headers: { 'Authorization': `Bearer ${token}` }
+            credentials: 'include' // 👈 Para enviar la cookie de sesión
         });
         return response.ok;
     } catch (error) {
@@ -73,12 +66,11 @@ export async function deleteChatFromServer(chatId: string, token: string | null)
     }
 }
 
-export async function deleteMessageFromServer(chatId: string, messageId: string, token: string | null) {
-    if (!token) return false;
+export async function deleteMessageFromServer(chatId: string, messageId: string) {
     try {
         const response = await fetch(`${API_BACKEND_URL}/chats/${chatId}/messages/${messageId}`, {
             method: 'DELETE',
-            headers: { 'Authorization': `Bearer ${token}` }
+            credentials: 'include' // 👈 Para enviar la cookie de sesión
         });
         return response.ok;
     } catch (error) {
@@ -87,17 +79,16 @@ export async function deleteMessageFromServer(chatId: string, messageId: string,
     }
 }
 
-export async function syncChatDraftToServer(chat: Chat, token: string | null) {
+export async function syncChatDraftToServer(chat: Chat) {
     if (!chat) return false;
-    if (!token) return false;
 
     try {
         const response = await fetch(`${API_BACKEND_URL}/chats`, {
             method: 'POST',
             headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${token}`
+                'Content-Type': 'application/json'
             },
+            credentials: 'include', // 👈 Para enviar la cookie de sesión
             body: JSON.stringify(chat),
             keepalive: true
         });
@@ -109,20 +100,20 @@ export async function syncChatDraftToServer(chat: Chat, token: string | null) {
     }
 }
 
-export async function fetchChatResponse(chatId: string, messagesHistory: Message[], model: string, token: string | null, provider: string): Promise<{ text: string, userMessageId?: string, aiMessageId?: string }> {
+export async function fetchChatResponse(chatId: string, messagesHistory: Message[], model: string, useServer: boolean, provider: string): Promise<{ text: string, userMessageId?: string, aiMessageId?: string }> {
     const modelLowerCase = model.toLowerCase();
     const providerLowerCase = provider.toLowerCase();
     const reasoningLevel = localStorage.getItem('reasoningLevel') || 'off';
     // ==========================================
     // RUTA A: CON SERVIDOR (USUARIO AUTENTICADO)
     // ==========================================
-    if (token) {
+    if (useServer) {
         const response = await fetch(`${API_BACKEND_URL}/chats/${chatId}/messages`, {
             method: 'POST',
             headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${token}`
+                'Content-Type': 'application/json'
             },
+            credentials: 'include', // 👈 Para enviar la cookie de sesión
             body: JSON.stringify({
                 content: messagesHistory[messagesHistory.length - 1].parts[0].text,
                 messages: messagesHistory,
@@ -248,6 +239,7 @@ export async function loginOrRegister(email: string, password: string, isSignUp:
     const response = await fetch(AUTH_URL, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        credentials: 'include', // 👈 Obliga al navegador a aceptar y guardar las cookies del servidor
         body: JSON.stringify({ email, password })
     });
 
@@ -257,6 +249,34 @@ export async function loginOrRegister(email: string, password: string, isSignUp:
     }
 
     return await response.json(); // Retorna el token o el mensaje de éxito
+}
+
+export async function logoutFromServer() {
+    try {
+        const response = await fetch(`${API_BACKEND_URL}/auth/logout`, {
+            method: 'POST',
+            credentials: 'include' // 👈 Para asegurar que limpie la cookie correspondiente
+        });
+        return response.ok;
+    } catch (error) {
+        console.error('❌ Error [logoutFromServer]:', error);
+        return false;
+    }
+}
+
+export async function checkSession(): Promise<boolean> {
+    try {
+        const response = await fetch(`${API_BACKEND_URL}/auth/me`, {
+            method: 'GET',
+            credentials: 'include' // 👈 Envía la cookie para verificarla
+        });
+        if (!response.ok) return false;
+        const data = await response.json();
+        return data.authenticated === true;
+    } catch (error) {
+        console.error('❌ Error [checkSession]:', error);
+        return false;
+    }
 }
 
 

@@ -76,3 +76,19 @@ exports.login = async (req, res) => {
     res.status(500).json({ message: 'Hubo un error en el servidor', error: error.message });
   }
 };
+
+// Limpia la cookie del token en el navegador del usuario
+exports.logout = (req, res) => {
+  res.clearCookie('token', {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: 'strict'
+  });
+  res.status(200).json({ message: 'Sesión cerrada con éxito.' });
+};
+
+// Valida si la sesión sigue activa (el middleware ya comprobó el JWT)
+exports.me = (req, res) => {
+  // Si llegó aquí es porque el token fue válido en el middleware
+  res.status(200).json({ authenticated: true, userId: req.user.id });
+};

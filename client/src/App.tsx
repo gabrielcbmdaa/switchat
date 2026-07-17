@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import type { Chat, Message } from './types';
 import { loadLocalChats, loadLocalActiveChatId, saveToLocalDisk, getTutorialChat } from './utils/storage';
-import { loadChatsFromServer, fetchChatResponse, saveChatToServer, syncChatDraftToServer, deleteChatFromServer, deleteMessageFromServer, fetchChatMessagesFromServer } from './services/api';
+import { loadChatsFromServer, fetchChatResponse, saveChatToServer, syncChatDraftToServer, deleteChatFromServer, deleteMessageFromServer, fetchChatMessagesFromServer, checkSession, logoutFromServer } from './services/api';
 import Sidebar from './components/Sidebar';
 import { SvgIcons } from './components/SvgIcons';
 import { initResizer } from './utils/resizer';
@@ -16,7 +16,7 @@ export default function App() {
   const [currentView, setCurrentView] = useState<'settings' | 'account' | 'chats'>('chats');
   const [hasMoreMap, setHasMoreMap] = useState<Record<string, boolean>>({});
   const currentChat = chatList.find((chat) => chat.id === activeChatId);
-  const [token, setToken] = useState<string | null>(localStorage.getItem('userToken'));
+  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false);
   const [model, setModel] = useState<string>(localStorage.getItem('model') || 'gemini-3.5-flash');
   const [provider, setProvider] = useState<string>(localStorage.getItem('provider') || 'google');
 
@@ -25,63 +25,66 @@ export default function App() {
       initResizer();
       let initialChats = loadLocalChats() || [];
       let initialActiveId = loadLocalActiveChatId() || '';
-      const initialToken = localStorage.getItem('userToken');
 
-      if (initialToken) {
+      // Solo verificamos sesión en el servidor si el usuario se logueó previamente
+      const hasSessionFlag = localStorage.getItem('isLoggedIn') === 'true';
+
+      if (hasSessionFlag) {
         try {
-          const serverChats = await loadChatsFromServer(initialToken);
-          if (serverChats && serverChats.length > 0) {
-            initialChats = serverChats;
-            if (!initialChats.some((chat: Chat) => chat.id === initialActiveId)) {
-              initialActiveId = initialChats[0].id;
+          const sessionActive = await checkSession();
+          if (sessionActive) {
+            setIsAuthenticated(true);
+            
+            const serverChats = await loadChatsFromServer();
+            if (serverChats && serverChats.length > 0) {
+              initialChats = serverChats;
+              if (!initialChats.some((chat: Chat) => chat.id === initialActiveId)) {
+                initialActiveId = initialChats[0].id;
+              }
             }
+          } else {
+            // Si la cookie expiró en el servidor pero la bandera seguía en true, la limpiamos
+            localStorage.removeItem('isLoggedIn');
           }
         } catch (error) {
-          console.error("Error al cargar chats del servidor:", error);
-          // Si falla el servidor, nos quedamos con los locales que ya se cargaron arriba
+          console.error("Error en la carga inicial de sesión o chats del servidor:", error);
         }
-      } else if (initialChats.length === 0) {
-        // Si no hay token y tampoco hay chats locales, metemos el tutorial
+      }
+
+      if (initialChats.length === 0) {
         initialChats = getTutorialChat();
         initialActiveId = 'tutorial-welcome';
         saveToLocalDisk(initialChats, initialActiveId);
       }
 
-      // 2. ¡LE PASAMOS LOS DATOS FINALES A REACT!
       setChatList(initialChats);
       setActiveChatId(initialActiveId);
-      // setCurrentView('chats');
     }
 
-    // 3. Ejecutamos la función de inmediato
     initializeApp();
   }, []);
 
   useEffect(() => {
     const handleBeforeUnload = () => {
-      // Si hay un chat seleccionado y el usuario está logueado, sincronizamos el borrador
-      if (currentChat && token) {
-        syncChatDraftToServer(currentChat, token);
+      if (currentChat && isAuthenticated) {
+        syncChatDraftToServer(currentChat);
       }
     };
 
-    // 1. Enganchamos el evento al navegador
     window.addEventListener('beforeunload', handleBeforeUnload);
 
-    // 2. La función de limpieza (cleanup)
-    // React ejecuta este return automáticamente cuando el componente cambia o muere
     return () => {
       window.removeEventListener('beforeunload', handleBeforeUnload);
     };
-  }, [currentChat, token]);
+  }, [currentChat, isAuthenticated]);
 
   useEffect(() => { // Carga inicial de los últimos 6 mensajes cuando cambia el chat activo
     if (!activeChatId) return;
-    if (!token) return; // En modo offline no hacemos peticiones
+    if (!isAuthenticated) return; // En modo offline no hacemos peticiones
 
     const activeChat = chatList.find(c => c.id === activeChatId);
     if (activeChat && (!activeChat.messages || activeChat.messages.length === 0) && hasMoreMap[activeChatId] !== false) {
-      fetchChatMessagesFromServer(activeChatId, token, 6).then(msgs => {
+      fetchChatMessagesFromServer(activeChatId, 6).then(msgs => {
         if (msgs) {
           setChatList(prevChats => prevChats.map(c => {
             if (c.id === activeChatId) {
@@ -95,10 +98,10 @@ export default function App() {
         }
       });
     }
-  }, [activeChatId, chatList, hasMoreMap, token]);
+  }, [activeChatId, chatList, hasMoreMap, isAuthenticated]);
 
   async function handleLoadMoreMessages(chatId: string) {
-    if (!token) return;
+    if (!isAuthenticated) return;
 
     const chat = chatList.find(c => c.id === chatId);
     if (!chat || !chat.messages || chat.messages.length === 0) return;
@@ -106,7 +109,7 @@ export default function App() {
     const oldestMessage = chat.messages[0];
     const before = oldestMessage.createdAt;
 
-    const newMessages = await fetchChatMessagesFromServer(chatId, token, 6, before);
+    const newMessages = await fetchChatMessagesFromServer(chatId, 6, before);
     if (newMessages) {
       setChatList(prevChats => prevChats.map(c => {
         if (c.id === chatId) {
@@ -143,8 +146,8 @@ export default function App() {
     setCurrentView('chats');
     saveToLocalDisk(chatList, clickedChatId);
     const clickedChat = chatList.find(chat => chat.id === clickedChatId);
-    if (clickedChat) {
-      saveChatToServer(clickedChat, token);
+    if (clickedChat && isAuthenticated) {
+      saveChatToServer(clickedChat);
     }
   }
 
@@ -162,15 +165,16 @@ export default function App() {
     saveToLocalDisk(updatedChats, activeChatId);
   }
 
-  async function handleAuthSuccess(newToken: string) {
+  async function handleAuthSuccess() {
+    localStorage.setItem('isLoggedIn', 'true'); // 👈 Guardamos el indicador de inicio de sesión
     setCurrentView('chats');
-    setToken(newToken);
+    setIsAuthenticated(true);
     setChatList([]);
     setActiveChatId('');
 
     try {
       // 2. Pedimos los datos al servidor
-      const serverChats = await loadChatsFromServer(newToken);
+      const serverChats = await loadChatsFromServer();
 
       if (serverChats && serverChats.length > 0) {
         // Opción A: El usuario ya tenía historial
@@ -196,10 +200,10 @@ export default function App() {
     setCurrentView('chats');
   }
 
-  function resetSessionToDefault() {
-    // 1. Limpiamos el token viejo
-    localStorage.removeItem('userToken');
-    setToken(null);
+  async function resetSessionToDefault() {
+    localStorage.removeItem('isLoggedIn'); // 👈 Limpiamos el indicador al cerrar sesión
+    await logoutFromServer(); // 👈 Llama al backend para limpiar la cookie de sesión
+    setIsAuthenticated(false);
 
     // 2. Preparamos los datos del tutorial
     const tutorialChats = getTutorialChat();
@@ -243,7 +247,7 @@ export default function App() {
     // 4. Llamamos a la API
     try {
       // Le pasamos los mensajes originales (sin el "pensando") a la API
-      const response = await fetchChatResponse(activeChatId, [...currentChat.messages, userMessage], model, token, provider);
+      const response = await fetchChatResponse(activeChatId, [...currentChat.messages, userMessage], model, isAuthenticated, provider);
 
       // Reemplazamos el mensaje "pensando" por la respuesta real, incluyendo los _id de MongoDB
       updatedMessages = [
@@ -283,7 +287,9 @@ export default function App() {
     setChatList(updatedChats);
     setActiveChatId(newActiveId);
     saveToLocalDisk(updatedChats, newActiveId);
-    deleteChatFromServer(chatId, token);
+    if (isAuthenticated) {
+      deleteChatFromServer(chatId);
+    }
   }
 
   function handleDeleteMessage(messageIndex: number) {
@@ -303,8 +309,8 @@ export default function App() {
     saveToLocalDisk(updatedChats, activeChatId);
 
     // 2. Si hay sesión y el mensaje tiene _id, borrarlo del servidor en segundo plano
-    if (token && messageToDelete._id) {
-      deleteMessageFromServer(activeChatId, messageToDelete._id, token);
+    if (isAuthenticated && messageToDelete._id) {
+      deleteMessageFromServer(activeChatId, messageToDelete._id);
     }
   }
 
@@ -323,8 +329,8 @@ export default function App() {
     saveToLocalDisk(updatedChats, activeChatId);
     const retitledChat = updatedChats.find((chat) => chat.id === chatId);
 
-    if (retitledChat && token) {
-      saveChatToServer(retitledChat, token);
+    if (retitledChat && isAuthenticated) {
+      saveChatToServer(retitledChat);
     }
   }
 
@@ -333,7 +339,7 @@ export default function App() {
       case 'account':
         return (
           <AccountView
-            token={token}
+            isAuthenticated={isAuthenticated}
             onAuthSuccess={handleAuthSuccess}
             onLogoutAction={resetSessionToDefault}
           />
@@ -395,7 +401,7 @@ export default function App() {
             hasMoreMap={hasMoreMap}
             onLoadMore={() => handleLoadMoreMessages(activeChatId)}
             onDeleteMessage={handleDeleteMessage}
-            token={token}
+            token={isAuthenticated ? 'active' : null}
             draft={currentChat?.draft || ''}
             onDraftChange={handleDraftChange}
             onSendMessage={handleSendMessage}
