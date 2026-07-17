@@ -106,7 +106,7 @@ export default function Sidebar({ chatList, activeChatId, onChatClick, onCreateN
                                 chat.title
                             )}
                         </div>
-                        <div className={styles.buttonContainer}>
+                        <div className={`${styles.buttonContainer} ${editingChatId === chat.id || isConfirming ? styles.buttonContainerVisible : ''}`}>
                             <DefaultButton
                                 className={styles.optionsButton}
                                 onMouseDown={(e) => {

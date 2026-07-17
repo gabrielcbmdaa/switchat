@@ -46,6 +46,7 @@
    ============================ */
 .chatButton {
   display: flex;
+  height: 30px;
   align-items: center;
   background-color: #191919;
   color: #858585;
@@ -67,7 +68,18 @@
 
 /* Show action buttons on chat item hover */
 .chatButton:hover .buttonContainer {
+  visibility: visible;
+  width: auto;
+  padding: 4px 4px 4px 0;
   opacity: 1;
+}
+
+/* Force-show buttons when editing or confirming delete */
+.buttonContainerVisible {
+  visibility: visible !important;
+  width: auto !important;
+  padding: 4px 4px 4px 0 !important;
+  opacity: 1 !important;
 }
 
 /* ============================
@@ -86,10 +98,11 @@
    ============================ */
 .titleContainer {
   flex: 1 1 0;
+  min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  margin-right: 8px;
+  padding-right: 8px;
 }
 
 /* ============================
@@ -114,11 +127,14 @@
 .buttonContainer {
   display: flex;
   flex-direction: row;
-  margin-left: auto;
   gap: 2px;
-  padding: 4px 4px 4px 0;
-  opacity: 0;
   flex-shrink: 0;
+  /* Hidden by default — no space occupied */
+  visibility: hidden;
+  width: 0;
+  padding: 0;
+  opacity: 0;
+  overflow: hidden;
 }
 
 /* ============================
