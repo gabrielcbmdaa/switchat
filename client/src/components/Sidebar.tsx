@@ -62,8 +62,8 @@ export default function Sidebar({ chatList, activeChatId, onChatClick, onCreateN
 
     return (
         <div className={styles.sidebarContainer}>
-            <button className={styles.chatButton} onClick={onCreateNewChat}>
-                + New Chat
+            <button className={styles.newChatButton} onClick={onCreateNewChat}>
+                New Chat
             </button>
             {/* Usamos .map() en lugar de .forEach() para imprimir el HTML */}
             {chatList.map((chat) => {
@@ -76,7 +76,7 @@ export default function Sidebar({ chatList, activeChatId, onChatClick, onCreateN
                         key={chat.id} // React necesita un "key" único cuando creas listas
                         className={styles.chatButton}
                         style={{
-                            paddingLeft: isActive ? '4px' : '24px',
+                            paddingLeft: isActive ? '6px' : '26px',
                         }}
                         onClick={() => onChatClick(chat.id)} // Enganchamos el clic de selección
                     >
@@ -88,6 +88,7 @@ export default function Sidebar({ chatList, activeChatId, onChatClick, onCreateN
                                     id={`edit-chat-${chat.id}`}
                                     name="chatTitle"
                                     type="text"
+                                    className={styles.editInput}
                                     value={editTitle}
                                     onChange={(e) => setEditTitle(e.target.value)}
                                     onClick={(e) => e.stopPropagation()}
