@@ -5,6 +5,7 @@ require('dotenv').config();
 const express = require('express');
 const mongoose = require('mongoose');
 const cors = require('cors');
+const cookieParser = require('cookie-parser'); // 👈 Importamos cookie-parser
 const path = require('node:path'); // 👈 Importamos 'path' para manejar rutas de archivos
 const { MongoClient } = require('mongodb');
 const authRoutes = require('./routes/authRoutes');
@@ -16,7 +17,11 @@ const PORT = process.env.PORT || 3000;
 // ==========================================
 // 1. MIDDLEWARES
 // ==========================================
-app.use(cors());
+app.use(cors({
+    origin: true,        // Permite cualquier origen (o el de tu frontend)
+    credentials: true    // 👈 Permite recibir y enviar cookies a través de CORS
+}));
+app.use(cookieParser()); // 👈 Le enseña a Express a leer las cookies
 app.use(express.json());
 
 // ==========================================

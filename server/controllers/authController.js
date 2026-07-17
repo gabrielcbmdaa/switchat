@@ -60,10 +60,16 @@ exports.login = async (req, res) => {
       { expiresIn: '7d' } // La pulsera expira en 7 días
     );
 
-    // Paso C: Si todo está bien, responder éxito (Por ahora, un mensaje simple)
+    // Paso C: Si todo está bien, guardar el token en una cookie HttpOnly y responder éxito
+    res.cookie('token', token, {
+      httpOnly: true,                                // 👈 Protege contra XSS (JS no puede leer esta cookie)
+      secure: process.env.NODE_ENV === 'production', // 👈 Solo HTTPS en producción (en desarrollo permite HTTP)
+      sameSite: 'strict',                            // 👈 Protege contra CSRF (la cookie no se envía desde otros sitios)
+      maxAge: 7 * 24 * 60 * 60 * 1000               // 👈 Expira en 7 días (igual que el token)
+    });
+
     res.status(200).json({
-      message: '¡Inicio de sesión exitoso! Bienvenido.',
-      token: token // <-- El frontend recibirá este texto largo encriptado
+      message: '¡Inicio de sesión exitoso! Bienvenido.'
     });
 
   } catch (error) {
