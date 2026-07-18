@@ -314,9 +314,78 @@ export default function App() {
     }
   }
 
-  function handleRetryMessage(messageIndex: number) {
-    console.log("Retry button clicked for message at index:", messageIndex);
-    // TODO: Implement retry logic (Phase 2)
+  async function handleRetryMessage(messageIndex: number) {
+    if (!currentChat) return;
+
+    const messageToRetry = currentChat.messages[messageIndex];
+    if (!messageToRetry || messageToRetry.isTemporary) return;
+
+    // 1. Encontrar dónde está el mensaje del usuario que detonó esta parte de la conversación
+    let userMessageIndex = messageIndex;
+    if (messageToRetry.role === 'model') {
+      userMessageIndex = messageIndex - 1;
+    }
+
+    // Seguridad: Asegurarnos de que encontramos un mensaje de usuario
+    if (userMessageIndex < 0 || currentChat.messages[userMessageIndex].role !== 'user') return;
+
+    const userMessage = currentChat.messages[userMessageIndex];
+    
+    // 2. Tomar el historial exacto que queremos reenviar a la API
+    const historyUpToUser = currentChat.messages.slice(0, userMessageIndex + 1);
+    
+    // 3. Bifurcación: Identificar los mensajes que serán descartados en el backend
+    const messagesToDeleteFromBackend = currentChat.messages.slice(userMessageIndex);
+
+    // 4. Preparar la UI agregando el estado de "Thinking..."
+    const thinkingMessage = { role: "model" as const, parts: [{ text: "Thinking..." }], isTemporary: true, createdAt: new Date().toISOString() };
+    let updatedMessages = [...historyUpToUser, thinkingMessage];
+
+    const chatsWithThinking = chatList.map(chat =>
+      chat.id === activeChatId
+        ? { ...chat, messages: updatedMessages }
+        : chat
+    );
+    setChatList(chatsWithThinking);
+
+    // 5. Eliminar mensajes antiguos del backend de forma silenciosa
+    if (isAuthenticated) {
+      messagesToDeleteFromBackend.forEach(msg => {
+        if (msg._id) {
+          deleteMessageFromServer(activeChatId, msg._id);
+        }
+      });
+    }
+
+    // 6. Hacer la petición a la API
+    try {
+      const response = await fetchChatResponse(activeChatId, historyUpToUser, model, isAuthenticated, provider);
+
+      // Reemplazamos "Thinking" por la respuesta y actualizamos los IDs
+      updatedMessages = [
+        ...historyUpToUser.slice(0, -1),
+        { ...userMessage, _id: response.userMessageId || userMessage._id },
+        { role: "model", parts: [{ text: response.text }], _id: response.aiMessageId, createdAt: new Date().toISOString() }
+      ];
+
+      const finalChats = chatsWithThinking.map(chat =>
+        chat.id === activeChatId
+          ? { ...chat, messages: updatedMessages }
+          : chat
+      );
+
+      setChatList(finalChats);
+      saveToLocalDisk(finalChats, activeChatId);
+    } catch (error) {
+      const err = error as Error;
+      if (err.message === 'SESSION_EXPIRED') {
+        resetSessionToDefault();
+        alert("Session expired. Please log in again.");
+      } else {
+        updatedMessages = [...historyUpToUser, { role: "model" as const, parts: [{ text: `Error: ${err.message}` }], createdAt: new Date().toISOString() }];
+        setChatList(chatsWithThinking.map(chat => chat.id === activeChatId ? { ...chat, messages: updatedMessages } : chat));
+      }
+    }
   }
 
   function handleReTitleChat(chatId: string, newTitle: string) {
