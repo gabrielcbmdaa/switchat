@@ -6,9 +6,10 @@ interface MessageBubbleProps {
     msg: Message;
     isUser: boolean;
     onDelete: () => void;
+    onRetry?: () => void;
 }
 
-export default function MessageBubble({ msg, isUser, onDelete }: MessageBubbleProps) {
+export default function MessageBubble({ msg, isUser, onDelete, onRetry }: MessageBubbleProps) {
     const rawText = msg.parts[0].text;
     const htmlContent = { __html: isUser ? rawText : marked.parse(rawText) as string };
 
@@ -19,7 +20,14 @@ export default function MessageBubble({ msg, isUser, onDelete }: MessageBubblePr
                 dangerouslySetInnerHTML={htmlContent}
             />
             <div className={styles.messageActions}>
-                <button className={styles.actionButton} title="Borrar mensaje" onClick={onDelete}>
+                {onRetry && !msg.isTemporary && (
+                    <button className={styles.actionButton} title="Reintentar mensaje" onClick={onRetry}>
+                        <svg width="16" height="16">
+                            <use xlinkHref="#icon-retry" />
+                        </svg>
+                    </button>
+                )}
+                <button className={styles.actionButton} title="Borrar mensaje" onClick={onDelete} disabled={msg.isTemporary}>
                     <svg width="16" height="16">
                         <use xlinkHref="#icon-trash" />
                     </svg>

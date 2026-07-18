@@ -314,6 +314,11 @@ export default function App() {
     }
   }
 
+  function handleRetryMessage(messageIndex: number) {
+    console.log("Retry button clicked for message at index:", messageIndex);
+    // TODO: Implement retry logic (Phase 2)
+  }
+
   function handleReTitleChat(chatId: string, newTitle: string) {
     const trimmedTitle = newTitle.trim();
     if (!trimmedTitle) return;
@@ -401,6 +406,7 @@ export default function App() {
             hasMoreMap={hasMoreMap}
             onLoadMore={() => handleLoadMoreMessages(activeChatId)}
             onDeleteMessage={handleDeleteMessage}
+            onRetryMessage={handleRetryMessage}
             token={isAuthenticated ? 'active' : null}
             draft={currentChat?.draft || ''}
             onDraftChange={handleDraftChange}

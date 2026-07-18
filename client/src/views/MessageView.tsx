@@ -10,13 +10,14 @@ interface MessageViewProps {
     hasMoreMap: Record<string, boolean>;
     onLoadMore: () => void;
     onDeleteMessage: (messageIndex: number) => void;
+    onRetryMessage: (messageIndex: number) => void;
     token: string | null;
     draft: string;
     onDraftChange: (draft: string) => void;
     onSendMessage: () => void;
 }
 
-export default function MessageView({ messages, chatId, hasMoreMap, onLoadMore, onDeleteMessage, token, draft, onDraftChange, onSendMessage }: MessageViewProps) {
+export default function MessageView({ messages, chatId, hasMoreMap, onLoadMore, onDeleteMessage, onRetryMessage, token, draft, onDraftChange, onSendMessage }: MessageViewProps) {
     const [visibleCount, setVisibleCount] = useState(6);
     const [promptHeight, setPromptHeight] = useState(58); // Altura inicial estimada del prompt
     const containerRef = useRef<HTMLDivElement>(null);
@@ -148,6 +149,7 @@ export default function MessageView({ messages, chatId, hasMoreMap, onLoadMore, 
                             msg={msg}
                             isUser={msg.role === 'user'}
                             onDelete={() => onDeleteMessage(realIndex)}
+                            onRetry={() => onRetryMessage(realIndex)}
                         />
                     );
                 })}

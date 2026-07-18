@@ -7,6 +7,7 @@ export interface Message {
   role: 'user' | 'model' | 'system';
   parts: MessagePart[];
   createdAt?: string;
+  isTemporary?: boolean;
 }
 
 export interface Chat {
