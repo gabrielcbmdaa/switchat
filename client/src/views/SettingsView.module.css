@@ -8,6 +8,30 @@
     padding: 10px;
 }
 
+.headerSection {
+    width: 100%;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding-bottom: 8px;
+    border-bottom: 1px solid #333333;
+}
+
+.closeBtn {
+    background: transparent;
+    border: none;
+    color: #858585;
+    cursor: pointer;
+    font-size: 14px;
+    padding: 2px 6px;
+    border-radius: 4px;
+}
+
+.closeBtn:hover {
+    color: #191919;
+    background-color: #858585;
+}
+
 /* CHAGE TITLE SECTION */
 .changeTitleSection {
     width: 100%;

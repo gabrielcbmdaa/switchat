@@ -10,9 +10,10 @@ interface SettingViewProps {
     currentProvider: string;
     onModelChange: (model: string) => void;
     onProviderChange: (provider: string) => void;
+    onClose?: () => void;
 }
 
-export default function SettingView({ currentModel, currentProvider, onModelChange, onProviderChange }: SettingViewProps) {
+export default function SettingView({ currentModel, currentProvider, onModelChange, onProviderChange, onClose }: SettingViewProps) {
     const [apiKey, setApiKey] = useState(localStorage.getItem('geminiApiKey') || '');
     // 1. Derivamos los niveles directamente del modelo actual (Estado Derivado)
     // Usamos la tabla estática y agregamos fallback dinámico para modelos de la API
@@ -187,6 +188,14 @@ export default function SettingView({ currentModel, currentProvider, onModelChan
 
     return (
         <div className={styles.settingsViewContainer}>
+            {onClose && (
+                <div className={styles.headerSection}>
+                    <span className={styles.configLabel}>Settings</span>
+                    <button type="button" className={styles.closeBtn} onClick={onClose} title="Cerrar">
+                        ✕
+                    </button>
+                </div>
+            )}
             {/* MODEL SECTION */}
             <div className={styles.modelSection}>
                 {/* PROVIDER */}

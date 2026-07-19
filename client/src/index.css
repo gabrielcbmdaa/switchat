@@ -55,6 +55,19 @@ body {
   height: 100%;
 }
 
+/* SETTINGS-SECTION */
+.settings-section {
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  width: 300px;
+  min-width: 300px;
+  height: 100%;
+  border-left: 1px solid #858585;
+  background-color: #191919;
+  overflow-y: auto;
+}
+
 /* RESIZER STYLES */
 .resizer {
   width: 3px;

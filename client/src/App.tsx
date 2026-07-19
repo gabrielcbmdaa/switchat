@@ -13,7 +13,8 @@ import MessageView from './views/MessageView';
 export default function App() {
   const [chatList, setChatList] = useState<Chat[]>([]);
   const [activeChatId, setActiveChatId] = useState<string>('');
-  const [currentView, setCurrentView] = useState<'settings' | 'account' | 'chats'>('chats');
+  const [currentView, setCurrentView] = useState<'account' | 'chats'>('chats');
+  const [isSettingsOpen, setIsSettingsOpen] = useState<boolean>(false);
   const [hasMoreMap, setHasMoreMap] = useState<Record<string, boolean>>({});
   const currentChat = chatList.find((chat) => chat.id === activeChatId);
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false);
@@ -34,7 +35,7 @@ export default function App() {
           const sessionActive = await checkSession();
           if (sessionActive) {
             setIsAuthenticated(true);
-            
+
             const serverChats = await loadChatsFromServer();
             if (serverChats && serverChats.length > 0) {
               initialChats = serverChats;
@@ -330,10 +331,10 @@ export default function App() {
     if (userMessageIndex < 0 || currentChat.messages[userMessageIndex].role !== 'user') return;
 
     const userMessage = currentChat.messages[userMessageIndex];
-    
+
     // 2. Tomar el historial exacto que queremos reenviar a la API
     const historyUpToUser = currentChat.messages.slice(0, userMessageIndex + 1);
-    
+
     // 3. Bifurcación: Identificar los mensajes que serán descartados en el backend
     const messagesToDeleteFromBackend = currentChat.messages.slice(userMessageIndex);
 
@@ -418,21 +419,6 @@ export default function App() {
             onLogoutAction={resetSessionToDefault}
           />
         );
-      case 'settings':
-        return (
-          <SettingView
-            currentModel={model}
-            currentProvider={provider}
-            onModelChange={(newModel) => {
-              setModel(newModel);
-              localStorage.setItem('model', newModel);
-            }}
-            onProviderChange={(newProvider) => {
-              setProvider(newProvider);
-              localStorage.setItem('provider', newProvider);
-            }}
-          />
-        );
       case 'chats':
         return (
           <Sidebar
@@ -456,11 +442,11 @@ export default function App() {
       <div className="app-container" id='app-container'>
 
 
-        <aside className="sidebar-section" id='sidebar-section'>
+        <aside className="sidebar-section" id='sidebar-section' aria-label="Navegación principal">
           {renderMainContent()}
           <Toolbar
             onNavChats={() => setCurrentView('chats')}
-            onNavConfig={() => setCurrentView('settings')}
+            onNavConfig={() => setIsSettingsOpen((prev) => !prev)}
             onNavAccount={() => setCurrentView('account')}
           />
         </aside>
@@ -483,7 +469,23 @@ export default function App() {
           />
         </main>
 
-
+        {isSettingsOpen && (
+          <aside className="settings-section" id='settings-section' aria-label="Panel de configuración">
+            <SettingView
+              currentModel={model}
+              currentProvider={provider}
+              onModelChange={(newModel) => {
+                setModel(newModel);
+                localStorage.setItem('model', newModel);
+              }}
+              onProviderChange={(newProvider) => {
+                setProvider(newProvider);
+                localStorage.setItem('provider', newProvider);
+              }}
+              onClose={() => setIsSettingsOpen(false)}
+            />
+          </aside>
+        )}
 
       </div>
     </>
