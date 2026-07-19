@@ -1,6 +1,38 @@
 const Message = require('../models/Message');
 const Chat = require('../models/Chat');
 
+const handleApiError = async (response, res, providerLowerCase, modelLowerCase) => {
+    const errorText = await response.text();
+    console.error(`❌ Detalle del error de la API (${providerLowerCase}):`, errorText);
+
+    let apiErrorMessage = errorText;
+    try {
+        const errorJson = JSON.parse(errorText);
+        apiErrorMessage = errorJson.error?.message || errorJson.message || errorText;
+    } catch {
+        // Si no es JSON, usamos el texto plano tal cual
+    }
+
+    const statusCode = response.status;
+    const errorMap = {
+        401: `🔑 Invalid or expired API Key for ${providerLowerCase}. Check your key in Config.`,
+        403: `🚫 Access denied by ${providerLowerCase}. Your API Key does not have permissions to use the model "${modelLowerCase}".`,
+        404: `❓ The model "${modelLowerCase}" does not exist or is unavailable in ${providerLowerCase}.`,
+        429: `⏳ Too many requests to ${providerLowerCase}. You have reached the rate limit. Please wait a moment and try again.`,
+        503: `🔥 The model "${modelLowerCase}" is experiencing high demand right now. Try again in a few seconds or try another model.`,
+    };
+
+    const userMessage = errorMap[statusCode] || `Error ${statusCode} de ${providerLowerCase}: ${apiErrorMessage}`;
+
+    return res.status(statusCode >= 500 ? 502 : statusCode).json({
+        message: userMessage,
+        error: apiErrorMessage,
+        code: statusCode,
+        provider: providerLowerCase,
+        model: modelLowerCase
+    });
+};
+
 exports.createMessage = async (req, res) => {
     try {
         // 1. Extraemos los datos que vienen del frontend
@@ -25,6 +57,105 @@ exports.createMessage = async (req, res) => {
         const providerLowerCase = provider.toLowerCase();
 
         // 3. SELECCIÓN DINÁMICA DE PROVEEDOR (OpenAI, Gemini o Local LM Studio)
+        // ------------------------------------------
+        // PROVEEDOR GOOGLE GEMINI (API REST NATIVA)
+        // ------------------------------------------
+        if (providerLowerCase === 'google') {
+            const apiKey = process.env.GOOGLE_API_KEY;
+            if (!apiKey) {
+                throw new Error("⚠️ API Key de Google no fue encontrada.");
+            }
+
+            console.log(`🚀 Enviando petición nativa a Google Gemini con modelo: ${modelLowerCase}`);
+
+            // Separar mensajes de sistema si existen
+            const systemMessages = messages.filter(msg => msg.role === 'system');
+            const systemInstruction = systemMessages.length > 0 ? {
+                parts: [{ text: systemMessages.map(msg => msg.parts?.[0]?.text || '').join('\n') }]
+            } : undefined;
+
+            // Formatear el historial de mensajes al formato nativo de Gemini (contents)
+            const contents = messages
+                .filter(msg => msg.role !== 'system')
+                .map(msg => ({
+                    role: msg.role === 'model' ? 'model' : 'user',
+                    parts: [{ text: msg.parts?.[0]?.text || '' }]
+                }));
+
+            // Configurar opciones de generación y razonamiento (Thinking Config)
+            const generationConfig = {};
+            if (reasoningLevel && reasoningLevel !== 'off') {
+                const thinkingLevelMap = {
+                    'minimal': 'MINIMAL',
+                    'low': 'LOW',
+                    'medium': 'MEDIUM',
+                    'high': 'HIGH'
+                };
+                generationConfig.thinkingConfig = {
+                    thinkingLevel: thinkingLevelMap[reasoningLevel] || 'HIGH'
+                };
+            } else {
+                generationConfig.thinkingConfig = {
+                    thinkingBudget: 0
+                };
+            }
+
+            const googleRequestBody = {
+                contents,
+                ...(systemInstruction ? { systemInstruction } : {}),
+                ...(Object.keys(generationConfig).length > 0 ? { generationConfig } : {})
+            };
+
+            const googleApiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${modelLowerCase}:generateContent?key=${apiKey}`;
+
+            const response = await fetch(googleApiUrl, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(googleRequestBody)
+            });
+
+            if (!response.ok) {
+                return await handleApiError(response, res, providerLowerCase, modelLowerCase);
+            }
+
+            const data = await response.json();
+            const candidate = data.candidates?.[0];
+            if (!candidate || !candidate.content || !candidate.content.parts) {
+                return res.status(502).json({
+                    message: 'La API de Google Gemini no devolvió ninguna respuesta válida.',
+                    provider: providerLowerCase,
+                    model: modelLowerCase
+                });
+            }
+
+            const parts = candidate.content.parts;
+            // Filtrar y devolver únicamente la respuesta final (excluyendo trazas de razonamiento 'thought: true')
+            const responseText = parts
+                .filter(part => !part.thought && part.text)
+                .map(part => part.text)
+                .join('') || parts.map(part => part.text || '').join('');
+
+            // GUARDAR LA RESPUESTA DE LA AI en MongoDB Atlas
+            const aiMessage = new Message({
+                chatId,
+                sender: 'ai',
+                content: responseText
+            });
+            await aiMessage.save();
+
+            // RESPONDER AL FRONTEND
+            return res.status(201).json({
+                text: responseText,
+                userMessageId: userMessage._id,
+                aiMessageId: aiMessage._id
+            });
+        }
+
+        // ------------------------------------------
+        // OTROS PROVEEDORES (OPENAI, ANTHROPIC, LM STUDIO, OLLAMA)
+        // ------------------------------------------
         let apiUrl = "";
         let apiKey = "";
 
@@ -34,13 +165,6 @@ exports.createMessage = async (req, res) => {
                 apiKey = process.env.OPENAI_API_KEY;
                 if (!apiKey) {
                     throw new Error("⚠️ API Key de OpenAI no fue encontrada.");
-                }
-                break;
-            case 'google':
-                apiUrl = 'https://generativelanguage.googleapis.com/v1beta/openai/chat/completions';
-                apiKey = process.env.GOOGLE_API_KEY;
-                if (!apiKey) {
-                    throw new Error("⚠️ API Key de Google no fue encontrada.");
                 }
                 break;
             case 'lm studio':
@@ -81,12 +205,6 @@ exports.createMessage = async (req, res) => {
             model: modelLowerCase,
             messages: formattedMessages
         };
-        if (providerLowerCase === 'google' && reasoningLevel && reasoningLevel !== 'off') {
-            // OpenAI compatible layer accepts "low", "medium", "high"
-            // We map 'minimal' to 'low' to match the API specification
-            const effort = reasoningLevel === 'minimal' ? 'low' : reasoningLevel;
-            requestBody.reasoning_effort = effort;
-        }
 
         const response = await fetch(apiUrl, {
             method: 'POST',
@@ -99,39 +217,7 @@ exports.createMessage = async (req, res) => {
 
         // 5. MANEJO ROBUSTO DE ERRORES DE LA API DEL PROVEEDOR
         if (!response.ok) {
-            const errorText = await response.text();
-            console.error(`❌ Detalle del error de la API (${providerLowerCase}):`, errorText);
-
-            // Intentamos parsear el JSON de error del proveedor para extraer el mensaje real
-            let apiErrorMessage = errorText;
-            try {
-                const errorJson = JSON.parse(errorText);
-                apiErrorMessage = errorJson.error?.message || errorJson.message || errorText;
-            } catch {
-                // Si no es JSON, usamos el texto plano tal cual
-            }
-
-            // Clasificamos el error por código HTTP y devolvemos un mensaje amigable
-            const statusCode = response.status;
-            const errorMap = {
-                401: `🔑 API Key inválida o expirada para ${providerLowerCase}. Revisa tu clave en Config.`,
-                403: `🚫 Acceso denegado por ${providerLowerCase}. Tu API Key no tiene permisos para usar el modelo "${modelLowerCase}".`,
-                404: `❓ El modelo "${modelLowerCase}" no existe o no está disponible en ${providerLowerCase}.`,
-                429: `⏳ Demasiadas peticiones a ${providerLowerCase}. Has alcanzado el límite de uso. Espera un momento e intenta de nuevo.`,
-                503: `🔥 El modelo "${modelLowerCase}" está bajo alta demanda en este momento. Intenta de nuevo en unos segundos o prueba con otro modelo.`,
-            };
-
-            const userMessage = errorMap[statusCode]
-                || `Error ${statusCode} de ${providerLowerCase}: ${apiErrorMessage}`;
-
-            // Reenviamos el código HTTP real al frontend (no siempre 500)
-            return res.status(statusCode >= 500 ? 502 : statusCode).json({
-                message: userMessage,
-                error: apiErrorMessage,
-                code: statusCode,
-                provider: providerLowerCase,
-                model: modelLowerCase
-            });
+            return await handleApiError(response, res, providerLowerCase, modelLowerCase);
         }
 
         const data = await response.json();
