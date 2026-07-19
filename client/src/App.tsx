@@ -9,12 +9,13 @@ import Toolbar from './components/Toolbar';
 import AccountView from './views/AccountView';
 import SettingView from './views/SettingsView';
 import MessageView from './views/MessageView';
+import NotesView from './views/NotesView';
 
 export default function App() {
   const [chatList, setChatList] = useState<Chat[]>([]);
   const [activeChatId, setActiveChatId] = useState<string>('');
   const [currentView, setCurrentView] = useState<'account' | 'chats'>('chats');
-  const [isSettingsOpen, setIsSettingsOpen] = useState<boolean>(false);
+  const [activeRightPanel, setActiveRightPanel] = useState<'settings' | 'notes' | null>(null);
   const [hasMoreMap, setHasMoreMap] = useState<Record<string, boolean>>({});
   const currentChat = chatList.find((chat) => chat.id === activeChatId);
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false);
@@ -446,7 +447,8 @@ export default function App() {
           {renderMainContent()}
           <Toolbar
             onNavChats={() => setCurrentView('chats')}
-            onNavConfig={() => setIsSettingsOpen((prev) => !prev)}
+            onNavNotes={() => setActiveRightPanel((prev) => (prev === 'notes' ? null : 'notes'))}
+            onNavConfig={() => setActiveRightPanel((prev) => (prev === 'settings' ? null : 'settings'))}
             onNavAccount={() => setCurrentView('account')}
           />
         </aside>
@@ -469,7 +471,7 @@ export default function App() {
           />
         </main>
 
-        {isSettingsOpen && (
+        {activeRightPanel === 'settings' && (
           <aside className="settings-section" id='settings-section' aria-label="Panel de configuración">
             <SettingView
               currentModel={model}
@@ -482,7 +484,15 @@ export default function App() {
                 setProvider(newProvider);
                 localStorage.setItem('provider', newProvider);
               }}
-              onClose={() => setIsSettingsOpen(false)}
+              onClose={() => setActiveRightPanel(null)}
+            />
+          </aside>
+        )}
+
+        {activeRightPanel === 'notes' && (
+          <aside className="settings-section" id='notes-section' aria-label="Panel de notas">
+            <NotesView
+              onClose={() => setActiveRightPanel(null)}
             />
           </aside>
         )}

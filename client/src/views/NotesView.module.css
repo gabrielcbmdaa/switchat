@@ -1,0 +1,69 @@
+.notesViewContainer {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    flex-direction: column;
+    gap: 10px;
+    padding: 10px;
+}
+
+.headerSection {
+    width: 100%;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding-bottom: 8px;
+    border-bottom: 1px solid #333333;
+}
+
+.titleHeader {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    color: #858585;
+    font-weight: 500;
+    font-size: 15px;
+}
+
+.closeBtn {
+    background: transparent;
+    border: none;
+    color: #858585;
+    cursor: pointer;
+    font-size: 14px;
+    padding: 2px 6px;
+    border-radius: 4px;
+    transition: background-color 0.2s, color 0.2s;
+}
+
+.closeBtn:hover {
+    color: #191919;
+    background-color: #858585;
+}
+
+.textareaContainer {
+    width: 100%;
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    min-height: 0;
+}
+
+.notesTextarea {
+    width: 100%;
+    height: 100%;
+    background-color: #191919;
+    color: #858585;
+    border: none;
+    padding: 12px;
+    font-size: 14px;
+    line-height: 1.5;
+    resize: none;
+    outline: none;
+}
+
+.notesTextarea::placeholder {
+    color: #858585;
+}
