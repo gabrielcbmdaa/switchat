@@ -142,10 +142,93 @@ export async function fetchChatResponse(chatId: string, messagesHistory: Message
         const data = await response.json();
         return { text: data.text, userMessageId: data.userMessageId, aiMessageId: data.aiMessageId };
 
+    } else {
         // ==========================================
         // RUTA B: MODO LOCAL (SIN SESIÓN)
         // ==========================================
-    } else {
+        // ------------------------------------------
+        // PROVEEDOR GOOGLE GEMINI (API REST NATIVA)
+        // ------------------------------------------
+        if (providerLowerCase === 'google') {
+            const apiKey = localStorage.getItem('geminiApiKey') || '';
+            if (!apiKey) {
+                throw new Error("⚠️ Por favor, ve al menú **Config** y guarda tu Gemini API Key para poder chatear.");
+            }
+
+            console.log(`🚀 Enviando petición nativa a Google Gemini... con modelo: ${modelLowerCase}`);
+
+            // Separar mensajes de sistema si existen
+            const systemMessages = messagesHistory.filter(msg => msg.role === 'system');
+            const systemInstruction = systemMessages.length > 0 ? {
+                parts: [{ text: systemMessages.map(msg => msg.parts?.[0]?.text || '').join('\n') }]
+            } : undefined;
+
+            // Formatear el historial de mensajes al formato nativo de Gemini (contents)
+            const contents = messagesHistory
+                .filter(msg => msg.role !== 'system')
+                .map(msg => ({
+                    role: msg.role === 'model' ? 'model' : 'user',
+                    parts: [{ text: msg.parts?.[0]?.text || '' }]
+                }));
+
+            // Configurar opciones de generación y razonamiento (Thinking Config)
+            const generationConfig: Record<string, any> = {};
+            if (reasoningLevel !== 'off') {
+                const thinkingLevelMap: Record<string, string> = {
+                    'minimal': 'MINIMAL',
+                    'low': 'LOW',
+                    'medium': 'MEDIUM',
+                    'high': 'HIGH'
+                };
+                generationConfig.thinkingConfig = {
+                    thinkingLevel: thinkingLevelMap[reasoningLevel] || 'HIGH'
+                };
+            } else {
+                generationConfig.thinkingConfig = {
+                    thinkingBudget: 0
+                };
+            }
+
+            const googleRequestBody = {
+                contents,
+                ...(systemInstruction ? { systemInstruction } : {}),
+                ...(Object.keys(generationConfig).length > 0 ? { generationConfig } : {})
+            };
+
+            const googleApiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${modelLowerCase}:generateContent?key=${apiKey}`;
+
+            const response = await fetch(googleApiUrl, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(googleRequestBody)
+            });
+
+            if (!response.ok) {
+                const errorData = await response.json();
+                throw new Error(errorData.error?.message || 'Error en la API de Google');
+            }
+
+            const data = await response.json();
+            const candidate = data.candidates?.[0];
+            if (!candidate || !candidate.content || !candidate.content.parts) {
+                throw new Error('La API de Google no devolvió ninguna respuesta válida.');
+            }
+
+            const parts = candidate.content.parts;
+            // Filtrar y devolver únicamente la respuesta final (excluyendo trazas de razonamiento 'thought: true')
+            const textContent = parts
+                .filter((part: any) => !part.thought && part.text)
+                .map((part: any) => part.text)
+                .join('');
+
+            return { text: textContent || parts.map((part: any) => part.text || '').join('') };
+        }
+
+        // ------------------------------------------
+        // OTROS PROVEEDORES (OPENAI, ANTHROPIC, LM STUDIO, OLLAMA)
+        // ------------------------------------------
         let apiKey: string;
         let apiUrl: string;
 
@@ -157,11 +240,11 @@ export async function fetchChatResponse(chatId: string, messagesHistory: Message
                     throw new Error("⚠️ Por favor, ve al menú **Config** y guarda tu OpenAI API Key para poder chatear.");
                 }
                 break;
-            case 'google':
-                apiUrl = 'https://generativelanguage.googleapis.com/v1beta/openai/chat/completions';
-                apiKey = localStorage.getItem('geminiApiKey') || '';
+            case 'anthropic':
+                apiUrl = 'https://api.anthropic.com/v1/chat/completions';
+                apiKey = localStorage.getItem('anthropicApiKey') || '';
                 if (!apiKey) {
-                    throw new Error("⚠️ Por favor, ve al menú **Config** y guarda tu Gemini API Key para poder chatear.");
+                    throw new Error("⚠️ Por favor, ve al menú **Config** y guarda tu Anthropic API Key para poder chatear.");
                 }
                 break;
             case 'lm studio':
@@ -171,13 +254,6 @@ export async function fetchChatResponse(chatId: string, messagesHistory: Message
             case 'ollama':
                 apiUrl = 'http://127.0.0.1:11434/v1/chat/completions';
                 apiKey = "ollama-key"; // Key dummy requerida por la especificación de OpenAI
-                break;
-            case 'anthropic':
-                apiUrl = 'https://api.anthropic.com/v1/chat/completions';
-                apiKey = localStorage.getItem('anthropicApiKey') || '';
-                if (!apiKey) {
-                    throw new Error("⚠️ Por favor, ve al menú **Config** y guarda tu Anthropic API Key para poder chatear.");
-                }
                 break;
             default:
                 throw new Error(`⚠️ El proveedor de IA "${providerLowerCase}" no está soportado.`);
@@ -203,15 +279,6 @@ export async function fetchChatResponse(chatId: string, messagesHistory: Message
             messages: formattedMessages
         };
 
-        if (providerLowerCase === 'google') {
-            if (reasoningLevel !== 'off') {
-                // OpenAI y su compatibilidad soporta "low", "medium", "high".
-                // Mapeamos 'minimal' a 'low' para cumplir con la especificación de la API.
-                const effort = reasoningLevel === 'minimal' ? 'low' : reasoningLevel;
-                requestBody.reasoning_effort = effort;
-            }
-        }
-
         const response = await fetch(apiUrl, {
             method: 'POST',
             headers: {
@@ -223,7 +290,7 @@ export async function fetchChatResponse(chatId: string, messagesHistory: Message
 
         if (!response.ok) {
             const errorData = await response.json();
-            throw new Error(errorData.error?.message || 'Error en la API de Google');
+            throw new Error(errorData.error?.message || 'Error en la API');
         }
 
         const data = await response.json();
