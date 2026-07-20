@@ -2,7 +2,7 @@ import { useState } from "react";
 import styles from './SettingsView.module.css'
 import DefaultInput from "../components/DefaultInput";
 import DefaultButton from "../components/DefaultButton";
-import { getModelConfig, MODEL_REGISTRY } from "../config/models.config";
+import { getModelConfig, getProviderIconId, MODEL_REGISTRY } from "../config/models.config";
 
 interface SettingViewProps {
     currentModel: string;
@@ -72,12 +72,19 @@ export default function SettingView({ currentModel, onModelChange, onClose }: Se
                     </button>
                 </div>
             )}
-            {/* MODEL SECTION */}
             <div className={styles.modelSection}>
                 {/* MODELS */}
                 <div className={styles.modelContainer}>
                     <label className={styles.configLabel}>Model</label>
                     <div className={styles.modelSelected}>
+                        {(() => {
+                            const iconId = getProviderIconId(currentModel);
+                            return iconId ? (
+                                <svg className={styles.providerIcon} width="16" height="16">
+                                    <use xlinkHref={`#${iconId}`} />
+                                </svg>
+                            ) : null;
+                        })()}
                         {currentModel}
                     </div>
                     <div className={styles.dropdownList}>
@@ -94,20 +101,28 @@ export default function SettingView({ currentModel, onModelChange, onClose }: Se
                             }}
                         />
                         {filteredModels.length > 0 ? (
-                            filteredModels.map(model => (
-                                <div
-                                    key={model}
-                                    className={styles.dropdownItem}
-                                    onClick={() => handleSelectModel(model)}
-                                >
-                                    <span className={styles.modelName}>
-                                        {model}
-                                    </span>
-                                </div>
-                            ))
+                            filteredModels.map(model => {
+                                const iconId = getProviderIconId(model);
+                                return (
+                                    <div
+                                        key={model}
+                                        className={styles.dropdownItem}
+                                        onClick={() => handleSelectModel(model)}
+                                    >
+                                        <span className={styles.modelName}>
+                                            {iconId && (
+                                                <svg className={styles.providerIcon} width="16" height="16">
+                                                    <use xlinkHref={`#${iconId}`} />
+                                                </svg>
+                                            )}
+                                            {model}
+                                        </span>
+                                    </div>
+                                );
+                            })
                         ) : (
                             <div className={styles.noMatches}>
-                                No hay coincidencias
+                                There are no coincidences
                             </div>
                         )}
                     </div>

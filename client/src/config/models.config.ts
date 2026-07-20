@@ -59,6 +59,18 @@ export const MODEL_REGISTRY: Record<string, ModelConfig> = {
         defaultThinking: 'off',
         provider: 'google',
     },
+    // ── Anthropic Claude 5.x ──────────────────────────────────
+    'claude-sonnet-5-test': {
+        thinkingLevels: ['minimal', 'low', 'medium', 'high'],
+        defaultThinking: 'high',
+        provider: 'anthropic',
+    },
+    // ── OpenAI GPT 5.x ──────────────────────────────────
+    'gpt-5.4-mini-test': {
+        thinkingLevels: ['minimal', 'low', 'medium', 'high'],
+        defaultThinking: 'high',
+        provider: 'openai',
+    },
 };
 
 /**
@@ -68,3 +80,22 @@ export const MODEL_REGISTRY: Record<string, ModelConfig> = {
 export function getModelConfig(modelName: string): ModelConfig | undefined {
     return MODEL_REGISTRY[modelName.toLowerCase()];
 }
+
+/**
+ * Retorna el ID del SVG symbol correspondiente al proveedor del modelo.
+ */
+export function getProviderIconId(modelName: string): string | null {
+    const config = getModelConfig(modelName);
+    if (!config) return null;
+    switch (config.provider) {
+        case 'google':
+            return 'icon-google';
+        case 'anthropic':
+            return 'icon-anthropic';
+        case 'openai':
+            return 'icon-openai';
+        default:
+            return null;
+    }
+}
+
