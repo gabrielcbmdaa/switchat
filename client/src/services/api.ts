@@ -1,4 +1,4 @@
-import type { Chat, Message, GeminiModel, ChatCompletionRequest } from "../types";
+import type { Chat, Message, ChatCompletionRequest } from "../types";
 import { getModelConfig } from "../config/models.config";
 
 export const API_BACKEND_URL = '/api';
@@ -359,25 +359,4 @@ export async function checkSession(): Promise<boolean> {
         console.error('❌ Error [checkSession]:', error);
         return false;
     }
-}
-
-
-// 2. Cliente de Modelos de Google
-export async function getLiveModels(apiKey: string): Promise<{ value: string; label: string; thinking?: boolean }[]> {
-    const modelsAskUrl = `https://generativelanguage.googleapis.com/v1beta/models?key=${apiKey}`;
-    const response = await fetch(modelsAskUrl);
-
-    if (!response.ok) throw new Error('No se pudieron obtener los modelos');
-
-    // 2. Le aseguramos a TypeScript que la respuesta tiene un array de 'GeminiModel'
-    const data = await response.json() as { models: GeminiModel[] };
-
-    // Ahora 'm' hereda automáticamente el tipo GeminiModel y autocompleta sus propiedades
-    return data.models
-        .filter(m => m.supportedGenerationMethods.includes('generateContent'))
-        .map(m => ({
-            value: m.name.replace('models/', ''),
-            label: m.displayName || m.name.replace('models/', ''),
-            thinking: m.thinking
-        }));
 }

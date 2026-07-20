@@ -1,9 +1,8 @@
-import { useState, useEffect, useRef } from "react";
+import { useState } from "react";
 import styles from './SettingsView.module.css'
 import DefaultInput from "../components/DefaultInput";
 import DefaultButton from "../components/DefaultButton";
-import { getLiveModels } from "../services/api";
-import { getModelConfig } from "../config/models.config";
+import { getModelConfig, MODEL_REGISTRY } from "../config/models.config";
 
 interface SettingViewProps {
     currentModel: string;
@@ -14,19 +13,8 @@ interface SettingViewProps {
 export default function SettingView({ currentModel, onModelChange, onClose }: SettingViewProps) {
     const [apiKey, setApiKey] = useState(localStorage.getItem('geminiApiKey') || '');
     // 1. Derivamos los niveles directamente del modelo actual (Estado Derivado)
-    // Usamos la tabla estática y agregamos fallback dinámico para modelos de la API
     const config = getModelConfig(currentModel);
-    let thinkingLevels: string[] = [];
-
-    if (config) {
-        thinkingLevels = ['off', ...config.thinkingLevels];
-    } else {
-        const apiThinkingModels = JSON.parse(localStorage.getItem('apiThinkingModels') || '[]');
-        if (apiThinkingModels.includes(currentModel.toLowerCase())) {
-            // Nivel genérico para modelos dinámicos que reportan soporte de thinking
-            thinkingLevels = ['off', 'low', 'medium', 'high'];
-        }
-    }
+    const thinkingLevels = config ? ['off', ...config.thinkingLevels] : [];
 
     const [prevModel, setPrevModel] = useState(currentModel);
     const [reasoningLevel, setReasoningLevel] = useState<number>(() => {
@@ -56,93 +44,23 @@ export default function SettingView({ currentModel, onModelChange, onClose }: Se
         localStorage.setItem('reasoningLevel', thinkingLevels[val]);
     };
 
-    const [savedModels, setSavedModels] = useState<string[]>(() => {
-        const stored = localStorage.getItem('savedModels'); //ADD CLOUD ROUTE
-        if (stored) {
-            try {
-                return JSON.parse(stored);
-            } catch (e) {
-                console.error("Error parsing savedModels:", e);
-            }
-        }
-        return [currentModel];
-    });
+    const [searchQuery, setSearchQuery] = useState('');
 
-    const [showModelDropdown, setShowModelDropdown] = useState(false);
-
-    const modelContainerRef = useRef<HTMLDivElement>(null);
-
-    // Close dropdown when clicking outside
-    useEffect(() => {
-        function handleClickOutside(event: MouseEvent) {
-            if (modelContainerRef.current && !modelContainerRef.current.contains(event.target as Node)) {
-                setShowModelDropdown(false);
-            }
-        }
-        document.addEventListener("mousedown", handleClickOutside);
-        return () => {
-            document.removeEventListener("mousedown", handleClickOutside);
-        };
-    }, []);
-
-
-
-    // Lógica para buscar modelos en vivo desde la API de Google
-    const handleConfirmApiKey = async () => {
-        try {
-            const trimmedKey = apiKey.trim();
-            localStorage.setItem('geminiApiKey', trimmedKey);
-            if (trimmedKey === '') {
-                return;
-            }
-            const liveModels = await getLiveModels(trimmedKey);
-            if (liveModels.length > 0) {
-                const firstModel = liveModels[0].value;
-                onModelChange(firstModel);
-
-                // Guardar la lista de modelos de la API que soportan thinking
-                const thinkingModelNames = liveModels
-                    .filter(m => m.thinking === true)
-                    .map(m => m.value.toLowerCase());
-                localStorage.setItem('apiThinkingModels', JSON.stringify(thinkingModelNames));
-
-                // Mezclar los modelos obtenidos en la lista local de modelos guardados
-                setSavedModels(prev => {
-                    const fetchedNames = liveModels.map(m => m.value);
-                    const merged = Array.from(new Set([...prev, ...fetchedNames]));
-                    localStorage.setItem('savedModels', JSON.stringify(merged));
-                    return merged;
-                });
-
-            }
-        } catch (err) {
-            console.error("Error al cargar modelos:", err);
-            alert("No se pudieron cargar los modelos. Verifica tu API Key.");
-        }
+    const handleConfirmApiKey = () => {
+        const trimmedKey = apiKey.trim();
+        localStorage.setItem('geminiApiKey', trimmedKey);
+        alert("¡API Key guardada!");
     };
 
-    const handleSaveModel = () => {
-        const trimmedModel = currentModel.trim();
-        if (!trimmedModel) return;
-
-        if (!savedModels.includes(trimmedModel)) {
-            const updated = [...savedModels, trimmedModel];
-            setSavedModels(updated);
-            localStorage.setItem('savedModels', JSON.stringify(updated));
-        }
-        localStorage.setItem('model', trimmedModel);
-        alert("¡Modelo guardado!");
-    };
-
-    const handleDeleteModel = (modelToDelete: string) => {
-        const updated = savedModels.filter(m => m !== modelToDelete);
-        setSavedModels(updated);
-        localStorage.setItem('savedModels', JSON.stringify(updated));
-    };
-
-    const filteredModels = savedModels.filter(model =>
-        model.toLowerCase().includes(currentModel.toLowerCase())
+    const availableModels = Object.keys(MODEL_REGISTRY);
+    const filteredModels = availableModels.filter(model =>
+        model.toLowerCase().includes(searchQuery.toLowerCase())
     );
+
+    const handleSelectModel = (modelName: string) => {
+        onModelChange(modelName);
+        setSearchQuery('');
+    };
 
     return (
         <div className={styles.settingsViewContainer}>
@@ -159,67 +77,40 @@ export default function SettingView({ currentModel, onModelChange, onClose }: Se
                 {/* MODELS */}
                 <div className={styles.modelContainer}>
                     <label className={styles.configLabel}>Model</label>
-                    <div className={styles.comboboxWrapper}>
-                        <DefaultInput
-                            type="text"
-                            placeholder="Enter custom model ID"
-                            value={currentModel}
-                            onChange={(e) => {
-                                const val = e.target.value;
-                                onModelChange(val);
-                            }}
-                            onFocus={() => setShowModelDropdown(true)}
-                            required
-                        />
-                        <button
-                            type="button"
-                            className={styles.dropdownToggle}
-                            onClick={() => setShowModelDropdown(!showModelDropdown)}
-                        >
-                            ▼
-                        </button>
+                    <div className={styles.modelSelected}>
+                        {currentModel}
                     </div>
-                    <DefaultButton
-                        onClick={handleSaveModel}
-                        iconId="icon-save"
-                    />
-                    {showModelDropdown && (
-                        <div className={styles.dropdownList} ref={modelContainerRef}>
-                            {filteredModels.length > 0 ? (
-                                filteredModels.map(model => (
-                                    <div
-                                        key={model}
-                                        className={styles.dropdownItem}
-                                    >
-                                        <span
-                                            className={styles.modelName}
-                                            onClick={() => {
-                                                onModelChange(model);
-                                                setShowModelDropdown(false);
-                                            }}
-                                        >
-                                            {model}
-                                        </span>
-                                        <button
-                                            type="button"
-                                            className={styles.deleteModelBtn}
-                                            onClick={(e) => {
-                                                e.stopPropagation();
-                                                handleDeleteModel(model);
-                                            }}
-                                            title="Eliminar modelo"
-                                        >
-                                            ✕
-                                        </button>
-                                    </div>
-                                ))
-                            ) : (
-                                <div className={styles.noMatches}>
-                                    No hay coincidencias
+                    <div className={styles.dropdownList}>
+                        <input
+                            type="text"
+                            value={searchQuery}
+                            className={styles.searchBox}
+                            placeholder="Search model ID..."
+                            onChange={(e) => setSearchQuery(e.target.value)}
+                            onKeyDown={(e) => {
+                                if (e.key === 'Enter' && searchQuery.trim()) {
+                                    handleSelectModel(searchQuery.trim());
+                                }
+                            }}
+                        />
+                        {filteredModels.length > 0 ? (
+                            filteredModels.map(model => (
+                                <div
+                                    key={model}
+                                    className={styles.dropdownItem}
+                                    onClick={() => handleSelectModel(model)}
+                                >
+                                    <span className={styles.modelName}>
+                                        {model}
+                                    </span>
                                 </div>
-                            )}
-                        </div>
-                    )}
+                            ))
+                        ) : (
+                            <div className={styles.noMatches}>
+                                No hay coincidencias
+                            </div>
+                        )}
+                    </div>
                 </div>
                 {/* API KEY */}
                 <div className={styles.apiKeyContainer}>

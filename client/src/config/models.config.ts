@@ -27,11 +27,6 @@ export const MODEL_REGISTRY: Record<string, ModelConfig> = {
         defaultThinking: 'high',
         provider: 'google',
     },
-    'gemini-3.1-flash-lite-image': {
-        thinkingLevels: ['minimal', 'high'],
-        defaultThinking: 'minimal',
-        provider: 'google',
-    },
     'gemini-3-flash-preview': {
         thinkingLevels: ['minimal', 'low', 'medium', 'high'],
         defaultThinking: 'high',

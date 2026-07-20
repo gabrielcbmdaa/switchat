@@ -84,79 +84,16 @@
     gap: 10px;
 }
 
-/* OTHERS */
-.modelSelect {
-    flex: 1;
-    border-radius: 20px;
-    background-color: transparent;
-    color: #858585;
-    border: 1px solid #858585;
-    height: 30px;
-    padding-left: 10px;
-    padding-right: 10px;
-    outline: none;
-}
-
-.btnModelSaveConfig {
-    background-color: transparent;
-    color: #858585;
-    border: 1px solid transparent;
-    width: 200px;
-    height: 30px;
-    padding: 5px;
-    border-radius: 20px;
-    transition: background 0.5s;
-    cursor: pointer;
-}
-
-.btnModelSaveConfig:hover {
-    background-color: #858585;
-    color: #000000;
-}
-
-/* COMBOBOX STYLES */
-.comboboxWrapper {
-    position: relative;
-    flex: 1;
-    display: flex;
-    align-items: center;
-}
-
-.comboboxWrapper input {
-    padding-right: 30px;
-    width: 100%;
-}
-
-.dropdownToggle {
-    position: absolute;
-    right: 10px;
-    background: none;
-    border: none;
-    color: #858585;
-    font-size: 10px;
-    cursor: pointer;
-    padding: 0;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    height: 100%;
-    user-select: none;
-    transition: color 0.2s ease;
-}
-
-.dropdownToggle:hover {
-    color: #ffffff;
-}
-
+/* DROPDOWN & MODEL SELECTION STYLES */
 .dropdownList {
     position: relative;
     width: 100%;
-    max-height: 180px;
+    height: 180px;
     overflow-y: auto;
     background-color: #191919;
     border: 1px solid #858585;
     border-radius: 20px;
-    padding: 6px 0;
+    padding-bottom: 6px;
 }
 
 .dropdownItem {
@@ -164,6 +101,7 @@
     justify-content: space-between;
     align-items: center;
     cursor: pointer;
+    margin: 0px 6px;
 }
 
 .modelName {
@@ -179,33 +117,11 @@
     align-items: center;
     padding-left: 12px;
     border-radius: 20px;
-    margin-left: 6px;
 }
 
 .modelName:hover {
     background-color: #858585;
     color: #191919;
-}
-
-.deleteModelBtn {
-    height: 30px;
-    width: 30px;
-    background-color: #191919;
-    border: none;
-    color: #858585;
-    font-size: 10px;
-    cursor: pointer;
-    margin-right: 6px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    border-radius: 20px;
-    transition: all 0.2s ease;
-}
-
-.deleteModelBtn:hover {
-    color: #191919;
-    background-color: #858585;
 }
 
 .noMatches {
@@ -301,4 +217,48 @@
 
 .reasoningSlider::-moz-range-thumb:active {
     transform: scale(1.1);
+}
+
+.modelSelected {
+    display: flex;
+    align-items: center;
+    flex: 1;
+    text-align: start;
+    height: 30px;
+    width: 100%;
+    min-height: 30px;
+    padding-left: 10px;
+    padding-right: 10px;
+    background-color: transparent;
+    color: #858585;
+    border: 1px solid #858585;
+    border-radius: 20px;
+    outline: none;
+    font-family: inherit;
+    font-size: 14px;
+}
+
+.searchBox {
+    position: sticky;
+    top: 0;
+    z-index: 2;
+    background-color: #191919;
+    flex: 1;
+    height: 30px;
+    width: 100%;
+    box-sizing: border-box;
+    min-height: 30px;
+    padding-left: 18px;
+    padding-right: 18px;
+    padding-top: 6px;
+    padding-bottom: 6px;
+    margin-bottom: 2px;
+    color: #858585;
+    border-bottom: 1px solid #858585;
+    border-top: none;
+    border-right: none;
+    border-left: none;
+    outline: none;
+    font-family: inherit;
+    font-size: 14px;
 }
