@@ -51,16 +51,6 @@
     gap: 10px;
 }
 
-.providerContainer {
-    width: 100%;
-    display: flex;
-    justify-content: left;
-    align-items: center;
-    gap: 10px;
-    position: relative;
-    flex-wrap: wrap;
-}
-
 .apiKeyContainer {
     width: 100%;
     display: flex;

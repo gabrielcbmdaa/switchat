@@ -7,13 +7,11 @@ import { getModelConfig } from "../config/models.config";
 
 interface SettingViewProps {
     currentModel: string;
-    currentProvider: string;
     onModelChange: (model: string) => void;
-    onProviderChange: (provider: string) => void;
     onClose?: () => void;
 }
 
-export default function SettingView({ currentModel, currentProvider, onModelChange, onProviderChange, onClose }: SettingViewProps) {
+export default function SettingView({ currentModel, onModelChange, onClose }: SettingViewProps) {
     const [apiKey, setApiKey] = useState(localStorage.getItem('geminiApiKey') || '');
     // 1. Derivamos los niveles directamente del modelo actual (Estado Derivado)
     // Usamos la tabla estática y agregamos fallback dinámico para modelos de la API
@@ -70,32 +68,15 @@ export default function SettingView({ currentModel, currentProvider, onModelChan
         return [currentModel];
     });
 
-    const [savedProviders, setSavedProviders] = useState<string[]>(() => {
-        const stored = localStorage.getItem('savedProviders'); //ADD CLOUD ROUTE
-        if (stored) {
-            try {
-                return JSON.parse(stored);
-            } catch (e) {
-                console.error("Error parsing savedProviders:", e);
-            }
-        }
-        return [currentProvider];
-    });
-
     const [showModelDropdown, setShowModelDropdown] = useState(false);
-    const [showProviderDropdown, setShowProviderDropdown] = useState(false);
 
     const modelContainerRef = useRef<HTMLDivElement>(null);
-    const providerContainerRef = useRef<HTMLDivElement>(null);
 
     // Close dropdown when clicking outside
     useEffect(() => {
         function handleClickOutside(event: MouseEvent) {
             if (modelContainerRef.current && !modelContainerRef.current.contains(event.target as Node)) {
                 setShowModelDropdown(false);
-            }
-            if (providerContainerRef.current && !providerContainerRef.current.contains(event.target as Node)) {
-                setShowProviderDropdown(false);
             }
         }
         document.addEventListener("mousedown", handleClickOutside);
@@ -153,37 +134,14 @@ export default function SettingView({ currentModel, currentProvider, onModelChan
         alert("¡Modelo guardado!");
     };
 
-    const handleSaveProvider = () => {
-        const trimmedProvider = currentProvider.trim();
-        if (!trimmedProvider) return;
-
-        if (!savedProviders.includes(trimmedProvider)) {
-            const updated = [...savedProviders, trimmedProvider];
-            setSavedProviders(updated);
-            localStorage.setItem('savedProviders', JSON.stringify(updated));
-        }
-        localStorage.setItem('provider', trimmedProvider);
-        alert("¡Provider guardado!");
-    };
-
     const handleDeleteModel = (modelToDelete: string) => {
         const updated = savedModels.filter(m => m !== modelToDelete);
         setSavedModels(updated);
         localStorage.setItem('savedModels', JSON.stringify(updated));
     };
 
-    const handleDeleteProvider = (providerToDelete: string) => {
-        const updated = savedProviders.filter(p => p !== providerToDelete);
-        setSavedProviders(updated);
-        localStorage.setItem('savedProviders', JSON.stringify(updated));
-    };
-
     const filteredModels = savedModels.filter(model =>
         model.toLowerCase().includes(currentModel.toLowerCase())
-    );
-
-    const filteredProviders = savedProviders.filter(provider =>
-        provider.toLowerCase().includes(currentProvider.toLowerCase())
     );
 
     return (
@@ -198,68 +156,6 @@ export default function SettingView({ currentModel, currentProvider, onModelChan
             )}
             {/* MODEL SECTION */}
             <div className={styles.modelSection}>
-                {/* PROVIDER */}
-                <div className={styles.providerContainer}>
-                    <label className={styles.configLabel} htmlFor="providerSelect">Provider</label>
-                    <div className={styles.comboboxWrapper}>
-                        <DefaultInput
-                            id="providerSelect"
-                            type="text"
-                            placeholder="Provider..."
-                            value={currentProvider}
-                            onChange={(e) => onProviderChange(e.target.value)}
-                            onFocus={() => setShowProviderDropdown(true)}
-                        />
-                        <button
-                            type="button"
-                            className={styles.dropdownToggle}
-                            onClick={() => setShowProviderDropdown(!showProviderDropdown)}
-                        >
-                            ▼
-                        </button>
-                    </div>
-                    <DefaultButton
-                        onClick={handleSaveProvider}
-                        iconId="icon-save"
-                    />
-                    {showProviderDropdown && (
-                        <div className={styles.dropdownList} ref={providerContainerRef}>
-                            {filteredProviders.length > 0 ? (
-                                filteredProviders.map(provider => (
-                                    <div
-                                        key={provider}
-                                        className={styles.dropdownItem}
-                                    >
-                                        <span
-                                            className={styles.modelName}
-                                            onClick={() => {
-                                                onProviderChange(provider);
-                                                setShowProviderDropdown(false);
-                                            }}
-                                        >
-                                            {provider}
-                                        </span>
-                                        <button
-                                            type="button"
-                                            className={styles.deleteModelBtn}
-                                            onClick={(e) => {
-                                                e.stopPropagation();
-                                                handleDeleteProvider(provider);
-                                            }}
-                                            title="Eliminar proveedor"
-                                        >
-                                            ✕
-                                        </button>
-                                    </div>
-                                ))
-                            ) : (
-                                <div className={styles.noMatches}>
-                                    No hay coincidencias
-                                </div>
-                            )}
-                        </div>
-                    )}
-                </div>
                 {/* MODELS */}
                 <div className={styles.modelContainer}>
                     <label className={styles.configLabel}>Model</label>

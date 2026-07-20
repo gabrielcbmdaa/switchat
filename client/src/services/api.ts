@@ -1,4 +1,5 @@
 import type { Chat, Message, GeminiModel, ChatCompletionRequest } from "../types";
+import { getModelConfig } from "../config/models.config";
 
 export const API_BACKEND_URL = '/api';
 
@@ -100,8 +101,10 @@ export async function syncChatDraftToServer(chat: Chat) {
     }
 }
 
-export async function fetchChatResponse(chatId: string, messagesHistory: Message[], model: string, useServer: boolean, provider: string): Promise<{ text: string, userMessageId?: string, aiMessageId?: string }> {
+export async function fetchChatResponse(chatId: string, messagesHistory: Message[], model: string, useServer: boolean): Promise<{ text: string, userMessageId?: string, aiMessageId?: string }> {
     const modelLowerCase = model.toLowerCase();
+    const config = getModelConfig(model);
+    const provider = config?.provider || 'google';
     const providerLowerCase = provider.toLowerCase();
     const reasoningLevel = localStorage.getItem('reasoningLevel') || 'off';
     // ==========================================
@@ -172,7 +175,19 @@ export async function fetchChatResponse(chatId: string, messagesHistory: Message
                 }));
 
             // Configurar opciones de generación y razonamiento (Thinking Config)
-            const generationConfig: Record<string, any> = {};
+            interface GeminiPart {
+                text?: string;
+                thought?: boolean;
+            }
+
+            interface GeminiGenerationConfig {
+                thinkingConfig?: {
+                    thinkingLevel?: string;
+                    thinkingBudget?: number;
+                };
+            }
+
+            const generationConfig: GeminiGenerationConfig = {};
             if (reasoningLevel !== 'off') {
                 const thinkingLevelMap: Record<string, string> = {
                     'minimal': 'MINIMAL',
@@ -216,14 +231,14 @@ export async function fetchChatResponse(chatId: string, messagesHistory: Message
                 throw new Error('La API de Google no devolvió ninguna respuesta válida.');
             }
 
-            const parts = candidate.content.parts;
+            const parts: GeminiPart[] = candidate.content.parts;
             // Filtrar y devolver únicamente la respuesta final (excluyendo trazas de razonamiento 'thought: true')
             const textContent = parts
-                .filter((part: any) => !part.thought && part.text)
-                .map((part: any) => part.text)
+                .filter((part: GeminiPart) => !part.thought && part.text)
+                .map((part: GeminiPart) => part.text)
                 .join('');
 
-            return { text: textContent || parts.map((part: any) => part.text || '').join('') };
+            return { text: textContent || parts.map((part: GeminiPart) => part.text || '').join('') };
         }
 
         // ------------------------------------------

@@ -20,7 +20,6 @@ export default function App() {
   const currentChat = chatList.find((chat) => chat.id === activeChatId);
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false);
   const [model, setModel] = useState<string>(localStorage.getItem('model') || 'gemini-3.5-flash');
-  const [provider, setProvider] = useState<string>(localStorage.getItem('provider') || 'google');
 
   useEffect(() => {
     async function initializeApp() {
@@ -249,7 +248,7 @@ export default function App() {
     // 4. Llamamos a la API
     try {
       // Le pasamos los mensajes originales (sin el "pensando") a la API
-      const response = await fetchChatResponse(activeChatId, [...currentChat.messages, userMessage], model, isAuthenticated, provider);
+      const response = await fetchChatResponse(activeChatId, [...currentChat.messages, userMessage], model, isAuthenticated);
 
       // Reemplazamos el mensaje "pensando" por la respuesta real, incluyendo los _id de MongoDB
       updatedMessages = [
@@ -361,7 +360,7 @@ export default function App() {
 
     // 6. Hacer la petición a la API
     try {
-      const response = await fetchChatResponse(activeChatId, historyUpToUser, model, isAuthenticated, provider);
+      const response = await fetchChatResponse(activeChatId, historyUpToUser, model, isAuthenticated);
 
       // Reemplazamos "Thinking" por la respuesta y actualizamos los IDs
       updatedMessages = [
@@ -475,14 +474,9 @@ export default function App() {
           <aside className="settings-section" id='settings-section' aria-label="Panel de configuración">
             <SettingView
               currentModel={model}
-              currentProvider={provider}
               onModelChange={(newModel) => {
                 setModel(newModel);
                 localStorage.setItem('model', newModel);
-              }}
-              onProviderChange={(newProvider) => {
-                setProvider(newProvider);
-                localStorage.setItem('provider', newProvider);
               }}
               onClose={() => setActiveRightPanel(null)}
             />
