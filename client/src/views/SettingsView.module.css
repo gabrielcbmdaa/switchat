@@ -1,3 +1,6 @@
+/* ============================================================
+   1. MAIN CONTAINER & HEADER
+   ============================================================ */
 .settingsViewContainer {
     width: 100%;
     height: 100%;
@@ -32,59 +35,63 @@
     background-color: #858585;
 }
 
-/* CHAGE TITLE SECTION */
-.changeTitleSection {
-    width: 100%;
-    display: flex;
-    justify-content: left;
-    align-items: center;
-    gap: 10px;
+.configLabel {
+    font-size: 14px;
+    font-weight: 500;
+    color: #858585;
+    user-select: none;
+    white-space: nowrap;
 }
 
-/* MODEL SECTION */
+.providerIcon {
+    width: 16px;
+    height: 16px;
+    flex-shrink: 0;
+    fill: currentColor;
+}
+
+/* ============================================================
+   2. MODEL SELECTION SECTION
+   ============================================================ */
 .modelSection {
     width: 100%;
     display: flex;
-    justify-content: left;
+    justify-content: flex-start;
     align-items: flex-start;
     flex-direction: column;
-    gap: 10px;
-}
-
-.apiKeyContainer {
-    width: 100%;
-    display: flex;
-    align-items: center;
-    justify-content: left;
     gap: 10px;
 }
 
 .modelContainer {
     width: 100%;
     display: flex;
-    justify-content: left;
+    justify-content: flex-start;
     align-items: center;
     gap: 10px;
     position: relative;
     flex-wrap: wrap;
 }
 
-.profileContainer {
-    width: 100%;
+.modelSelected {
     display: flex;
-    justify-content: left;
     align-items: center;
-    gap: 10px;
-}
-
-.columnContainer {
-    display: flex;
-    flex-direction: column;
+    flex: 1;
+    text-align: start;
+    height: 30px;
     width: 100%;
-    gap: 10px;
+    min-height: 30px;
+    padding-left: 10px;
+    padding-right: 10px;
+    background-color: transparent;
+    color: #858585;
+    border: 1px solid #858585;
+    border-radius: 20px;
+    outline: none;
+    font-family: inherit;
+    font-size: 14px;
+    gap: 8px;
 }
 
-/* DROPDOWN & MODEL SELECTION STYLES */
 .dropdownList {
     position: relative;
     width: 100%;
@@ -96,12 +103,34 @@
     padding-bottom: 6px;
 }
 
+.searchBox {
+    position: sticky;
+    top: 0;
+    z-index: 2;
+    background-color: #191919;
+    flex: 1;
+    height: 30px;
+    width: 100%;
+    box-sizing: border-box;
+    min-height: 30px;
+    padding: 6px 18px;
+    margin-bottom: 2px;
+    color: #858585;
+    border-bottom: 1px solid #858585;
+    border-top: none;
+    border-right: none;
+    border-left: none;
+    outline: none;
+    font-family: inherit;
+    font-size: 14px;
+}
+
 .dropdownItem {
     display: flex;
     justify-content: space-between;
     align-items: center;
     cursor: pointer;
-    margin: 0px 6px;
+    margin: 0 6px;
 }
 
 .modelName {
@@ -135,19 +164,134 @@
     font-style: italic;
 }
 
-.configLabel {
-    font-size: 14px;
-    font-weight: 500;
-    color: #858585;
-    user-select: none;
+/* ============================================================
+   3. API KEY SECTION
+   ============================================================ */
+.apiKeySection {
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    align-items: flex-start;
 }
 
+.apiKeyContainer {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: flex-start;
+    gap: 10px;
+}
+
+.providerButtonsContainer {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-shrink: 0;
+}
+
+.apiKeysListContainer {
+    position: relative;
+    width: 100%;
+    height: 180px;
+    overflow-y: auto;
+    background-color: #191919;
+    border: 1px solid #858585;
+    border-radius: 20px;
+    padding: 6px 0;
+}
+
+.apiKeyDropdownItem {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    cursor: pointer;
+    margin: 0 6px;
+    padding: 0 10px;
+    height: 32px;
+    border-radius: 20px;
+    transition: background-color 0.2s ease;
+}
+
+.apiKeyDropdownItem:hover {
+    background-color: #858585;
+}
+
+.apiKeyDropdownItem:hover .apiKeyText {
+    color: #191919;
+}
+
+.apiKeyDropdownItem:hover .providerIcon {
+    fill: #191919;
+    color: #191919;
+}
+
+.apiKeyDropdownItem:hover .deleteApiKeyBtn {
+    color: #191919;
+}
+
+.apiKeyDropdownItem:hover .deleteApiKeyBtn:hover {
+    background-color: #191919;
+    color: #858585;
+}
+
+.apiKeyItemContent {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex: 1;
+    overflow: hidden;
+}
+
+.activeDot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background-color: transparent;
+    flex-shrink: 0;
+    transition: background-color 0.2s ease;
+}
+
+.activeDotVisible {
+    background-color: #858585;
+}
+
+.apiKeyDropdownItem:hover .activeDotVisible {
+    background-color: #191919;
+}
+
+.apiKeyText {
+    color: #858585;
+    font-size: 13px;
+    font-family: monospace;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.deleteApiKeyBtn {
+    height: 24px;
+    width: 24px;
+    background-color: transparent;
+    border: none;
+    color: #858585;
+    font-size: 10px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+    transition: all 0.2s ease;
+}
+
+/* ============================================================
+   4. REASONING SLIDER SECTION
+   ============================================================ */
 .reasoningContainer {
     display: flex;
     flex-direction: column;
     width: 100%;
     gap: 12px;
-    margin-top: 15px;
 }
 
 .reasoningHeader {
@@ -168,13 +312,6 @@
     border-radius: 20px;
     border: 1px solid #858585;
     transition: all 0.2s ease;
-}
-
-.sliderWrapper {
-    width: 100%;
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
 }
 
 .reasoningSlider {
@@ -218,56 +355,4 @@
 
 .reasoningSlider::-moz-range-thumb:active {
     transform: scale(1.1);
-}
-
-.modelSelected {
-    display: flex;
-    align-items: center;
-    flex: 1;
-    text-align: start;
-    height: 30px;
-    width: 100%;
-    min-height: 30px;
-    padding-left: 10px;
-    padding-right: 10px;
-    background-color: transparent;
-    color: #858585;
-    border: 1px solid #858585;
-    border-radius: 20px;
-    outline: none;
-    font-family: inherit;
-    font-size: 14px;
-    gap: 8px;
-}
-
-.providerIcon {
-    width: 16px;
-    height: 16px;
-    flex-shrink: 0;
-    fill: currentColor;
-}
-
-.searchBox {
-    position: sticky;
-    top: 0;
-    z-index: 2;
-    background-color: #191919;
-    flex: 1;
-    height: 30px;
-    width: 100%;
-    box-sizing: border-box;
-    min-height: 30px;
-    padding-left: 18px;
-    padding-right: 18px;
-    padding-top: 6px;
-    padding-bottom: 6px;
-    margin-bottom: 2px;
-    color: #858585;
-    border-bottom: 1px solid #858585;
-    border-top: none;
-    border-right: none;
-    border-left: none;
-    outline: none;
-    font-family: inherit;
-    font-size: 14px;
 }

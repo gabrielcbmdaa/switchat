@@ -6,6 +6,7 @@ interface DefaultButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElemen
   size?: number;     // Button size (width and height)
   iconSize?: number; // SVG Icon size (width and height)
   iconId?: string;   // custom icon ID, e.g. "icon-pencil"
+  viewBox?: string;  // SVG viewBox opcional
 }
 
 export default function DefaultButton({
@@ -15,6 +16,7 @@ export default function DefaultButton({
   size = 30,
   iconSize = 22,
   iconId = 'icon-confirm',
+  viewBox,
   ...props
 }: DefaultButtonProps) {
   return (
@@ -25,7 +27,7 @@ export default function DefaultButton({
       style={{ width: size, height: size }}
       {...props}
     >
-      <svg width={iconSize} height={iconSize} viewBox="0 0 24 24">
+      <svg width={iconSize} height={iconSize} {...(viewBox ? { viewBox } : {})}>
         <use xlinkHref={`#${iconId}`} />
       </svg>
     </button>
