@@ -14,6 +14,8 @@ export interface ModelConfig {
     defaultThinking: string;
     /** Proveedor del modelo */
     provider: string;
+    /** Mapeo de nivel de thinking a budget_tokens para el proveedor */
+    thinkingBudgets: Record<string, number>;
 }
 
 /**
@@ -26,21 +28,31 @@ export const MODEL_REGISTRY: Record<string, ModelConfig> = {
         thinkingLevels: ['low', 'medium', 'high'],
         defaultThinking: 'high',
         provider: 'google',
+        thinkingBudgets: {},
     },
     'gemini-3-flash-preview': {
         thinkingLevels: ['minimal', 'low', 'medium', 'high'],
         defaultThinking: 'high',
         provider: 'google',
+        thinkingBudgets: {},
     },
     'gemini-3-pro-preview': {
         thinkingLevels: ['low', 'high'],
         defaultThinking: 'high',
         provider: 'google',
+        thinkingBudgets: {},
     },
     'gemini-3.5-flash': {
         thinkingLevels: ['minimal', 'low', 'medium', 'high'],
         defaultThinking: 'medium',
         provider: 'google',
+        thinkingBudgets: {},
+    },
+    'gemini-3.1-flash-lite': {
+        thinkingLevels: ['minimal', 'low', 'medium', 'high'],
+        defaultThinking: 'minimal',
+        provider: 'google',
+        thinkingBudgets: {},
     },
 
     // ── Google Gemini 2.5 ──────────────────────────────────
@@ -48,28 +60,118 @@ export const MODEL_REGISTRY: Record<string, ModelConfig> = {
         thinkingLevels: ['low', 'medium', 'high'],
         defaultThinking: 'high',
         provider: 'google',
+        thinkingBudgets: {},
     },
     'gemini-2.5-flash': {
         thinkingLevels: ['low', 'medium', 'high'],
         defaultThinking: 'high',
         provider: 'google',
+        thinkingBudgets: {},
     },
     'gemini-2.5-flash-lite': {
         thinkingLevels: ['low', 'medium', 'high'],
         defaultThinking: 'off',
         provider: 'google',
+        thinkingBudgets: {},
     },
-    // ── Anthropic Claude 5.x ──────────────────────────────────
-    'claude-sonnet-5-test': {
+    // ── Anthropic Claude ─────────────────────────────────────
+    'claude-fable-5': {
         thinkingLevels: ['minimal', 'low', 'medium', 'high'],
         defaultThinking: 'high',
         provider: 'anthropic',
+        thinkingBudgets: {
+            minimal: 2048,
+            low: 8192,
+            medium: 16384,
+            high: 32768,
+        },
     },
-    // ── OpenAI GPT 5.x ──────────────────────────────────
-    'gpt-5.4-mini-test': {
+    'claude-opus-4-8': {
         thinkingLevels: ['minimal', 'low', 'medium', 'high'],
         defaultThinking: 'high',
+        provider: 'anthropic',
+        thinkingBudgets: {
+            minimal: 2048,
+            low: 8192,
+            medium: 16384,
+            high: 32768,
+        },
+    },
+    'claude-sonnet-5': {
+        thinkingLevels: ['minimal', 'low', 'medium', 'high'],
+        defaultThinking: 'high',
+        provider: 'anthropic',
+        thinkingBudgets: {
+            minimal: 1024,
+            low: 4096,
+            medium: 8192,
+            high: 16384,
+        },
+    },
+    'claude-haiku-4-5-20251001': {
+        thinkingLevels: ['minimal', 'low', 'medium', 'high'],
+        defaultThinking: 'medium',
+        provider: 'anthropic',
+        thinkingBudgets: {
+            minimal: 1024,
+            low: 2048,
+            medium: 4096,
+            high: 8192,
+        },
+    },
+    'claude-haiku-4-5': {
+        thinkingLevels: ['minimal', 'low', 'medium', 'high'],
+        defaultThinking: 'medium',
+        provider: 'anthropic',
+        thinkingBudgets: {
+            minimal: 1024,
+            low: 2048,
+            medium: 4096,
+            high: 8192,
+        },
+    },
+    // ── OpenAI GPT & Reasoning ──────────────────────────────
+    'gpt-5.6-sol': {
+        thinkingLevels: ['minimal', 'low', 'medium', 'high', 'xhigh'],
+        defaultThinking: 'high',
         provider: 'openai',
+        thinkingBudgets: {},
+    },
+    'gpt-5.6-terra': {
+        thinkingLevels: ['minimal', 'low', 'medium', 'high'],
+        defaultThinking: 'medium',
+        provider: 'openai',
+        thinkingBudgets: {},
+    },
+    'gpt-5.6-luna': {
+        thinkingLevels: ['minimal', 'low', 'medium'],
+        defaultThinking: 'low',
+        provider: 'openai',
+        thinkingBudgets: {},
+    },
+    'gpt-5.5': {
+        thinkingLevels: ['low', 'medium', 'high'],
+        defaultThinking: 'high',
+        provider: 'openai',
+        thinkingBudgets: {},
+    },
+    'gpt-5.4-mini': {
+        thinkingLevels: ['minimal', 'low', 'medium', 'high'],
+        defaultThinking: 'medium',
+        provider: 'openai',
+        thinkingBudgets: {},
+    },
+    'o3-mini': {
+        thinkingLevels: ['low', 'medium', 'high'],
+        defaultThinking: 'high',
+        provider: 'openai',
+        thinkingBudgets: {},
+    },
+    'o1': {
+        thinkingLevels: ['low', 'medium', 'high'],
+        defaultThinking: 'medium',
+        provider: 'openai',
+        thinkingBudgets: {},
     },
 };
 
