@@ -10,6 +10,7 @@ import AccountView from './views/AccountView';
 import SettingView from './views/SettingsView';
 import MessageView from './views/MessageView';
 import NotesView from './views/NotesView';
+import { getModelConfig } from './config/models.config';
 
 export default function App() {
   const [chatList, setChatList] = useState<Chat[]>([]);
@@ -19,7 +20,13 @@ export default function App() {
   const [hasMoreMap, setHasMoreMap] = useState<Record<string, boolean>>({});
   const currentChat = chatList.find((chat) => chat.id === activeChatId);
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false);
-  const [model, setModel] = useState<string>(localStorage.getItem('model') || 'gemini-3.5-flash');
+  const [model, setModel] = useState<string>(() => {
+    const savedModel = localStorage.getItem('model');
+    if (savedModel && getModelConfig(savedModel)) {
+      return savedModel;
+    }
+    return 'gemini-3.5-flash';
+  });
 
   useEffect(() => {
     async function initializeApp() {
