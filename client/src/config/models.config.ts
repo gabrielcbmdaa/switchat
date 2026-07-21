@@ -24,27 +24,27 @@ export interface ModelConfig {
  */
 export const MODEL_REGISTRY: Record<string, ModelConfig> = {
     // ── Google Gemini 3.x ──────────────────────────────────
-    'gemini-3.1-pro-preview': {
-        thinkingLevels: ['low', 'medium', 'high'],
-        defaultThinking: 'high',
-        provider: 'google',
-        thinkingBudgets: {},
-    },
-    'gemini-3-flash-preview': {
+    'gemini-3.6-flash': {
         thinkingLevels: ['minimal', 'low', 'medium', 'high'],
-        defaultThinking: 'high',
-        provider: 'google',
-        thinkingBudgets: {},
-    },
-    'gemini-3-pro-preview': {
-        thinkingLevels: ['low', 'high'],
-        defaultThinking: 'high',
+        defaultThinking: 'medium',
         provider: 'google',
         thinkingBudgets: {},
     },
     'gemini-3.5-flash': {
         thinkingLevels: ['minimal', 'low', 'medium', 'high'],
         defaultThinking: 'medium',
+        provider: 'google',
+        thinkingBudgets: {},
+    },
+    'gemini-3.5-flash-lite': {
+        thinkingLevels: ['minimal', 'low', 'medium', 'high'],
+        defaultThinking: 'minimal',
+        provider: 'google',
+        thinkingBudgets: {},
+    },
+    'gemini-3.1-pro-preview': {
+        thinkingLevels: ['low', 'medium', 'high'],
+        defaultThinking: 'high',
         provider: 'google',
         thinkingBudgets: {},
     },
@@ -55,7 +55,7 @@ export const MODEL_REGISTRY: Record<string, ModelConfig> = {
         thinkingBudgets: {},
     },
 
-    // ── Google Gemini 2.5 ──────────────────────────────────
+    // ── Google Gemini 2.5 ────────────────────────────────────
     'gemini-2.5-pro': {
         thinkingLevels: ['low', 'medium', 'high'],
         defaultThinking: 'high',
@@ -68,12 +68,7 @@ export const MODEL_REGISTRY: Record<string, ModelConfig> = {
         provider: 'google',
         thinkingBudgets: {},
     },
-    'gemini-2.5-flash-lite': {
-        thinkingLevels: ['low', 'medium', 'high'],
-        defaultThinking: 'off',
-        provider: 'google',
-        thinkingBudgets: {},
-    },
+
     // ── Anthropic Claude ─────────────────────────────────────
     'claude-fable-5': {
         thinkingLevels: ['minimal', 'low', 'medium', 'high'],
@@ -108,17 +103,6 @@ export const MODEL_REGISTRY: Record<string, ModelConfig> = {
             high: 16384,
         },
     },
-    'claude-haiku-4-5-20251001': {
-        thinkingLevels: ['minimal', 'low', 'medium', 'high'],
-        defaultThinking: 'medium',
-        provider: 'anthropic',
-        thinkingBudgets: {
-            minimal: 1024,
-            low: 2048,
-            medium: 4096,
-            high: 8192,
-        },
-    },
     'claude-haiku-4-5': {
         thinkingLevels: ['minimal', 'low', 'medium', 'high'],
         defaultThinking: 'medium',
@@ -144,7 +128,7 @@ export const MODEL_REGISTRY: Record<string, ModelConfig> = {
         thinkingBudgets: {},
     },
     'gpt-5.6-luna': {
-        thinkingLevels: ['minimal', 'low', 'medium'],
+        thinkingLevels: ['none', 'low', 'medium', 'high', 'xhigh'],
         defaultThinking: 'low',
         provider: 'openai',
         thinkingBudgets: {},
@@ -157,18 +141,6 @@ export const MODEL_REGISTRY: Record<string, ModelConfig> = {
     },
     'gpt-5.4-mini': {
         thinkingLevels: ['minimal', 'low', 'medium', 'high'],
-        defaultThinking: 'medium',
-        provider: 'openai',
-        thinkingBudgets: {},
-    },
-    'o3-mini': {
-        thinkingLevels: ['low', 'medium', 'high'],
-        defaultThinking: 'high',
-        provider: 'openai',
-        thinkingBudgets: {},
-    },
-    'o1': {
-        thinkingLevels: ['low', 'medium', 'high'],
         defaultThinking: 'medium',
         provider: 'openai',
         thinkingBudgets: {},
