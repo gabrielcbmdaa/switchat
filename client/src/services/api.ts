@@ -158,6 +158,8 @@ export async function fetchChatResponse(
   const provider = (config?.provider || 'google').toLowerCase();
   const reasoningLevel = localStorage.getItem('reasoningLevel') || 'off';
 
+  const thinkingBudget = config?.thinkingBudgets?.[reasoningLevel] || 4096;
+
   if (useServer) {
     const lastMessageText = messagesHistory.at(-1)?.parts?.[0]?.text ?? '';
 
@@ -169,6 +171,7 @@ export async function fetchChatResponse(
         model: modelLowerCase,
         provider,
         reasoningLevel,
+        thinkingBudget,
       }),
     });
 
