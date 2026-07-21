@@ -23,9 +23,3 @@ export interface GeminiModel {
   supportedGenerationMethods: string[];
   thinking?: boolean;
 }
-
-export interface ChatCompletionRequest {
-  model: string;
-  messages: { role: string; content: string }[];
-  reasoning_effort?: string;
-}
