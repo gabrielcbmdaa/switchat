@@ -222,6 +222,8 @@ async function fetchFromProvider({ model, provider, messagesHistory, reasoningLe
     const modelLowerCase = model ? model.toLowerCase() : '';
     const providerLowerCase = (provider || 'google').toLowerCase();
 
+    console.log(`🚀 [Backend] Enviando petición a ${providerLowerCase} con modelo: ${modelLowerCase}`);
+
     switch (providerLowerCase) {
         case 'google':
             return await sendToGoogle(modelLowerCase, messagesHistory, reasoningLevel);
