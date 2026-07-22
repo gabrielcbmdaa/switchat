@@ -16,6 +16,7 @@ export default function App() {
   const [chatList, setChatList] = useState<Chat[]>([]);
   const [activeChatId, setActiveChatId] = useState<string>('');
   const [currentView, setCurrentView] = useState<'account' | 'chats'>('chats');
+  const [isLeftSidebarOpen, setIsLeftSidebarOpen] = useState<boolean>(true);
   const [activeRightPanel, setActiveRightPanel] = useState<'settings' | 'notes' | null>(null);
   const [hasMoreMap, setHasMoreMap] = useState<Record<string, boolean>>({});
   const currentChat = chatList.find((chat) => chat.id === activeChatId);
@@ -27,6 +28,12 @@ export default function App() {
     }
     return 'gemini-3.5-flash';
   });
+
+  useEffect(() => {
+    if (isLeftSidebarOpen) {
+      initResizer();
+    }
+  }, [isLeftSidebarOpen]);
 
   useEffect(() => {
     async function initializeApp() {
@@ -449,17 +456,21 @@ export default function App() {
       <div className="app-container" id='app-container'>
 
 
-        <aside className="sidebar-section" id='sidebar-section' aria-label="Navegación principal">
-          {renderMainContent()}
-          <Toolbar
-            onNavChats={() => setCurrentView('chats')}
-            onNavNotes={() => setActiveRightPanel((prev) => (prev === 'notes' ? null : 'notes'))}
-            onNavConfig={() => setActiveRightPanel((prev) => (prev === 'settings' ? null : 'settings'))}
-            onNavAccount={() => setCurrentView('account')}
-          />
-        </aside>
+        {isLeftSidebarOpen && (
+          <>
+            <aside className="sidebar-section" id='sidebar-section' aria-label="Navegación principal">
+              {renderMainContent()}
+              <Toolbar
+                onNavChats={() => setCurrentView('chats')}
+                onNavNotes={() => setActiveRightPanel((prev) => (prev === 'notes' ? null : 'notes'))}
+                onNavConfig={() => setActiveRightPanel((prev) => (prev === 'settings' ? null : 'settings'))}
+                onNavAccount={() => setCurrentView('account')}
+              />
+            </aside>
 
-        <div className="resizer" id='resizer'></div>
+            <div className="resizer" id='resizer'></div>
+          </>
+        )}
 
         <main className="message-section">
           <MessageView
@@ -474,7 +485,10 @@ export default function App() {
             draft={currentChat?.draft || ''}
             onDraftChange={handleDraftChange}
             onSendMessage={handleSendMessage}
+            isLeftSidebarOpen={isLeftSidebarOpen}
             isRightSidebarOpen={activeRightPanel !== null}
+            onToggleLeftSidebar={() => setIsLeftSidebarOpen((prev) => !prev)}
+            onToggleRightSidebar={() => setActiveRightPanel((prev) => (prev ? null : 'settings'))}
           />
         </main>
 
