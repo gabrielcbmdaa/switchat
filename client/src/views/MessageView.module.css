@@ -3,18 +3,42 @@
     width: 100%;
     height: 100%;
     overflow: hidden;
+    display: flex;
+    flex-direction: column;
     margin-bottom: 16px;
+}
+
+.toggleBtn {
+    position: absolute;
+    top: 14px;
+    z-index: 10;
+    background-color: #191919;
+}
+
+.toggleBtnLeft {
+    left: 16px;
+}
+
+.toggleBtnRight {
+    right: 16px;
+}
+
+.toggleBtn:hover {
+    background-color: #858585;
+    color: #191919;
+    border-color: #858585;
 }
 
 .messageViewContainer {
     background-color: transparent;
     display: flex;
     width: 100%;
-    height: 100%;
+    flex: 1;
+    min-height: 0;
     flex-direction: column;
     gap: 15px;
     overflow-y: auto;
-    padding: 26px;
+    padding: 52px 26px 26px 26px;
     /* padding-bottom se aplica dinámicamente desde React */
 }
 

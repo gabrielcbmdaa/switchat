@@ -474,6 +474,7 @@ export default function App() {
             draft={currentChat?.draft || ''}
             onDraftChange={handleDraftChange}
             onSendMessage={handleSendMessage}
+            isRightSidebarOpen={activeRightPanel !== null}
           />
         </main>
 

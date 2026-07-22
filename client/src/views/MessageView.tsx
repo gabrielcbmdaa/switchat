@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, useCallback } from 'react';
 import styles from './MessageView.module.css'
 import MessageBubble from '../components/MessageBubble';
 import PromptInput from '../components/PromptInput';
+import DefaultButton from '../components/DefaultButton';
 import type { Message } from '../types';
 
 interface MessageViewProps {
@@ -15,9 +16,28 @@ interface MessageViewProps {
     draft: string;
     onDraftChange: (draft: string) => void;
     onSendMessage: () => void;
+    isLeftSidebarOpen?: boolean;
+    isRightSidebarOpen?: boolean;
+    onToggleLeftSidebar?: () => void;
+    onToggleRightSidebar?: () => void;
 }
 
-export default function MessageView({ messages, chatId, hasMoreMap, onLoadMore, onDeleteMessage, onRetryMessage, token, draft, onDraftChange, onSendMessage }: MessageViewProps) {
+export default function MessageView({
+    messages,
+    chatId,
+    hasMoreMap,
+    onLoadMore,
+    onDeleteMessage,
+    onRetryMessage,
+    token,
+    draft,
+    onDraftChange,
+    onSendMessage,
+    isLeftSidebarOpen = true,
+    isRightSidebarOpen = false,
+    onToggleLeftSidebar,
+    onToggleRightSidebar
+}: MessageViewProps) {
     const [visibleCount, setVisibleCount] = useState(6);
     const [promptHeight, setPromptHeight] = useState(58); // Altura inicial estimada del prompt
     const containerRef = useRef<HTMLDivElement>(null);
@@ -129,6 +149,24 @@ export default function MessageView({ messages, chatId, hasMoreMap, onLoadMore, 
 
     return (
         <div className={styles.messageViewWrapper}>
+            <DefaultButton
+                className={`${styles.toggleBtn} ${styles.toggleBtnLeft}`}
+                onClick={onToggleLeftSidebar || (() => {})}
+                iconId={isLeftSidebarOpen ? "icon-chevron-left" : "icon-chevron-right"}
+                size={30}
+                iconSize={16}
+                title={isLeftSidebarOpen ? "Ocultar barra izquierda" : "Mostrar barra izquierda"}
+            />
+
+            <DefaultButton
+                className={`${styles.toggleBtn} ${styles.toggleBtnRight}`}
+                onClick={onToggleRightSidebar || (() => {})}
+                iconId={isRightSidebarOpen ? "icon-chevron-right" : "icon-chevron-left"}
+                size={30}
+                iconSize={16}
+                title={isRightSidebarOpen ? "Ocultar barra derecha" : "Mostrar barra derecha"}
+            />
+
             <div
                 ref={containerRef}
                 className={styles.messageViewContainer}
