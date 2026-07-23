@@ -5,6 +5,21 @@ export interface ProviderResponse {
     text: string;
 }
 
+/**
+ * Obtiene la API key correspondiente al proveedor desde localStorage.
+ */
+export function getApiKeyForProvider(providerName: string): string {
+    const p = (providerName || '').toLowerCase();
+    if (p === 'google') {
+        return localStorage.getItem('geminiApiKey') || '';
+    } else if (p === 'anthropic') {
+        return localStorage.getItem('anthropicApiKey') || '';
+    } else if (p === 'openai') {
+        return localStorage.getItem('openaiApiKey') || '';
+    }
+    return '';
+}
+
 // Interfaces internas para Google Gemini
 interface GeminiPart {
     text?: string;

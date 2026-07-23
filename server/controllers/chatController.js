@@ -4,9 +4,10 @@ const { fetchFromProvider } = require('../services/providerService');
 
 exports.createMessage = async (req, res) => {
     try {
-        // 1. Extraemos los datos que vienen del frontend
+        // 1. Extraemos los datos que vienen del frontend (incluyendo la clave de API efímera si fue enviada)
         const { chatId } = req.params;
         const { content, messages, model, provider, reasoningLevel, thinkingBudget } = req.body;
+        const userApiKey = req.headers['x-user-api-key'] || req.body.userApiKey;
 
         // Validación rápida
         if (!content || content.trim() === '') {
@@ -27,7 +28,8 @@ exports.createMessage = async (req, res) => {
             provider,
             messagesHistory: messages,
             reasoningLevel,
-            thinkingBudget
+            thinkingBudget,
+            userApiKey
         });
 
         // 4. GUARDAR LA RESPUESTA DE LA AI en MongoDB Atlas

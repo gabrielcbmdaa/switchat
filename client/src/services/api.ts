@@ -1,6 +1,6 @@
 import type { Chat, Message } from "../types";
 import { getModelConfig } from "../config/models.config";
-import { fetchFromProvider } from "./providers";
+import { fetchFromProvider, getApiKeyForProvider } from "./providers";
 
 export const API_BACKEND_URL = '/api';
 
@@ -161,10 +161,17 @@ export async function fetchChatResponse(
   const thinkingBudget = config?.thinkingBudgets?.[reasoningLevel] || 4096;
 
   if (useServer) {
+    const userApiKey = getApiKeyForProvider(provider);
     const lastMessageText = messagesHistory.at(-1)?.parts?.[0]?.text ?? '';
+
+    const headers: Record<string, string> = {};
+    if (userApiKey) {
+      headers['x-user-api-key'] = userApiKey;
+    }
 
     const response = await apiFetch(`/chats/${chatId}/messages`, {
       method: 'POST',
+      headers,
       body: JSON.stringify({
         content: lastMessageText,
         messages: messagesHistory,
