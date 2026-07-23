@@ -15,9 +15,8 @@ import { getModelConfig } from './config/models.config';
 export default function App() {
   const [chatList, setChatList] = useState<Chat[]>([]);
   const [activeChatId, setActiveChatId] = useState<string>('');
-  const [currentView, setCurrentView] = useState<'account' | 'chats'>('chats');
-  const [isLeftSidebarOpen, setIsLeftSidebarOpen] = useState<boolean>(true);
-  const [activeRightPanel, setActiveRightPanel] = useState<'settings' | 'notes' | null>(null);
+  const [activeLeftPanel, setActiveLeftPanel] = useState<'chats' | 'account' | null>('chats');
+  const [activeRightPanel, setActiveRightPanel] = useState<'settings' | 'notes' | null>('settings');
   const [hasMoreMap, setHasMoreMap] = useState<Record<string, boolean>>({});
   const currentChat = chatList.find((chat) => chat.id === activeChatId);
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false);
@@ -30,14 +29,19 @@ export default function App() {
   });
 
   useEffect(() => {
-    if (isLeftSidebarOpen) {
-      initResizer();
+    if (activeLeftPanel !== null) {
+      return initResizer('left');
     }
-  }, [isLeftSidebarOpen]);
+  }, [activeLeftPanel]);
+
+  useEffect(() => {
+    if (activeRightPanel !== null) {
+      return initResizer('right');
+    }
+  }, [activeRightPanel]);
 
   useEffect(() => {
     async function initializeApp() {
-      initResizer();
       let initialChats = loadLocalChats() || [];
       let initialActiveId = loadLocalActiveChatId() || '';
 
@@ -153,12 +157,12 @@ export default function App() {
 
     // 3. Le decimos a React cuál es el nuevo ID activo y a qué vista ir
     setActiveChatId(newId);
-    setCurrentView('chats');
+    setActiveLeftPanel('chats');
   }
 
   function handleSelectChat(clickedChatId: string) {
     setActiveChatId(clickedChatId);
-    setCurrentView('chats');
+    setActiveLeftPanel('chats');
     saveToLocalDisk(chatList, clickedChatId);
     const clickedChat = chatList.find(chat => chat.id === clickedChatId);
     if (clickedChat && isAuthenticated) {
@@ -182,7 +186,7 @@ export default function App() {
 
   async function handleAuthSuccess() {
     localStorage.setItem('isLoggedIn', 'true'); // 👈 Guardamos el indicador de inicio de sesión
-    setCurrentView('chats');
+    setActiveLeftPanel('chats');
     setIsAuthenticated(true);
     setChatList([]);
     setActiveChatId('');
@@ -212,7 +216,7 @@ export default function App() {
 
     // 3. Cambiamos la vista. Lo ponemos al final para que la pantalla de chat 
     // ya entre con los datos cargados en memoria.
-    setCurrentView('chats');
+    setActiveLeftPanel('chats');
   }
 
   async function resetSessionToDefault() {
@@ -227,7 +231,7 @@ export default function App() {
     // 3. Le avisamos a React para que actualice la interfaz sola
     setChatList(tutorialChats);
     setActiveChatId(tutorialId);
-    setCurrentView('chats');
+    setActiveLeftPanel('chats');
 
     // 4. Guardamos en el disco local esta estructura limpia
     saveToLocalDisk(tutorialChats, tutorialId);
@@ -423,50 +427,39 @@ export default function App() {
     }
   }
 
-  function renderMainContent() {
-    switch (currentView) {
-      case 'account':
-        return (
-          <AccountView
-            isAuthenticated={isAuthenticated}
-            onAuthSuccess={handleAuthSuccess}
-            onLogoutAction={resetSessionToDefault}
-          />
-        );
-      case 'chats':
-        return (
-          <Sidebar
-            chatList={chatList}
-            activeChatId={activeChatId}
-            onChatClick={handleSelectChat}
-            onCreateNewChat={handleCreateNewChat}
-            onDeleteChat={handleDeleteChat}
-            onReTitleChat={handleReTitleChat}
-          />
-        );
-      default:
-        return null;
-    }
-  }
-
   return (
     <>
       {/* 1. Inyectamos los símbolos en el DOM */}
       <SvgIcons />
       <div className="app-container" id='app-container'>
 
-
-        {isLeftSidebarOpen && (
+        {activeLeftPanel !== null && (
           <>
             <aside className="sidebar-section" id='sidebar-section' aria-label="Navegación principal">
-              {renderMainContent()}
+              {activeLeftPanel === 'account' && (
+                <AccountView
+                  isAuthenticated={isAuthenticated}
+                  onAuthSuccess={handleAuthSuccess}
+                  onLogoutAction={resetSessionToDefault}
+                />
+              )}
+              {activeLeftPanel === 'chats' && (
+                <Sidebar
+                  chatList={chatList}
+                  activeChatId={activeChatId}
+                  onChatClick={handleSelectChat}
+                  onCreateNewChat={handleCreateNewChat}
+                  onDeleteChat={handleDeleteChat}
+                  onReTitleChat={handleReTitleChat}
+                />
+              )}
               <Toolbar
-                onNavChats={() => setCurrentView('chats')}
-                onNavAccount={() => setCurrentView('account')}
+                onNavChats={() => setActiveLeftPanel('chats')}
+                onNavAccount={() => setActiveLeftPanel('account')}
               />
             </aside>
 
-            <div className="resizer" id='resizer'></div>
+            <div className="resizer resizer-left" id='left-resizer'></div>
           </>
         )}
 
@@ -483,32 +476,35 @@ export default function App() {
             draft={currentChat?.draft || ''}
             onDraftChange={handleDraftChange}
             onSendMessage={handleSendMessage}
-            isLeftSidebarOpen={isLeftSidebarOpen}
+            isLeftSidebarOpen={activeLeftPanel !== null}
             isRightSidebarOpen={activeRightPanel !== null}
-            onToggleLeftSidebar={() => setIsLeftSidebarOpen((prev) => !prev)}
+            onToggleLeftSidebar={() => setActiveLeftPanel((prev) => (prev ? null : 'chats'))}
             onToggleRightSidebar={() => setActiveRightPanel((prev) => (prev ? null : 'settings'))}
           />
         </main>
 
         {activeRightPanel !== null && (
-          <aside className="settings-section" id='settings-section' aria-label="Panel secundario">
-            {activeRightPanel === 'settings' && (
-              <SettingView
-                currentModel={model}
-                onModelChange={(newModel) => {
-                  setModel(newModel);
-                  localStorage.setItem('model', newModel);
-                }}
+          <>
+            <div className="resizer resizer-right" id="right-resizer"></div>
+            <aside className="settings-section" id='settings-section' aria-label="Panel secundario">
+              {activeRightPanel === 'settings' && (
+                <SettingView
+                  currentModel={model}
+                  onModelChange={(newModel) => {
+                    setModel(newModel);
+                    localStorage.setItem('model', newModel);
+                  }}
+                />
+              )}
+              {activeRightPanel === 'notes' && (
+                <NotesView />
+              )}
+              <Toolbar
+                onNavNotes={() => setActiveRightPanel('notes')}
+                onNavConfig={() => setActiveRightPanel('settings')}
               />
-            )}
-            {activeRightPanel === 'notes' && (
-              <NotesView />
-            )}
-            <Toolbar
-              onNavNotes={() => setActiveRightPanel('notes')}
-              onNavConfig={() => setActiveRightPanel('settings')}
-            />
-          </aside>
+            </aside>
+          </>
         )}
 
       </div>
