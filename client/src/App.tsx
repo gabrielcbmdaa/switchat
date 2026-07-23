@@ -462,8 +462,6 @@ export default function App() {
               {renderMainContent()}
               <Toolbar
                 onNavChats={() => setCurrentView('chats')}
-                onNavNotes={() => setActiveRightPanel((prev) => (prev === 'notes' ? null : 'notes'))}
-                onNavConfig={() => setActiveRightPanel((prev) => (prev === 'settings' ? null : 'settings'))}
                 onNavAccount={() => setCurrentView('account')}
               />
             </aside>
@@ -492,23 +490,23 @@ export default function App() {
           />
         </main>
 
-        {activeRightPanel === 'settings' && (
-          <aside className="settings-section" id='settings-section' aria-label="Panel de configuración">
-            <SettingView
-              currentModel={model}
-              onModelChange={(newModel) => {
-                setModel(newModel);
-                localStorage.setItem('model', newModel);
-              }}
-              onClose={() => setActiveRightPanel(null)}
-            />
-          </aside>
-        )}
-
-        {activeRightPanel === 'notes' && (
-          <aside className="settings-section" id='notes-section' aria-label="Panel de notas">
-            <NotesView
-              onClose={() => setActiveRightPanel(null)}
+        {activeRightPanel !== null && (
+          <aside className="settings-section" id='settings-section' aria-label="Panel secundario">
+            {activeRightPanel === 'settings' && (
+              <SettingView
+                currentModel={model}
+                onModelChange={(newModel) => {
+                  setModel(newModel);
+                  localStorage.setItem('model', newModel);
+                }}
+              />
+            )}
+            {activeRightPanel === 'notes' && (
+              <NotesView />
+            )}
+            <Toolbar
+              onNavNotes={() => setActiveRightPanel('notes')}
+              onNavConfig={() => setActiveRightPanel('settings')}
             />
           </aside>
         )}

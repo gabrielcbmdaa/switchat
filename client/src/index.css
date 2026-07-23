@@ -65,6 +65,11 @@ body {
   height: 100%;
   border-left: 1px solid #858585;
   background-color: #191919;
+}
+
+.settings-section> :first-child {
+  flex: 1;
+  min-height: 0;
   overflow-y: auto;
 }
 
