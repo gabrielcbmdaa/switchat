@@ -48,10 +48,20 @@ exports.createMessage = async (req, res) => {
         });
 
     } catch (error) {
-        console.error("❌ Error en chatController:", error);
+        // Diferenciamos errores conocidos de validación / negocio de errores inesperados de servidor
+        const isKnownError = error.message && error.message.startsWith('⚠️');
+
+        if (isKnownError) {
+            console.warn(`⚠️ [chatController] ${error.message}`);
+            return res.status(400).json({
+                message: error.message,
+                error: error.message
+            });
+        }
 
         // Si el error provino de providerService (error formateado de la API externa)
         if (error.apiErrorMessage) {
+            console.warn(`⚠️ [chatController] Error ${error.status} de ${error.provider}: ${error.apiErrorMessage}`);
             const errorMap = {
                 401: `🔑 Invalid or expired API Key for ${error.provider}. Check your configuration.`,
                 403: `🚫 Access denied by ${error.provider}. Your API Key does not have permissions to use the model "${error.model}".`,
@@ -71,23 +81,20 @@ exports.createMessage = async (req, res) => {
             });
         }
 
-        // Diferenciamos errores conocidos de errores inesperados
-        const isKnownError = error.message && error.message.startsWith('⚠️');
         const isNetworkError = error.code === 'ECONNREFUSED' || error.code === 'ENOTFOUND' || error.cause?.code === 'ECONNREFUSED';
 
-        let statusCode = 500;
-        let userMessage = 'Error interno del servidor. Intenta de nuevo.';
-
-        if (isKnownError) {
-            statusCode = 400;
-            userMessage = error.message;
-        } else if (isNetworkError) {
-            statusCode = 503;
-            userMessage = '🔌 No se pudo conectar con el servidor local de IA. Asegúrate de que LM Studio u Ollama estén ejecutándose.';
+        if (isNetworkError) {
+            console.warn(`🔌 [chatController] No se pudo conectar con el servidor local de IA (${error.message}).`);
+            return res.status(503).json({
+                message: '🔌 No se pudo conectar con el servidor local de IA. Asegúrate de que LM Studio u Ollama estén ejecutándose.',
+                error: error.message
+            });
         }
 
-        res.status(statusCode).json({
-            message: userMessage,
+        // Únicamente si es un error 500 no controlado imprimimos la traza completa
+        console.error("❌ Error inesperado en chatController:", error);
+        res.status(500).json({
+            message: 'Error interno del servidor. Intenta de nuevo.',
             error: error.message
         });
     }
