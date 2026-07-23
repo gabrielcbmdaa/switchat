@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { marked } from 'marked';
 import styles from './MessageBubble.module.css';
 import type { Message } from '../types';
@@ -10,8 +11,19 @@ interface MessageBubbleProps {
 }
 
 export default function MessageBubble({ msg, isUser, onDelete, onRetry }: MessageBubbleProps) {
-    const rawText = msg.parts[0].text;
+    const [copied, setCopied] = useState(false);
+    const rawText = msg.parts[0]?.text || '';
     const htmlContent = { __html: isUser ? rawText : marked.parse(rawText) as string };
+
+    const handleCopy = async () => {
+        try {
+            await navigator.clipboard.writeText(rawText);
+            setCopied(true);
+            setTimeout(() => setCopied(false), 2000);
+        } catch (err) {
+            console.error('Failed to copy to clipboard:', err);
+        }
+    };
 
     return (
         <div className={`${styles.messageWrapper} ${isUser ? styles.userWrapper : styles.geminiWrapper}`}>
@@ -20,14 +32,23 @@ export default function MessageBubble({ msg, isUser, onDelete, onRetry }: Messag
                 dangerouslySetInnerHTML={htmlContent}
             />
             <div className={styles.messageActions}>
+                <button
+                    className={styles.actionButton}
+                    title={copied ? "Copied!" : "Copy message"}
+                    onClick={handleCopy}
+                >
+                    <svg width="16" height="16">
+                        <use xlinkHref={copied ? "#icon-confirm" : "#icon-copy"} />
+                    </svg>
+                </button>
                 {onRetry && !msg.isTemporary && (
-                    <button className={styles.actionButton} title="Reintentar mensaje" onClick={onRetry}>
+                    <button className={styles.actionButton} title="Retry message" onClick={onRetry}>
                         <svg width="16" height="16">
                             <use xlinkHref="#icon-retry" />
                         </svg>
                     </button>
                 )}
-                <button className={styles.actionButton} title="Borrar mensaje" onClick={onDelete} disabled={msg.isTemporary}>
+                <button className={styles.actionButton} title="Delete message" onClick={onDelete} disabled={msg.isTemporary}>
                     <svg width="16" height="16">
                         <use xlinkHref="#icon-trash" />
                     </svg>
