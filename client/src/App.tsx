@@ -157,12 +157,20 @@ export default function App() {
 
     // 3. Le decimos a React cuál es el nuevo ID activo y a qué vista ir
     setActiveChatId(newId);
-    setActiveLeftPanel('chats');
+    if (window.innerWidth < 768) {
+      setActiveLeftPanel(null);
+    } else {
+      setActiveLeftPanel('chats');
+    }
   }
 
   function handleSelectChat(clickedChatId: string) {
     setActiveChatId(clickedChatId);
-    setActiveLeftPanel('chats');
+    if (window.innerWidth < 768) {
+      setActiveLeftPanel(null);
+    } else {
+      setActiveLeftPanel('chats');
+    }
     saveToLocalDisk(chatList, clickedChatId);
     const clickedChat = chatList.find(chat => chat.id === clickedChatId);
     if (clickedChat && isAuthenticated) {
@@ -432,6 +440,15 @@ export default function App() {
       {/* 1. Inyectamos los símbolos en el DOM */}
       <SvgIcons />
       <div className="app-container" id='app-container'>
+        {(activeLeftPanel !== null || activeRightPanel !== null) && (
+          <div
+            className="backdrop-overlay"
+            onClick={() => {
+              setActiveLeftPanel(null);
+              setActiveRightPanel(null);
+            }}
+          />
+        )}
 
         {activeLeftPanel !== null && (
           <>

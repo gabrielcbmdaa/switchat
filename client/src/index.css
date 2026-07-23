@@ -119,3 +119,96 @@ body {
 ::-webkit-scrollbar-thumb:hover {
   background: #858585;
 }
+
+/* BACKDROP OVERLAY FOR MOBILE DRAWERS */
+.backdrop-overlay {
+  display: none;
+}
+
+/* RESPONSIVE STYLES (MOBILE & TABLET) */
+@media (max-width: 767px) {
+  .app-container {
+    position: relative;
+    overflow: hidden;
+  }
+
+  .resizer {
+    display: none !important;
+  }
+
+  .sidebar-section {
+    position: fixed;
+    top: 0;
+    left: 0;
+    bottom: 0;
+    width: 85vw;
+    max-width: 320px;
+    min-width: 0;
+    z-index: 100;
+    background-color: #191919;
+    box-shadow: 4px 0 20px rgba(0, 0, 0, 0.6);
+    border-right: 1px solid #333333;
+    animation: drawerSlideLeft 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+
+  .settings-section {
+    position: fixed;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    width: 85vw;
+    max-width: 320px;
+    min-width: 0;
+    z-index: 100;
+    background-color: #191919;
+    box-shadow: -4px 0 20px rgba(0, 0, 0, 0.6);
+    border-left: 1px solid #333333;
+    animation: drawerSlideRight 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+
+  .message-section {
+    width: 100%;
+    min-width: 0;
+  }
+
+  .backdrop-overlay {
+    display: block;
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: rgba(0, 0, 0, 0.65);
+    backdrop-filter: blur(4px);
+    -webkit-backdrop-filter: blur(4px);
+    z-index: 90;
+    animation: backdropFadeIn 0.2s ease-out;
+  }
+}
+
+@keyframes drawerSlideLeft {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: translateX(0);
+  }
+}
+
+@keyframes drawerSlideRight {
+  from {
+    transform: translateX(100%);
+  }
+  to {
+    transform: translateX(0);
+  }
+}
+
+@keyframes backdropFadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}

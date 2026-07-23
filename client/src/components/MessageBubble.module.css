@@ -109,3 +109,15 @@
     background-color: #858585;
     color: #191919;
 }
+
+@media (max-width: 767px) {
+    .userBubble {
+        max-width: 92%;
+    }
+    .messageActions {
+        opacity: 0.75;
+    }
+    .messageBubble pre {
+        padding: 8px 10px;
+    }
+}

@@ -62,3 +62,17 @@
     color: #ffffff;
     border-color: rgba(255, 255, 255, 0.2);
 }
+
+@media (max-width: 767px) {
+    .messageViewContainer {
+        padding: 48px 12px 24px 12px;
+    }
+
+    .toggleBtnLeft {
+        left: 10px;
+    }
+
+    .toggleBtnRight {
+        right: 10px;
+    }
+}
