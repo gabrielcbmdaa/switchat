@@ -50,6 +50,7 @@ body {
 .message-section {
   flex: 1;
   min-width: 400px;
+  overflow-x: hidden;
   display: flex;
   flex-direction: column;
   height: 100%;

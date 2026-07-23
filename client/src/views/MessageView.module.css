@@ -34,10 +34,11 @@
     display: flex;
     width: 100%;
     flex: 1;
-    min-height: 0;
+    min-width: 0;
     flex-direction: column;
     gap: 15px;
     overflow-y: auto;
+    overflow-x: hidden;
     padding: 52px 26px 26px 26px;
     /* padding-bottom se aplica dinámicamente desde React */
 }
