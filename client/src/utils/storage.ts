@@ -41,3 +41,14 @@ export function saveToLocalDisk(chatList: Chat[], activeChatId: string) {
     localStorage.setItem('activeChatId', activeChatId);
     localStorage.setItem('chatList', JSON.stringify(chatList));
 }
+
+// 4. Notas: localStorage es la fuente de verdad, así que funciona aunque
+// NotesView no esté montada (ej. al enviar texto desde el ContextMenu).
+export function appendToNotes(text: string) {
+    const prev = localStorage.getItem('switchat_notes') || '';
+    const separator = prev.trim() ? '\n\n' : '';
+    const updated = prev + separator + text;
+    localStorage.setItem('switchat_notes', updated);
+    window.dispatchEvent(new CustomEvent('sendToNotes', { detail: updated }));
+    return updated;
+}

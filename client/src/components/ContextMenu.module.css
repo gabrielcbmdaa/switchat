@@ -1,0 +1,58 @@
+.contextMenuOverlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    z-index: 9999;
+}
+
+.contextMenu {
+    position: fixed;
+    z-index: 10000;
+    background-color: #222222;
+    border: 1px solid #333333;
+    border-radius: 12px;
+    padding: 4px;
+    min-width: 180px;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+    animation: contextMenuFadeIn 0.12s ease-out;
+}
+
+.menuItem {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    width: 100%;
+    padding: 8px 12px;
+    background: transparent;
+    border: none;
+    border-radius: 8px;
+    color: #858585;
+    font-size: 13px;
+    font-family: 'Space Grotesk', sans-serif;
+    cursor: pointer;
+    transition: background-color 0.15s ease, color 0.15s ease;
+    text-align: left;
+    white-space: nowrap;
+}
+
+.menuItem:hover {
+    background-color: #858585;
+    color: #191919;
+}
+
+.menuItem svg {
+    flex-shrink: 0;
+}
+
+@keyframes contextMenuFadeIn {
+    from {
+        opacity: 0;
+        transform: scale(0.95);
+    }
+    to {
+        opacity: 1;
+        transform: scale(1);
+    }
+}

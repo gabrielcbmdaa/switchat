@@ -11,6 +11,7 @@ import SettingView from './views/SettingsView';
 import MessageView from './views/MessageView';
 import NotesView from './views/NotesView';
 import { getModelConfig } from './config/models.config';
+import ContextMenu from './components/ContextMenu';
 
 export default function App() {
   const [chatList, setChatList] = useState<Chat[]>([]);
@@ -451,6 +452,7 @@ export default function App() {
     <>
       {/* 1. Inyectamos los símbolos en el DOM */}
       <SvgIcons />
+      <ContextMenu />
       <div className="app-container" id='app-container'>
         {(activeLeftPanel !== null || activeRightPanel !== null) && (
           <div
