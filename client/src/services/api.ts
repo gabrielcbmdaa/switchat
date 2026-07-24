@@ -160,6 +160,11 @@ export async function fetchChatResponse(
 
   const thinkingBudget = config?.thinkingBudgets?.[reasoningLevel] || 4096;
 
+  const systemPrompt = (localStorage.getItem('systemPrompt') || '').trim();
+  const historyWithSystemPrompt: Message[] = systemPrompt
+    ? [{ role: 'system', parts: [{ text: systemPrompt }] }, ...messagesHistory]
+    : messagesHistory;
+
   if (useServer) {
     const userApiKey = getApiKeyForProvider(provider);
     const lastMessageText = messagesHistory.at(-1)?.parts?.[0]?.text ?? '';
@@ -174,7 +179,7 @@ export async function fetchChatResponse(
       headers,
       body: JSON.stringify({
         content: lastMessageText,
-        messages: messagesHistory,
+        messages: historyWithSystemPrompt,
         model: modelLowerCase,
         provider,
         reasoningLevel,
@@ -200,6 +205,6 @@ export async function fetchChatResponse(
     const data = await response.json();
     return { text: data.text, userMessageId: data.userMessageId, aiMessageId: data.aiMessageId };
   } else {
-    return await fetchFromProvider(model, messagesHistory, reasoningLevel);
+    return await fetchFromProvider(model, historyWithSystemPrompt, reasoningLevel);
   }
 }

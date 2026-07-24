@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, type ChangeEvent } from "react";
 import styles from './SettingsView.module.css'
 import DefaultInput from "../components/DefaultInput";
 import DefaultButton from "../components/DefaultButton";
@@ -88,6 +88,16 @@ export default function SettingView({ currentModel, onModelChange, onClose }: Se
     const handleReasoningChange = (val: number) => {
         setReasoningLevel(val);
         localStorage.setItem('reasoningLevel', thinkingLevels[val]);
+    };
+
+    const [systemPrompt, setSystemPrompt] = useState<string>(() => {
+        return localStorage.getItem('systemPrompt') || '';
+    });
+
+    const handleSystemPromptChange = (e: ChangeEvent<HTMLTextAreaElement>) => {
+        const value = e.target.value;
+        setSystemPrompt(value);
+        localStorage.setItem('systemPrompt', value);
     };
 
     const [searchQuery, setSearchQuery] = useState('');
@@ -198,6 +208,17 @@ export default function SettingView({ currentModel, onModelChange, onClose }: Se
                             </div>
                         )}
                     </div>
+                </div>
+                {/* SYSTEM PROMPT */}
+                <div className={styles.systemPromptContainer}>
+                    <label className={styles.configLabel} htmlFor="systemPromptInput">System Prompt</label>
+                    <textarea
+                        id="systemPromptInput"
+                        className={styles.systemPromptTextarea}
+                        placeholder="Optional instructions the AI should always follow (tone, role, constraints)..."
+                        value={systemPrompt}
+                        onChange={handleSystemPromptChange}
+                    />
                 </div>
                 {/* API KEY */}
                 <div className={styles.apiKeySection}>
