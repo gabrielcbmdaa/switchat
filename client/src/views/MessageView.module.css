@@ -64,6 +64,10 @@
 }
 
 @media (max-width: 767px) {
+    .messageViewWrapper {
+        margin-bottom: calc(env(safe-area-inset-bottom, 0px) + 12px);
+    }
+
     .messageViewContainer {
         padding: 48px 12px 24px 12px;
     }

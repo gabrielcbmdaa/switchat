@@ -15,8 +15,12 @@ import { getModelConfig } from './config/models.config';
 export default function App() {
   const [chatList, setChatList] = useState<Chat[]>([]);
   const [activeChatId, setActiveChatId] = useState<string>('');
-  const [activeLeftPanel, setActiveLeftPanel] = useState<'chats' | 'account' | null>('chats');
-  const [activeRightPanel, setActiveRightPanel] = useState<'settings' | 'notes' | null>('settings');
+  const [activeLeftPanel, setActiveLeftPanel] = useState<'chats' | 'account' | null>(() => {
+    return typeof window !== 'undefined' && window.innerWidth < 768 ? null : 'chats';
+  });
+  const [activeRightPanel, setActiveRightPanel] = useState<'settings' | 'notes' | null>(() => {
+    return typeof window !== 'undefined' && window.innerWidth < 768 ? null : 'settings';
+  });
   const [hasMoreMap, setHasMoreMap] = useState<Record<string, boolean>>({});
   const currentChat = chatList.find((chat) => chat.id === activeChatId);
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false);
@@ -224,7 +228,11 @@ export default function App() {
 
     // 3. Cambiamos la vista. Lo ponemos al final para que la pantalla de chat 
     // ya entre con los datos cargados en memoria.
-    setActiveLeftPanel('chats');
+    if (window.innerWidth < 768) {
+      setActiveLeftPanel(null);
+    } else {
+      setActiveLeftPanel('chats');
+    }
   }
 
   async function resetSessionToDefault() {
@@ -239,7 +247,11 @@ export default function App() {
     // 3. Le avisamos a React para que actualice la interfaz sola
     setChatList(tutorialChats);
     setActiveChatId(tutorialId);
-    setActiveLeftPanel('chats');
+    if (window.innerWidth < 768) {
+      setActiveLeftPanel(null);
+    } else {
+      setActiveLeftPanel('chats');
+    }
 
     // 4. Guardamos en el disco local esta estructura limpia
     saveToLocalDisk(tutorialChats, tutorialId);
