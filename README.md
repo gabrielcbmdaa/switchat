@@ -6,7 +6,7 @@
 [![TypeScript](https://img.shields.io/badge/Language-TypeScript-blue?logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
 [![pnpm](https://img.shields.io/badge/Package%20Manager-pnpm-orange?logo=pnpm&logoColor=white)](https://pnpm.io/)
 
-**Switchat** is a modern hybrid platform designed to connect and manage conversations with multiple Artificial Intelligence Large Language Models (LLMs). It allows users to chat seamlessly with **Google Gemini**, **OpenAI**, and local models via **LM Studio**, offering both secure cloud synchronization (with MongoDB Atlas databases) and a 100% local/private mode.
+**Switchat** is a modern hybrid platform designed to connect and manage conversations with multiple Artificial Intelligence Large Language Models (LLMs). It allows users to chat seamlessly with **Google Gemini**, **Anthropic Claude**, **OpenAI**, and local models via **LM Studio** or **Ollama**, offering both secure cloud synchronization (with MongoDB Atlas databases) and a 100% local/private mode.
 
 ---
 
@@ -16,10 +16,14 @@
 - ☁️ **Cloud Sync & Local Mode**:
   - **Online Mode (With Session)**: Automatically syncs your chats, real-time messages, and drafts to **MongoDB Atlas**.
   - **Offline Mode (No Session)**: Respects your privacy by storing all your data exclusively in `localStorage` and making direct API requests to the AI providers using your own API Keys.
-- 🧠 **Multi-Provider AI**: Dynamically switch between **Google Gemini**, **OpenAI (ChatGPT)**, and local inference servers (**LM Studio**) from a unified configuration settings menu.
-- 🔑 **Robust Authentication**: Secure registration and login protected with password hashing via `bcrypt` and route authorization using JSON Web Tokens (`JWT`).
+
+- 🧠 **Multi-Provider AI**: Dynamically switch between **Google Gemini**, **Anthropic Claude**, **OpenAI (ChatGPT)**, and local inference servers (**LM Studio**, **Ollama**) from a unified configuration settings menu.
+- 💭 **Reasoning Control**: Adjust the extended-thinking/reasoning effort (`off` to `high`) per model directly from the Settings panel.
+- 📝 **Custom System Prompt**: Set a persistent system prompt from Settings to steer the AI's tone, role, or constraints across every chat.
+- 🔑 **Robust Authentication**: Secure registration and login protected with password hashing via `bcrypt` and route authorization using signed, `HttpOnly` JSON Web Tokens (`JWT`) cookies.
 - ⚡ **Incremental Message Pagination**: Performance optimization that loads messages in batches of 6 using a time-based cursor (`before` / `limit`), speeding up rendering for long chat histories.
-- 📐 **Adjustable Layout**: Resizable sidebar using a drag-and-drop divider to customize your workspace layout.
+- 📐 **Responsive, Adjustable Layout**: Resizable sidebar using a drag-and-drop divider on desktop, plus a mobile-friendly drawer layout on smaller screens.
+- 🗒️ **Notes Panel**: Jot down notes alongside your chats, or right-click any selected message text to send it straight to Notes.
 
 ---
 
@@ -124,17 +128,20 @@ All backend endpoints are prefixed with `/api`.
 | Method | Endpoint | Description | Requires Auth |
 | :--- | :--- | :--- | :--- |
 | `POST` | `/auth/register` | Registers a new user. Hashes the password using `bcrypt`. | No |
-| `POST` | `/auth/login` | Log in a user. Returns a JWT token valid for 7 days. | No |
+| `POST` | `/auth/login` | Logs in a user and sets a signed, `HttpOnly` session cookie (JWT) valid for 7 days. | No |
+| `POST` | `/auth/logout` | Clears the session cookie, logging the user out. | No |
+| `GET` | `/auth/me` | Checks whether the current session cookie is still valid. | Yes (Session Cookie) |
 
 ### Chat & Message Management (`/api/chats`)
 
 | Method | Endpoint | Description | Requires Auth |
 | :--- | :--- | :--- | :--- |
-| `GET` | `/chats` | Retrieves all chats for the authenticated user, sorted by creation date. | Yes (Bearer Token) |
-| `POST` | `/chats` | Syncs (creates or updates) a chat or draft in the database (upsert). | Yes (Bearer Token) |
-| `DELETE` | `/chats/:id` | Permanently deletes a chat and all its associated messages. | Yes (Bearer Token) |
-| `GET` | `/chats/:chatId/messages`| Returns messages from a chat (optional query parameters: `limit` and `before`). | Yes (Bearer Token) |
-| `POST` | `/chats/:chatId/messages`| Sends a user message, queries the configured LLM, and saves both messages. | Yes (Bearer Token) |
+| `GET` | `/chats` | Retrieves all chats for the authenticated user, sorted by creation date. | Yes (Session Cookie) |
+| `POST` | `/chats` | Syncs (creates or updates) a chat or draft in the database (upsert). | Yes (Session Cookie) |
+| `DELETE` | `/chats/:id` | Permanently deletes a chat and all its associated messages. | Yes (Session Cookie) |
+| `GET` | `/chats/:chatId/messages`| Returns messages from a chat (optional query parameters: `limit` and `before`). | Yes (Session Cookie) |
+| `POST` | `/chats/:chatId/messages`| Sends a user message, queries the configured LLM, and saves both messages. | Yes (Session Cookie) |
+| `DELETE` | `/chats/:chatId/messages/:messageId`| Permanently deletes a single message from a chat. | Yes (Session Cookie) |
 
 ---
 
@@ -148,8 +155,11 @@ graph TD
     
     B -->|Yes Cloud Mode| C[Send POST request to /api/chats/:chatId/messages]
     C --> D[Server saves user message in MongoDB]
-    D --> E[Server queries external AI API using .env keys]
-    E --> F[Server saves AI response in MongoDB]
+    D --> E{User sent an x-user-api-key header?}
+    E -->|Yes| E1[Server queries external AI API using the client-provided key]
+    E -->|No| E2[Server queries external AI API using .env keys]
+    E1 --> F[Server saves AI response in MongoDB]
+    E2 --> F
     F --> G[Server returns response text to client]
     
     B -->|No Local Mode| H[Client reads API Key from localStorage]
