@@ -151,7 +151,8 @@ export async function fetchChatResponse(
   chatId: string,
   messagesHistory: Message[],
   model: string,
-  useServer: boolean
+  useServer: boolean,
+  systemPrompt?: string
 ): Promise<{ text: string; userMessageId?: string; aiMessageId?: string }> {
   const modelLowerCase = model.toLowerCase();
   const config = getModelConfig(model);
@@ -160,9 +161,9 @@ export async function fetchChatResponse(
 
   const thinkingBudget = config?.thinkingBudgets?.[reasoningLevel] || 4096;
 
-  const systemPrompt = (localStorage.getItem('systemPrompt') || '').trim();
-  const historyWithSystemPrompt: Message[] = systemPrompt
-    ? [{ role: 'system', parts: [{ text: systemPrompt }] }, ...messagesHistory]
+  const trimmedSystemPrompt = (systemPrompt || '').trim();
+  const historyWithSystemPrompt: Message[] = trimmedSystemPrompt
+    ? [{ role: 'system', parts: [{ text: trimmedSystemPrompt }] }, ...messagesHistory]
     : messagesHistory;
 
   if (useServer) {

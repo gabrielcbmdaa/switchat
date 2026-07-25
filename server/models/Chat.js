@@ -5,6 +5,7 @@ const ChatSchema = new mongoose.Schema({
     userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true}, // Para saber de quién es el chat
     draft: { type: String, default: '' },
     title: { type: String, default: 'Nuevo Chat' },
+    systemPrompt: { type: String, default: '' },
     createdAt: { type: Date, default: Date.now }
 });
 

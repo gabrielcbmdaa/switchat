@@ -1,4 +1,4 @@
-import { useState, type ChangeEvent } from "react";
+import { useState } from "react";
 import styles from './SettingsView.module.css'
 import DefaultInput from "../components/DefaultInput";
 import DefaultButton from "../components/DefaultButton";
@@ -7,10 +7,12 @@ import { getModelConfig, getProviderIconId, MODEL_REGISTRY } from "../config/mod
 interface SettingViewProps {
     currentModel: string;
     onModelChange: (model: string) => void;
+    systemPrompt: string;
+    onSystemPromptChange: (value: string) => void;
     onClose?: () => void;
 }
 
-export default function SettingView({ currentModel, onModelChange, onClose }: SettingViewProps) {
+export default function SettingView({ currentModel, onModelChange, systemPrompt, onSystemPromptChange, onClose }: SettingViewProps) {
     const [apiKey, setApiKey] = useState('');
     const [showProviderSelectorForApiKey, setShowProviderSelectorForApiKey] = useState(false);
 
@@ -88,16 +90,6 @@ export default function SettingView({ currentModel, onModelChange, onClose }: Se
     const handleReasoningChange = (val: number) => {
         setReasoningLevel(val);
         localStorage.setItem('reasoningLevel', thinkingLevels[val]);
-    };
-
-    const [systemPrompt, setSystemPrompt] = useState<string>(() => {
-        return localStorage.getItem('systemPrompt') || '';
-    });
-
-    const handleSystemPromptChange = (e: ChangeEvent<HTMLTextAreaElement>) => {
-        const value = e.target.value;
-        setSystemPrompt(value);
-        localStorage.setItem('systemPrompt', value);
     };
 
     const [searchQuery, setSearchQuery] = useState('');
@@ -217,7 +209,7 @@ export default function SettingView({ currentModel, onModelChange, onClose }: Se
                         className={styles.systemPromptTextarea}
                         placeholder="Optional instructions the AI should always follow (tone, role, constraints)..."
                         value={systemPrompt}
-                        onChange={handleSystemPromptChange}
+                        onChange={(e) => onSystemPromptChange(e.target.value)}
                     />
                 </div>
                 {/* API KEY */}

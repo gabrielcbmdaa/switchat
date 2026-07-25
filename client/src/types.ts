@@ -15,6 +15,7 @@ export interface Chat {
   title: string;
   draft: string;
   messages: Message[];
+  systemPrompt?: string;
 }
 
 export interface GeminiModel {

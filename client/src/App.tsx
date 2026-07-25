@@ -197,6 +197,23 @@ export default function App() {
     saveToLocalDisk(updatedChats, activeChatId);
   }
 
+  function handleSystemPromptChange(newSystemPrompt: string) {
+    const updatedChats = chatList.map((chat) => {
+      if (chat.id === activeChatId) {
+        return { ...chat, systemPrompt: newSystemPrompt };
+      }
+      return chat;
+    });
+
+    setChatList(updatedChats);
+    saveToLocalDisk(updatedChats, activeChatId);
+
+    const updatedChat = updatedChats.find((chat) => chat.id === activeChatId);
+    if (updatedChat && isAuthenticated) {
+      saveChatToServer(updatedChat);
+    }
+  }
+
   async function handleAuthSuccess() {
     localStorage.setItem('isLoggedIn', 'true'); // 👈 Guardamos el indicador de inicio de sesión
     setActiveLeftPanel('chats');
@@ -287,7 +304,7 @@ export default function App() {
     // 4. Llamamos a la API
     try {
       // Le pasamos los mensajes originales (sin el "pensando") a la API
-      const response = await fetchChatResponse(activeChatId, [...currentChat.messages, userMessage], model, isAuthenticated);
+      const response = await fetchChatResponse(activeChatId, [...currentChat.messages, userMessage], model, isAuthenticated, currentChat.systemPrompt);
 
       // Reemplazamos el mensaje "pensando" por la respuesta real, incluyendo los _id de MongoDB
       updatedMessages = [
@@ -399,7 +416,7 @@ export default function App() {
 
     // 6. Hacer la petición a la API
     try {
-      const response = await fetchChatResponse(activeChatId, historyUpToUser, model, isAuthenticated);
+      const response = await fetchChatResponse(activeChatId, historyUpToUser, model, isAuthenticated, currentChat.systemPrompt);
 
       // Reemplazamos "Thinking" por la respuesta y actualizamos los IDs
       updatedMessages = [
@@ -525,6 +542,8 @@ export default function App() {
                     setModel(newModel);
                     localStorage.setItem('model', newModel);
                   }}
+                  systemPrompt={currentChat?.systemPrompt ?? ''}
+                  onSystemPromptChange={handleSystemPromptChange}
                 />
               )}
               {activeRightPanel === 'notes' && (
