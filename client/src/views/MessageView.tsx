@@ -16,6 +16,8 @@ interface MessageViewProps {
     draft: string;
     onDraftChange: (draft: string) => void;
     onSendMessage: () => void;
+    isGenerating?: boolean;
+    onStopGeneration?: () => void;
     isLeftSidebarOpen?: boolean;
     isRightSidebarOpen?: boolean;
     onToggleLeftSidebar?: () => void;
@@ -33,6 +35,8 @@ export default function MessageView({
     draft,
     onDraftChange,
     onSendMessage,
+    isGenerating = false,
+    onStopGeneration,
     isLeftSidebarOpen = true,
     isRightSidebarOpen = false,
     onToggleLeftSidebar,
@@ -196,6 +200,8 @@ export default function MessageView({
                 draft={draft}
                 onDraftChange={onDraftChange}
                 onSendMessage={onSendMessage}
+                isGenerating={isGenerating}
+                onStopGeneration={onStopGeneration}
                 onHeightChange={handlePromptHeightChange}
             />
         </div>

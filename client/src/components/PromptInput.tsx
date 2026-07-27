@@ -5,10 +5,19 @@ interface PromptInputProps {
     draft: string;
     onDraftChange: (draft: string) => void;
     onSendMessage: () => void;
+    isGenerating?: boolean;
+    onStopGeneration?: () => void;
     onHeightChange?: (height: number) => void; // Callback para reportar la altura
 }
 
-export default function PromptInput({ draft, onDraftChange, onSendMessage, onHeightChange }: PromptInputProps) {
+export default function PromptInput({
+    draft,
+    onDraftChange,
+    onSendMessage,
+    isGenerating = false,
+    onStopGeneration,
+    onHeightChange,
+}: PromptInputProps) {
     const textareaRef = useRef<HTMLTextAreaElement>(null);
     const containerRef = useRef<HTMLDivElement>(null);
 
@@ -48,6 +57,7 @@ export default function PromptInput({ draft, onDraftChange, onSendMessage, onHei
     const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
         if (e.key === 'Enter' && !e.shiftKey) {
             e.preventDefault(); // Evita el salto de línea
+            if (isGenerating) return;
             onSendMessage();    // Dispara el envío del mensaje
         }
     };
@@ -65,11 +75,12 @@ export default function PromptInput({ draft, onDraftChange, onSendMessage, onHei
             />
             <button
                 className={styles.sendButton}
-                onClick={onSendMessage}
-                title="Enviar mensaje"
+                onClick={isGenerating ? onStopGeneration : onSendMessage}
+                title={isGenerating ? 'Detener generación' : 'Enviar mensaje'}
+                type="button"
             >
                 <svg width="20" height="20">
-                    <use xlinkHref="#icon-send" />
+                    <use xlinkHref={isGenerating ? '#icon-stop' : '#icon-send'} />
                 </svg>
             </button>
         </div>

@@ -33,6 +33,20 @@ export function SvgIcons() {
                 <path d="M6 12h16" />
             </symbol>
 
+            {/* 2b. ICON STOP */}
+            <symbol
+                id="icon-stop"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                className="lucide lucide-square-icon lucide-square"
+            >
+                <rect width="18" height="18" x="3" y="3" rx="2" />
+            </symbol>
+
             {/* 3. ICON ACCOUNT */}
             <symbol
                 id="icon-account"

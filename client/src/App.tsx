@@ -25,6 +25,7 @@ export default function App() {
   const [hasMoreMap, setHasMoreMap] = useState<Record<string, boolean>>({});
   const currentChat = chatList.find((chat) => chat.id === activeChatId);
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false);
+  const [isGenerating, setIsGenerating] = useState<boolean>(false);
   const [model, setModel] = useState<string>(() => {
     const savedModel = localStorage.getItem('model');
     if (savedModel && getModelConfig(savedModel)) {
@@ -277,7 +278,7 @@ export default function App() {
 
   async function handleSendMessage() {
     // 1. Validaciones iniciales (Reemplaza a tu document.getElementById)
-    if (!currentChat || !currentChat.draft.trim()) return;
+    if (!currentChat || !currentChat.draft.trim() || isGenerating) return;
     const promptText = currentChat.draft.trim();
 
     // 2. Preparamos el mensaje del usuario y el mensaje temporal de "pensando"
@@ -300,6 +301,7 @@ export default function App() {
         : chat
     );
     setChatList(chatsWithUserMsg);
+    setIsGenerating(true);
 
     // 4. Llamamos a la API
     try {
@@ -332,6 +334,8 @@ export default function App() {
         updatedMessages = [...currentChat.messages, userMessage, { role: "model" as const, parts: [{ text: `Error: ${err.message}` }], createdAt: new Date().toISOString() }];
         setChatList(chatsWithUserMsg.map(chat => chat.id === activeChatId ? { ...chat, messages: updatedMessages } : chat));
       }
+    } finally {
+      setIsGenerating(false);
     }
   }
 
@@ -372,7 +376,7 @@ export default function App() {
   }
 
   async function handleRetryMessage(messageIndex: number) {
-    if (!currentChat) return;
+    if (!currentChat || isGenerating) return;
 
     const messageToRetry = currentChat.messages[messageIndex];
     if (!messageToRetry || messageToRetry.isTemporary) return;
@@ -404,6 +408,7 @@ export default function App() {
         : chat
     );
     setChatList(chatsWithThinking);
+    setIsGenerating(true);
 
     // 5. Eliminar mensajes antiguos del backend de forma silenciosa
     if (isAuthenticated) {
@@ -442,7 +447,13 @@ export default function App() {
         updatedMessages = [...historyUpToUser, { role: "model" as const, parts: [{ text: `Error: ${err.message}` }], createdAt: new Date().toISOString() }];
         setChatList(chatsWithThinking.map(chat => chat.id === activeChatId ? { ...chat, messages: updatedMessages } : chat));
       }
+    } finally {
+      setIsGenerating(false);
     }
+  }
+
+  function handleStopGeneration() {
+    // No-op hasta el Paso 3 (AbortController)
   }
 
   function handleReTitleChat(chatId: string, newTitle: string) {
@@ -524,6 +535,8 @@ export default function App() {
             draft={currentChat?.draft || ''}
             onDraftChange={handleDraftChange}
             onSendMessage={handleSendMessage}
+            isGenerating={isGenerating}
+            onStopGeneration={handleStopGeneration}
             isLeftSidebarOpen={activeLeftPanel !== null}
             isRightSidebarOpen={activeRightPanel !== null}
             onToggleLeftSidebar={() => setActiveLeftPanel((prev) => (prev ? null : 'chats'))}
