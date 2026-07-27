@@ -48,7 +48,6 @@ switchat/
 │   ├── models/                 # Modelos de base de datos Mongoose (User, Chat, Message)
 │   ├── routes/                 # Rutas de API Express (authRoutes, chatRoutes)
 │   └── server.js               # Inicio de servidor y conexión a MongoDB
-└── .agents/skills/             # Habilidades y reglas específicas del proyecto
 ```
 
 ---
@@ -80,7 +79,7 @@ Al crear o modificar componentes de UI en `client/`, **es obligatorio respetar e
 5. **Inversión de Contraste al Interactuar (Hover / Active):**
    - Los elementos interactivos pasan de fondo `#191919` / transparente con texto `#858585` a fondo `#858585` con texto `#191919` en hover.
 
-> 📘 **Manual Completo:** Para revisar las variables CSS exactas, clases de Tailwind y ejemplos de componentes, consulta la habilidad en `.agents/skills/switchat-design-system/SKILL.md`.
+> 📘 Tokens CSS y estilos globales: `client/src/index.css`.
 
 ---
 
@@ -90,4 +89,17 @@ Al crear o modificar componentes de UI en `client/`, **es obligatorio respetar e
 - **Sincronización Dual:** Si modificas el almacenamiento de chats o mensajes, asegura la compatibilidad tanto para `localStorage` (Offline) como para `api.ts` (Online).
 - **Commits:** Utiliza **Conventional Commits** (`feat: ...`, `fix: ...`, `refactor: ...`, `docs: ...`).
 - **Seguridad:** NUNCA modifiques ni expongas claves o secretos almacenados en `.secrets/` o `.env`.
-- **Verificación Obligatoria:** Ejecuta siempre `pnpm build` y `pnpm lint` para verificar tus cambios antes de declarar una tarea como finalizada.
+- **Verificación Obligatoria:** Ejecuta siempre `pnpm build` y `pnpm lint` para verificar tus cambios antes de declarar una tarea como finalizada. No existe suite de tests (`pnpm test` no está configurado); la verificación es `pnpm build` (cliente: `tsc -b` + `vite build`) y `pnpm lint` (solo cliente — el servidor no tiene script de lint).
+
+---
+
+## 🧠 7. Arquitectura: detalles que no deben divergir
+
+- **Lógica de providers duplicada a propósito — mantener ambas en sync.** El mismo conjunto de proveedores (Google Gemini, Anthropic, OpenAI, LM Studio, Ollama) está implementado dos veces con lógica paralela de construcción de requests:
+  - `client/src/services/providers.ts` — **Modo Offline**, llama a las APIs del proveedor desde el navegador con keys de `localStorage`.
+  - `server/services/providerService.js` — **Modo Online**, llamado desde `server/controllers/chatController.js`, usa keys de `server/.env` o el header por-request `x-user-api-key`.
+  Al añadir/cambiar un provider o la forma del request (system prompt, thinking/reasoning, etc.), actualiza ambos archivos de forma idéntica.
+- **`client/src/config/models.config.ts` (`MODEL_REGISTRY`)** es la única fuente de verdad para IDs de modelos conocidos, su provider y budgets de thinking/reasoning. Tanto el path offline del cliente como el payload a `/api/chats/:chatId/messages` derivan `provider`/`thinkingBudget` de este archivo — añade modelos nuevos aquí primero.
+- **Orden de persistencia:** `localStorage` (`client/src/utils/storage.ts`) es siempre la primera escritura y el fallback; el sync al servidor (`client/src/services/api.ts`) es best-effort encima (ver llamadas a `saveToLocalDisk` antes de `saveChatToServer`/`syncChatDraftToServer` en `App.tsx`). Mantén este orden al tocar handlers de chat/mensaje/borrador para que la app siga funcionando fully offline.
+- **Paginación de mensajes:** los chats cargan con `messages: []` desde `GET /api/chats`; los 6 mensajes más recientes se fetchean lazy al seleccionar el chat; los más antiguos vía cursor (`before`, ISO date) — ver el `useEffect` y `handleLoadMoreMessages` en `client/src/App.tsx` y `getMessages` en `server/controllers/chatController.js`.
+- **Serving en producción:** `server/server.js` sirve `client/dist` como estáticos y tiene catch-all a `index.html` para SPA — hay que correr `pnpm build` (cliente) antes de que `pnpm start` refleje cambios de frontend en Modo Online.

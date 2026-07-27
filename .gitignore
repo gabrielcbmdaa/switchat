@@ -6,4 +6,5 @@ node_modules/
 copilot-instructions.md
 .secrets
 .pnpm-store/
-.gemini/
+.agents/
+.claude/
