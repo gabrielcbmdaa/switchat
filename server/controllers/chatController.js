@@ -36,7 +36,8 @@ exports.createMessage = async (req, res) => {
         const aiMessage = new Message({
             chatId,
             sender: 'ai',
-            content: responseText
+            content: responseText,
+            model
         });
         await aiMessage.save();
 
@@ -143,7 +144,8 @@ exports.getMessages = async (req, res) => {
             _id: msg._id,
             role: msg.sender === 'user' ? 'user' : 'model',
             parts: [{ text: msg.content }],
-            createdAt: msg.createdAt
+            createdAt: msg.createdAt,
+            model: msg.model
         })).reverse();
 
         res.json(formattedMessages);

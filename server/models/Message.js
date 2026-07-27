@@ -15,6 +15,9 @@ const MessageSchema = new mongoose.Schema({
         type: String,
         required: true
     },
+    model: {
+        type: String // Solo relevante para mensajes sender: 'ai'
+    },
     createdAt: {
         type: Date,
         default: Date.now // 🕒 Si no le pasamos fecha, MongoDB le pone la hora actual automáticamente

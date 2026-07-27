@@ -80,6 +80,7 @@
 .messageActions {
     display: flex;
     flex-direction: row;
+    align-items: center;
     gap: 4px;
     padding: 2px 4px;
     opacity: 0;
@@ -88,6 +89,17 @@
 
 .messageWrapper:hover .messageActions {
     opacity: 1;
+}
+
+.modelLabel {
+    font-family: ui-monospace, monospace;
+    font-size: 11px;
+    font-weight: 500;
+    color: #858585;
+    white-space: nowrap;
+    padding: 0 6px;
+    line-height: 28px;
+    user-select: none;
 }
 
 .actionButton {

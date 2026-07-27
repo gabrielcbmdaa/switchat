@@ -8,6 +8,7 @@ export interface Message {
   parts: MessagePart[];
   createdAt?: string;
   isTemporary?: boolean;
+  model?: string;
 }
 
 export interface Chat {

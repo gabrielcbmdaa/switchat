@@ -310,7 +310,7 @@ export default function App() {
       updatedMessages = [
         ...currentChat.messages,
         { ...userMessage, _id: response.userMessageId },
-        { role: "model", parts: [{ text: response.text }], _id: response.aiMessageId, createdAt: new Date().toISOString() }
+        { role: "model", parts: [{ text: response.text }], _id: response.aiMessageId, createdAt: new Date().toISOString(), model }
       ];
 
       const finalChats = chatsWithUserMsg.map(chat =>
@@ -422,7 +422,7 @@ export default function App() {
       updatedMessages = [
         ...historyUpToUser.slice(0, -1),
         { ...userMessage, _id: response.userMessageId || userMessage._id },
-        { role: "model", parts: [{ text: response.text }], _id: response.aiMessageId, createdAt: new Date().toISOString() }
+        { role: "model", parts: [{ text: response.text }], _id: response.aiMessageId, createdAt: new Date().toISOString(), model }
       ];
 
       const finalChats = chatsWithThinking.map(chat =>

@@ -53,6 +53,9 @@ export default function MessageBubble({ msg, isUser, onDelete, onRetry }: Messag
                         <use xlinkHref="#icon-trash" />
                     </svg>
                 </button>
+                {!isUser && msg.model && (
+                    <span className={styles.modelLabel}>{msg.model}</span>
+                )}
             </div>
         </div>
     );
