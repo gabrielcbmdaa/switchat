@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import type { Chat, Message } from './types';
 import { loadLocalChats, loadLocalActiveChatId, saveToLocalDisk, getTutorialChat } from './utils/storage';
 import { loadChatsFromServer, fetchChatResponse, saveChatToServer, syncChatDraftToServer, deleteChatFromServer, deleteMessageFromServer, fetchChatMessagesFromServer, checkSession, logoutFromServer } from './services/api';
@@ -26,6 +26,7 @@ export default function App() {
   const currentChat = chatList.find((chat) => chat.id === activeChatId);
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false);
   const [isGenerating, setIsGenerating] = useState<boolean>(false);
+  const abortControllerRef = useRef<AbortController | null>(null);
   const [model, setModel] = useState<string>(() => {
     const savedModel = localStorage.getItem('model');
     if (savedModel && getModelConfig(savedModel)) {
@@ -301,12 +302,21 @@ export default function App() {
         : chat
     );
     setChatList(chatsWithUserMsg);
+    const controller = new AbortController();
+    abortControllerRef.current = controller;
     setIsGenerating(true);
 
     // 4. Llamamos a la API
     try {
       // Le pasamos los mensajes originales (sin el "pensando") a la API
-      const response = await fetchChatResponse(activeChatId, [...currentChat.messages, userMessage], model, isAuthenticated, currentChat.systemPrompt);
+      const response = await fetchChatResponse(
+        activeChatId,
+        [...currentChat.messages, userMessage],
+        model,
+        isAuthenticated,
+        currentChat.systemPrompt,
+        controller.signal
+      );
 
       // Reemplazamos el mensaje "pensando" por la respuesta real, incluyendo los _id de MongoDB
       updatedMessages = [
@@ -326,7 +336,16 @@ export default function App() {
 
     } catch (error) {
       const err = error as Error;
-      if (err.message === 'SESSION_EXPIRED') {
+      if (err.name === 'AbortError') {
+        updatedMessages = [...currentChat.messages, userMessage];
+        const abortedChats = chatsWithUserMsg.map(chat =>
+          chat.id === activeChatId
+            ? { ...chat, messages: updatedMessages }
+            : chat
+        );
+        setChatList(abortedChats);
+        saveToLocalDisk(abortedChats, activeChatId);
+      } else if (err.message === 'SESSION_EXPIRED') {
         resetSessionToDefault(); // Implementarás esto luego
         alert("Session expired. Please log in again.");
       } else {
@@ -335,6 +354,9 @@ export default function App() {
         setChatList(chatsWithUserMsg.map(chat => chat.id === activeChatId ? { ...chat, messages: updatedMessages } : chat));
       }
     } finally {
+      if (abortControllerRef.current === controller) {
+        abortControllerRef.current = null;
+      }
       setIsGenerating(false);
     }
   }
@@ -408,6 +430,8 @@ export default function App() {
         : chat
     );
     setChatList(chatsWithThinking);
+    const controller = new AbortController();
+    abortControllerRef.current = controller;
     setIsGenerating(true);
 
     // 5. Eliminar mensajes antiguos del backend de forma silenciosa
@@ -421,7 +445,14 @@ export default function App() {
 
     // 6. Hacer la petición a la API
     try {
-      const response = await fetchChatResponse(activeChatId, historyUpToUser, model, isAuthenticated, currentChat.systemPrompt);
+      const response = await fetchChatResponse(
+        activeChatId,
+        historyUpToUser,
+        model,
+        isAuthenticated,
+        currentChat.systemPrompt,
+        controller.signal
+      );
 
       // Reemplazamos "Thinking" por la respuesta y actualizamos los IDs
       updatedMessages = [
@@ -440,7 +471,16 @@ export default function App() {
       saveToLocalDisk(finalChats, activeChatId);
     } catch (error) {
       const err = error as Error;
-      if (err.message === 'SESSION_EXPIRED') {
+      if (err.name === 'AbortError') {
+        updatedMessages = historyUpToUser;
+        const abortedChats = chatsWithThinking.map(chat =>
+          chat.id === activeChatId
+            ? { ...chat, messages: updatedMessages }
+            : chat
+        );
+        setChatList(abortedChats);
+        saveToLocalDisk(abortedChats, activeChatId);
+      } else if (err.message === 'SESSION_EXPIRED') {
         resetSessionToDefault();
         alert("Session expired. Please log in again.");
       } else {
@@ -448,12 +488,15 @@ export default function App() {
         setChatList(chatsWithThinking.map(chat => chat.id === activeChatId ? { ...chat, messages: updatedMessages } : chat));
       }
     } finally {
+      if (abortControllerRef.current === controller) {
+        abortControllerRef.current = null;
+      }
       setIsGenerating(false);
     }
   }
 
   function handleStopGeneration() {
-    // No-op hasta el Paso 3 (AbortController)
+    abortControllerRef.current?.abort();
   }
 
   function handleReTitleChat(chatId: string, newTitle: string) {

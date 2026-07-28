@@ -51,7 +51,8 @@ interface ChatCompletionRequest {
 async function sendToGoogle(
     modelLowerCase: string,
     messagesHistory: Message[],
-    reasoningLevel: string
+    reasoningLevel: string,
+    signal?: AbortSignal
 ): Promise<ProviderResponse> {
     const apiKey = localStorage.getItem('geminiApiKey') || '';
     if (!apiKey) {
@@ -103,7 +104,8 @@ async function sendToGoogle(
     const response = await fetch(googleApiUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(googleRequestBody)
+        body: JSON.stringify(googleRequestBody),
+        signal,
     });
 
     if (!response.ok) {
@@ -133,7 +135,8 @@ async function sendToGoogle(
 async function sendToAnthropic(
     modelLowerCase: string,
     messagesHistory: Message[],
-    reasoningLevel: string
+    reasoningLevel: string,
+    signal?: AbortSignal
 ): Promise<ProviderResponse> {
     const apiKey = localStorage.getItem('anthropicApiKey') || '';
     if (!apiKey) {
@@ -184,7 +187,8 @@ async function sendToAnthropic(
             'anthropic-version': '2023-06-01',
             'anthropic-dangerous-direct-browser-access': 'true'
         },
-        body: JSON.stringify(requestBody)
+        body: JSON.stringify(requestBody),
+        signal,
     });
 
     if (!response.ok) {
@@ -212,7 +216,8 @@ async function sendToAnthropic(
 async function sendToOpenAI(
     modelLowerCase: string,
     messagesHistory: Message[],
-    reasoningLevel: string
+    reasoningLevel: string,
+    signal?: AbortSignal
 ): Promise<ProviderResponse> {
     const apiKey = localStorage.getItem('openaiApiKey') || '';
     if (!apiKey) {
@@ -221,7 +226,14 @@ async function sendToOpenAI(
 
     console.log(`🚀 [Providers] Petición a OpenAI (${modelLowerCase})...`);
 
-    return sendToOpenAICompatible('https://api.openai.com/v1/chat/completions', apiKey, modelLowerCase, messagesHistory, reasoningLevel);
+    return sendToOpenAICompatible(
+        'https://api.openai.com/v1/chat/completions',
+        apiKey,
+        modelLowerCase,
+        messagesHistory,
+        reasoningLevel,
+        signal
+    );
 }
 
 /**
@@ -232,7 +244,8 @@ async function sendToOpenAICompatible(
     apiKey: string,
     modelLowerCase: string,
     messagesHistory: Message[],
-    reasoningLevel?: string
+    reasoningLevel?: string,
+    signal?: AbortSignal
 ): Promise<ProviderResponse> {
     const formattedMessages: ChatCompletionMessage[] = messagesHistory.map((msg) => {
         let role = 'user';
@@ -258,7 +271,8 @@ async function sendToOpenAICompatible(
             'Content-Type': 'application/json',
             'Authorization': `Bearer ${apiKey}`
         },
-        body: JSON.stringify(requestBody)
+        body: JSON.stringify(requestBody),
+        signal,
     });
 
     if (!response.ok) {
@@ -276,7 +290,8 @@ async function sendToOpenAICompatible(
 export async function fetchFromProvider(
     model: string,
     messagesHistory: Message[],
-    reasoningLevel: string
+    reasoningLevel: string,
+    signal?: AbortSignal
 ): Promise<ProviderResponse> {
     const modelLowerCase = model.toLowerCase();
     const config = getModelConfig(model);
@@ -284,24 +299,28 @@ export async function fetchFromProvider(
 
     switch (provider) {
         case 'google':
-            return await sendToGoogle(modelLowerCase, messagesHistory, reasoningLevel);
+            return await sendToGoogle(modelLowerCase, messagesHistory, reasoningLevel, signal);
         case 'anthropic':
-            return await sendToAnthropic(modelLowerCase, messagesHistory, reasoningLevel);
+            return await sendToAnthropic(modelLowerCase, messagesHistory, reasoningLevel, signal);
         case 'openai':
-            return await sendToOpenAI(modelLowerCase, messagesHistory, reasoningLevel);
+            return await sendToOpenAI(modelLowerCase, messagesHistory, reasoningLevel, signal);
         case 'lm studio':
             return await sendToOpenAICompatible(
                 'http://127.0.0.1:1234/v1/chat/completions',
                 'lm-studio-key',
                 modelLowerCase,
-                messagesHistory
+                messagesHistory,
+                undefined,
+                signal
             );
         case 'ollama':
             return await sendToOpenAICompatible(
                 'http://127.0.0.1:11434/v1/chat/completions',
                 'ollama-key',
                 modelLowerCase,
-                messagesHistory
+                messagesHistory,
+                undefined,
+                signal
             );
         default:
             throw new Error(`⚠️ El proveedor de IA "${provider}" no está soportado.`);

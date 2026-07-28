@@ -152,7 +152,8 @@ export async function fetchChatResponse(
   messagesHistory: Message[],
   model: string,
   useServer: boolean,
-  systemPrompt?: string
+  systemPrompt?: string,
+  signal?: AbortSignal
 ): Promise<{ text: string; userMessageId?: string; aiMessageId?: string }> {
   const modelLowerCase = model.toLowerCase();
   const config = getModelConfig(model);
@@ -186,6 +187,7 @@ export async function fetchChatResponse(
         reasoningLevel,
         thinkingBudget,
       }),
+      signal,
     });
 
     if (response.status === 401) {
@@ -206,6 +208,6 @@ export async function fetchChatResponse(
     const data = await response.json();
     return { text: data.text, userMessageId: data.userMessageId, aiMessageId: data.aiMessageId };
   } else {
-    return await fetchFromProvider(model, historyWithSystemPrompt, reasoningLevel);
+    return await fetchFromProvider(model, historyWithSystemPrompt, reasoningLevel, signal);
   }
 }
