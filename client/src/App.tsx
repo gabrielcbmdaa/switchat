@@ -86,29 +86,28 @@ export default function App() {
       let initialChats = loadLocalChats() || [];
       let initialActiveId = loadLocalActiveChatId() || '';
 
-      // Solo verificamos sesión en el servidor si el usuario se logueó previamente
-      const hasSessionFlag = localStorage.getItem('isLoggedIn') === 'true';
+      // Siempre intentamos reatachar la sesión vía cookie HttpOnly (/auth/me).
+      // Antes solo se hacía si existía localStorage.isLoggedIn, y si esa bandera
+      // faltaba (storage limpio parcial, otro perfil, etc.) la cookie quedaba viva
+      // pero la UI se quedaba en modo offline: login visible y mensajes sin cargar.
+      try {
+        const sessionActive = await checkSession();
+        if (sessionActive) {
+          localStorage.setItem('isLoggedIn', 'true');
+          setIsAuthenticated(true);
 
-      if (hasSessionFlag) {
-        try {
-          const sessionActive = await checkSession();
-          if (sessionActive) {
-            setIsAuthenticated(true);
-
-            const serverChats = await loadChatsFromServer();
-            if (serverChats && serverChats.length > 0) {
-              initialChats = serverChats;
-              if (!initialChats.some((chat: Chat) => chat.id === initialActiveId)) {
-                initialActiveId = initialChats[0].id;
-              }
+          const serverChats = await loadChatsFromServer();
+          if (serverChats && serverChats.length > 0) {
+            initialChats = serverChats;
+            if (!initialChats.some((chat: Chat) => chat.id === initialActiveId)) {
+              initialActiveId = initialChats[0].id;
             }
-          } else {
-            // Si la cookie expiró en el servidor pero la bandera seguía en true, la limpiamos
-            localStorage.removeItem('isLoggedIn');
           }
-        } catch (error) {
-          console.error("Error en la carga inicial de sesión o chats del servidor:", error);
+        } else {
+          localStorage.removeItem('isLoggedIn');
         }
+      } catch (error) {
+        console.error("Error en la carga inicial de sesión o chats del servidor:", error);
       }
 
       if (initialChats.length === 0) {
