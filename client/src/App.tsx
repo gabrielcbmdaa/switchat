@@ -27,6 +27,9 @@ export default function App() {
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false);
   const [isGenerating, setIsGenerating] = useState<boolean>(false);
   const abortControllerRef = useRef<AbortController | null>(null);
+  const draftSyncTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const currentChatRef = useRef(currentChat);
+  const isAuthenticatedRef = useRef(isAuthenticated);
   const [model, setModel] = useState<string>(() => {
     const savedModel = localStorage.getItem('model');
     if (savedModel && getModelConfig(savedModel)) {
@@ -34,6 +37,37 @@ export default function App() {
     }
     return 'gemini-3.5-flash';
   });
+
+  useEffect(() => {
+    currentChatRef.current = currentChat;
+  }, [currentChat]);
+
+  useEffect(() => {
+    isAuthenticatedRef.current = isAuthenticated;
+  }, [isAuthenticated]);
+
+  function clearDraftSyncTimer() {
+    if (draftSyncTimerRef.current) {
+      clearTimeout(draftSyncTimerRef.current);
+      draftSyncTimerRef.current = null;
+    }
+  }
+
+  function scheduleDraftSyncToServer(chat: Chat) {
+    if (!isAuthenticatedRef.current) return;
+    clearDraftSyncTimer();
+    draftSyncTimerRef.current = setTimeout(() => {
+      syncChatDraftToServer(chat);
+      draftSyncTimerRef.current = null;
+    }, 2000);
+  }
+
+  function flushDraftSyncToServer(chat: Chat | undefined) {
+    clearDraftSyncTimer();
+    if (chat && isAuthenticatedRef.current) {
+      syncChatDraftToServer(chat);
+    }
+  }
 
   useEffect(() => {
     if (activeLeftPanel !== null) {
@@ -92,8 +126,9 @@ export default function App() {
 
   useEffect(() => {
     const handleBeforeUnload = () => {
-      if (currentChat && isAuthenticated) {
-        syncChatDraftToServer(currentChat);
+      if (currentChatRef.current && isAuthenticatedRef.current) {
+        clearDraftSyncTimer();
+        syncChatDraftToServer(currentChatRef.current);
       }
     };
 
@@ -101,8 +136,9 @@ export default function App() {
 
     return () => {
       window.removeEventListener('beforeunload', handleBeforeUnload);
+      clearDraftSyncTimer();
     };
-  }, [currentChat, isAuthenticated]);
+  }, []);
 
   useEffect(() => { // Carga inicial de los últimos 6 mensajes cuando cambia el chat activo
     if (!activeChatId) return;
@@ -154,6 +190,8 @@ export default function App() {
   }
 
   function handleCreateNewChat() {
+    flushDraftSyncToServer(currentChat);
+
     // 1. Creamos el nuevo dato exactamente igual que antes
     const newId = 'chat-' + Date.now();
     const newChat = { id: newId, title: 'New conversation', messages: [], draft: '' };
@@ -172,6 +210,11 @@ export default function App() {
   }
 
   function handleSelectChat(clickedChatId: string) {
+    if (clickedChatId !== activeChatId) {
+      // Sync the chat we're leaving (with its current draft), not the destination
+      flushDraftSyncToServer(currentChat);
+    }
+
     setActiveChatId(clickedChatId);
     if (window.innerWidth < 768) {
       setActiveLeftPanel(null);
@@ -179,10 +222,6 @@ export default function App() {
       setActiveLeftPanel('chats');
     }
     saveToLocalDisk(chatList, clickedChatId);
-    const clickedChat = chatList.find(chat => chat.id === clickedChatId);
-    if (clickedChat && isAuthenticated) {
-      saveChatToServer(clickedChat);
-    }
   }
 
   function handleDraftChange(newDraft: string) {
@@ -197,6 +236,11 @@ export default function App() {
 
     setChatList(updatedChats);
     saveToLocalDisk(updatedChats, activeChatId);
+
+    const updatedChat = updatedChats.find((chat) => chat.id === activeChatId);
+    if (updatedChat) {
+      scheduleDraftSyncToServer(updatedChat);
+    }
   }
 
   function handleSystemPromptChange(newSystemPrompt: string) {
@@ -280,6 +324,7 @@ export default function App() {
   async function handleSendMessage() {
     // 1. Validaciones iniciales (Reemplaza a tu document.getElementById)
     if (!currentChat || !currentChat.draft.trim() || isGenerating) return;
+    clearDraftSyncTimer(); // Avoid syncing a stale draft after send clears it
     const promptText = currentChat.draft.trim();
 
     // 2. Preparamos el mensaje del usuario y el mensaje temporal de "pensando"
