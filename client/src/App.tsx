@@ -89,8 +89,8 @@ export default function App() {
 
   useEffect(() => {
     async function initializeApp() {
-      let initialChats = loadLocalChats() || [];
-      let initialActiveId = loadLocalActiveChatId() || '';
+      const localChats = loadLocalChats() || [];
+      const localActiveId = loadLocalActiveChatId() || '';
 
       // Siempre intentamos reatachar la sesión vía cookie HttpOnly (/auth/me).
       // Antes solo se hacía si existía localStorage.isLoggedIn, y si esa bandera
@@ -104,18 +104,31 @@ export default function App() {
 
           const serverChats = await loadChatsFromServer();
           if (serverChats && serverChats.length > 0) {
-            initialChats = serverChats;
-            if (!initialChats.some((chat: Chat) => chat.id === initialActiveId)) {
-              initialActiveId = initialChats[0].id;
-            }
+            // Online: solo state. No escribir chats del servidor en localStorage.
+            setChatList(serverChats);
+            setActiveChatId(
+              localActiveId && serverChats.some((chat: Chat) => chat.id === localActiveId)
+                ? localActiveId
+                : serverChats[0].id
+            );
+            return;
           }
-        } else {
-          localStorage.removeItem('isLoggedIn');
+
+          // Sesión activa pero sin chats en servidor: tutorial solo en memoria.
+          const tutorialChats = getTutorialChat();
+          setChatList(tutorialChats);
+          setActiveChatId('tutorial-welcome');
+          return;
         }
+
+        localStorage.removeItem('isLoggedIn');
       } catch (error) {
         console.error("Error en la carga inicial de sesión o chats del servidor:", error);
       }
 
+      // Offline: usar chats locales; si vacíos, tutorial + persistir.
+      let initialChats = localChats;
+      let initialActiveId = localActiveId;
       if (initialChats.length === 0) {
         initialChats = getTutorialChat();
         initialActiveId = 'tutorial-welcome';
