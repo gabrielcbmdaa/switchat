@@ -18,7 +18,8 @@ export function getTutorialChat(): Chat[] {
     }];
 }
 
-// 2. Funciones para leer de LocalStorage al iniciar la app
+// chatList / activeChatId en localStorage son solo para modo offline.
+// Los chats online viven en React state + MongoDB; no deben escribirse aquí.
 export function loadLocalChats(): Chat[] {
     const localData = localStorage.getItem('chatList');
 

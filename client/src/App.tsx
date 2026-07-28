@@ -69,6 +69,12 @@ export default function App() {
     }
   }
 
+  function persistIfOffline(chats: Chat[], activeId: string) {
+    if (!isAuthenticatedRef.current) {
+      saveToLocalDisk(chats, activeId);
+    }
+  }
+
   useEffect(() => {
     if (activeLeftPanel !== null) {
       return initResizer('left');
@@ -220,7 +226,7 @@ export default function App() {
     } else {
       setActiveLeftPanel('chats');
     }
-    saveToLocalDisk(chatList, clickedChatId);
+    persistIfOffline(chatList, clickedChatId);
   }
 
   function handleDraftChange(newDraft: string) {
@@ -234,7 +240,7 @@ export default function App() {
     });
 
     setChatList(updatedChats);
-    saveToLocalDisk(updatedChats, activeChatId);
+    persistIfOffline(updatedChats, activeChatId);
 
     const updatedChat = updatedChats.find((chat) => chat.id === activeChatId);
     if (updatedChat) {
@@ -251,7 +257,7 @@ export default function App() {
     });
 
     setChatList(updatedChats);
-    saveToLocalDisk(updatedChats, activeChatId);
+    persistIfOffline(updatedChats, activeChatId);
 
     const updatedChat = updatedChats.find((chat) => chat.id === activeChatId);
     if (updatedChat && isAuthenticated) {
@@ -376,7 +382,7 @@ export default function App() {
       );
 
       setChatList(finalChats);
-      saveToLocalDisk(finalChats, activeChatId); // Tu guardado local
+      persistIfOffline(finalChats, activeChatId);
 
     } catch (error) {
       const err = error as Error;
@@ -388,7 +394,7 @@ export default function App() {
             : chat
         );
         setChatList(abortedChats);
-        saveToLocalDisk(abortedChats, activeChatId);
+        persistIfOffline(abortedChats, activeChatId);
       } else if (err.message === 'SESSION_EXPIRED') {
         resetSessionToDefault(); // Implementarás esto luego
         alert("Session expired. Please log in again.");
@@ -413,7 +419,7 @@ export default function App() {
       : activeChatId;
     setChatList(updatedChats);
     setActiveChatId(newActiveId);
-    saveToLocalDisk(updatedChats, newActiveId);
+    persistIfOffline(updatedChats, newActiveId);
     if (isAuthenticated) {
       deleteChatFromServer(chatId);
     }
@@ -433,7 +439,7 @@ export default function App() {
         : chat
     );
     setChatList(updatedChats);
-    saveToLocalDisk(updatedChats, activeChatId);
+    persistIfOffline(updatedChats, activeChatId);
 
     // 2. Si hay sesión y el mensaje tiene _id, borrarlo del servidor en segundo plano
     if (isAuthenticated && messageToDelete._id) {
@@ -512,7 +518,7 @@ export default function App() {
       );
 
       setChatList(finalChats);
-      saveToLocalDisk(finalChats, activeChatId);
+      persistIfOffline(finalChats, activeChatId);
     } catch (error) {
       const err = error as Error;
       if (err.name === 'AbortError') {
@@ -523,7 +529,7 @@ export default function App() {
             : chat
         );
         setChatList(abortedChats);
-        saveToLocalDisk(abortedChats, activeChatId);
+        persistIfOffline(abortedChats, activeChatId);
       } else if (err.message === 'SESSION_EXPIRED') {
         resetSessionToDefault();
         alert("Session expired. Please log in again.");
@@ -555,7 +561,7 @@ export default function App() {
       return chat;
     });
     setChatList(updatedChats);
-    saveToLocalDisk(updatedChats, activeChatId);
+    persistIfOffline(updatedChats, activeChatId);
     const retitledChat = updatedChats.find((chat) => chat.id === chatId);
 
     if (retitledChat && isAuthenticated) {
