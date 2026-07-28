@@ -279,37 +279,28 @@ export default function App() {
   }
 
   async function handleAuthSuccess() {
-    localStorage.setItem('isLoggedIn', 'true'); // 👈 Guardamos el indicador de inicio de sesión
+    localStorage.setItem('isLoggedIn', 'true');
     setActiveLeftPanel('chats');
     setIsAuthenticated(true);
     setChatList([]);
     setActiveChatId('');
 
     try {
-      // 2. Pedimos los datos al servidor
       const serverChats = await loadChatsFromServer();
 
       if (serverChats && serverChats.length > 0) {
-        // Opción A: El usuario ya tenía historial
         setChatList(serverChats);
         setActiveChatId(serverChats[0].id);
       } else {
-        // Opción B: Cuenta nueva, no hay chats. Le cargamos el tutorial.
-        const tutorialChats = getTutorialChat(); // Asegúrate de tener esto importado
-        const tutorialId = 'tutorial-welcome';
-
+        // Cuenta nueva: tutorial solo en state. No pisar chats locales en disco.
+        const tutorialChats = getTutorialChat();
         setChatList(tutorialChats);
-        setActiveChatId(tutorialId);
-        saveToLocalDisk(tutorialChats, tutorialId); // Guardamos para que no lo pierda al recargar
+        setActiveChatId('tutorial-welcome');
       }
     } catch (error) {
       console.error("Error al cargar chats del servidor:", error);
-      // Nota: Si falla el servidor, la lista quedará vacía. 
-      // Más adelante podrías agregar un estado para mostrar un mensaje de error en la UI.
     }
 
-    // 3. Cambiamos la vista. Lo ponemos al final para que la pantalla de chat 
-    // ya entre con los datos cargados en memoria.
     if (window.innerWidth < 768) {
       setActiveLeftPanel(null);
     } else {
@@ -318,25 +309,28 @@ export default function App() {
   }
 
   async function resetSessionToDefault() {
-    localStorage.removeItem('isLoggedIn'); // 👈 Limpiamos el indicador al cerrar sesión
-    await logoutFromServer(); // 👈 Llama al backend para limpiar la cookie de sesión
+    localStorage.removeItem('isLoggedIn');
+    await logoutFromServer();
     setIsAuthenticated(false);
 
-    // 2. Preparamos los datos del tutorial
-    const tutorialChats = getTutorialChat();
-    const tutorialId = 'tutorial-welcome';
+    // Restaurar chats offline intactos; solo persistir tutorial si no había ninguno.
+    let localChats = loadLocalChats() || [];
+    let localActiveId = loadLocalActiveChatId() || '';
+    if (localChats.length === 0) {
+      localChats = getTutorialChat();
+      localActiveId = 'tutorial-welcome';
+      saveToLocalDisk(localChats, localActiveId);
+    } else if (!localChats.some((chat) => chat.id === localActiveId)) {
+      localActiveId = localChats[0].id;
+    }
 
-    // 3. Le avisamos a React para que actualice la interfaz sola
-    setChatList(tutorialChats);
-    setActiveChatId(tutorialId);
+    setChatList(localChats);
+    setActiveChatId(localActiveId);
     if (window.innerWidth < 768) {
       setActiveLeftPanel(null);
     } else {
       setActiveLeftPanel('chats');
     }
-
-    // 4. Guardamos en el disco local esta estructura limpia
-    saveToLocalDisk(tutorialChats, tutorialId);
   }
 
   async function handleSendMessage() {
