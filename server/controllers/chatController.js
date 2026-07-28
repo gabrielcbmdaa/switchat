@@ -3,6 +3,15 @@ const Chat = require('../models/Chat');
 const { fetchFromProvider } = require('../services/providerService');
 
 exports.createMessage = async (req, res) => {
+    const abortController = new AbortController();
+
+    const abortOnClientDisconnect = () => {
+        if (!res.writableEnded && !abortController.signal.aborted) {
+            abortController.abort();
+        }
+    };
+    req.on('close', abortOnClientDisconnect);
+
     try {
         // 1. Extraemos los datos que vienen del frontend (incluyendo la clave de API efímera si fue enviada)
         const { chatId } = req.params;
@@ -22,6 +31,11 @@ exports.createMessage = async (req, res) => {
         });
         await userMessage.save();
 
+        if (abortController.signal.aborted) {
+            console.warn('⏹️ [chatController] Cliente desconectado antes de llamar al proveedor.');
+            return;
+        }
+
         // 3. OBTENER RESPUESTA DEL PROVEEDOR (Google, Anthropic, OpenAI, LM Studio, Ollama)
         const { text: responseText } = await fetchFromProvider({
             model,
@@ -29,8 +43,15 @@ exports.createMessage = async (req, res) => {
             messagesHistory: messages,
             reasoningLevel,
             thinkingBudget,
-            userApiKey
+            userApiKey,
+            signal: abortController.signal
         });
+
+        // Cliente abortó: no persistir ni responder la generación cancelada
+        if (abortController.signal.aborted || res.writableEnded) {
+            console.warn('⏹️ [chatController] Generación abortada; no se guarda la respuesta AI.');
+            return;
+        }
 
         // 4. GUARDAR LA RESPUESTA DE LA AI en MongoDB Atlas
         const aiMessage = new Message({
@@ -41,6 +62,10 @@ exports.createMessage = async (req, res) => {
         });
         await aiMessage.save();
 
+        if (res.writableEnded) {
+            return;
+        }
+
         // 5. RESPONDER AL FRONTEND
         return res.status(201).json({
             text: responseText,
@@ -49,6 +74,21 @@ exports.createMessage = async (req, res) => {
         });
 
     } catch (error) {
+        const isAbort =
+            error.name === 'AbortError' ||
+            error.code === 'ABORT_ERR' ||
+            abortController.signal.aborted;
+
+        if (isAbort) {
+            console.warn('⏹️ [chatController] Generación cancelada por desconexión del cliente.');
+            return;
+        }
+
+        if (res.writableEnded || res.headersSent) {
+            console.warn('⚠️ [chatController] Error tras cierre de conexión:', error.message);
+            return;
+        }
+
         // Diferenciamos errores conocidos de validación / negocio de errores inesperados de servidor
         const isKnownError = error.message && error.message.startsWith('⚠️');
 
@@ -98,6 +138,8 @@ exports.createMessage = async (req, res) => {
             message: 'Error interno del servidor. Intenta de nuevo.',
             error: error.message
         });
+    } finally {
+        req.off('close', abortOnClientDisconnect);
     }
 };
 

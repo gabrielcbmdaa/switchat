@@ -6,7 +6,7 @@
 /**
  * Cliente nativo para Google Gemini REST API.
  */
-async function sendToGoogle(modelLowerCase, messagesHistory, reasoningLevel, userApiKey) {
+async function sendToGoogle(modelLowerCase, messagesHistory, reasoningLevel, userApiKey, signal) {
     const apiKey = userApiKey || process.env.GOOGLE_API_KEY;
     if (!apiKey) {
         throw new Error("⚠️ No se encontró la API Key para Google Gemini. Por favor configúrala en el menú Config.");
@@ -52,7 +52,8 @@ async function sendToGoogle(modelLowerCase, messagesHistory, reasoningLevel, use
     const response = await fetch(googleApiUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(googleRequestBody)
+        body: JSON.stringify(googleRequestBody),
+        signal
     });
 
     if (!response.ok) {
@@ -77,7 +78,7 @@ async function sendToGoogle(modelLowerCase, messagesHistory, reasoningLevel, use
 /**
  * Cliente nativo para Anthropic Messages API (/v1/messages) con soporte para Extended Thinking.
  */
-async function sendToAnthropic(modelLowerCase, messagesHistory, reasoningLevel, thinkingBudget = 4096, userApiKey) {
+async function sendToAnthropic(modelLowerCase, messagesHistory, reasoningLevel, thinkingBudget = 4096, userApiKey, signal) {
     const apiKey = userApiKey || process.env.ANTHROPIC_API_KEY;
     if (!apiKey) {
         throw new Error("⚠️ No se encontró la API Key para Anthropic. Por favor configúrala en el menú Config.");
@@ -117,7 +118,8 @@ async function sendToAnthropic(modelLowerCase, messagesHistory, reasoningLevel, 
             'x-api-key': apiKey,
             'anthropic-version': '2023-06-01'
         },
-        body: JSON.stringify(requestBody)
+        body: JSON.stringify(requestBody),
+        signal
     });
 
     if (!response.ok) {
@@ -140,7 +142,7 @@ async function sendToAnthropic(modelLowerCase, messagesHistory, reasoningLevel, 
 /**
  * Cliente para OpenAI Chat Completions API.
  */
-async function sendToOpenAI(modelLowerCase, messagesHistory, reasoningLevel, userApiKey) {
+async function sendToOpenAI(modelLowerCase, messagesHistory, reasoningLevel, userApiKey, signal) {
     const apiKey = userApiKey || process.env.OPENAI_API_KEY;
     if (!apiKey) {
         throw new Error("⚠️ No se encontró la API Key para OpenAI. Por favor configúrala en el menú Config.");
@@ -152,14 +154,15 @@ async function sendToOpenAI(modelLowerCase, messagesHistory, reasoningLevel, use
         modelLowerCase,
         messagesHistory,
         reasoningLevel,
-        'openai'
+        'openai',
+        signal
     );
 }
 
 /**
  * Cliente genérico compatible con el formato OpenAI Chat Completions (usado por OpenAI, LM Studio y Ollama).
  */
-async function sendToOpenAICompatible(apiUrl, apiKey, modelLowerCase, messagesHistory, reasoningLevel, providerName = 'openai') {
+async function sendToOpenAICompatible(apiUrl, apiKey, modelLowerCase, messagesHistory, reasoningLevel, providerName = 'openai', signal) {
     const formattedMessages = messagesHistory.map(msg => {
         let role = 'user';
         if (msg.role === 'model') role = 'assistant';
@@ -184,7 +187,8 @@ async function sendToOpenAICompatible(apiUrl, apiKey, modelLowerCase, messagesHi
             'Content-Type': 'application/json',
             'Authorization': `Bearer ${apiKey}`
         },
-        body: JSON.stringify(requestBody)
+        body: JSON.stringify(requestBody),
+        signal
     });
 
     if (!response.ok) {
@@ -218,7 +222,7 @@ async function throwProviderError(response, providerLowerCase, modelLowerCase) {
 /**
  * Router principal de proveedores para el backend.
  */
-async function fetchFromProvider({ model, provider, messagesHistory, reasoningLevel, thinkingBudget, userApiKey }) {
+async function fetchFromProvider({ model, provider, messagesHistory, reasoningLevel, thinkingBudget, userApiKey, signal }) {
     const modelLowerCase = model ? model.toLowerCase() : '';
     const providerLowerCase = (provider || 'google').toLowerCase();
 
@@ -226,11 +230,11 @@ async function fetchFromProvider({ model, provider, messagesHistory, reasoningLe
 
     switch (providerLowerCase) {
         case 'google':
-            return await sendToGoogle(modelLowerCase, messagesHistory, reasoningLevel, userApiKey);
+            return await sendToGoogle(modelLowerCase, messagesHistory, reasoningLevel, userApiKey, signal);
         case 'anthropic':
-            return await sendToAnthropic(modelLowerCase, messagesHistory, reasoningLevel, thinkingBudget, userApiKey);
+            return await sendToAnthropic(modelLowerCase, messagesHistory, reasoningLevel, thinkingBudget, userApiKey, signal);
         case 'openai':
-            return await sendToOpenAI(modelLowerCase, messagesHistory, reasoningLevel, userApiKey);
+            return await sendToOpenAI(modelLowerCase, messagesHistory, reasoningLevel, userApiKey, signal);
         case 'lm studio':
             return await sendToOpenAICompatible(
                 'http://127.0.0.1:1234/v1/chat/completions',
@@ -238,7 +242,8 @@ async function fetchFromProvider({ model, provider, messagesHistory, reasoningLe
                 modelLowerCase,
                 messagesHistory,
                 reasoningLevel,
-                'lm studio'
+                'lm studio',
+                signal
             );
         case 'ollama':
             return await sendToOpenAICompatible(
@@ -247,7 +252,8 @@ async function fetchFromProvider({ model, provider, messagesHistory, reasoningLe
                 modelLowerCase,
                 messagesHistory,
                 reasoningLevel,
-                'ollama'
+                'ollama',
+                signal
             );
         default:
             throw new Error(`⚠️ El proveedor de IA "${providerLowerCase}" no está soportado.`);
