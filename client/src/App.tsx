@@ -226,7 +226,8 @@ export default function App() {
 
     // 2. En lugar de hacer .push(), le pasamos la nueva lista completa a React
     // (...chatList significa: "copia todos los chats que ya tenías y agrégale el nuevo")
-    setChatList([...chatList, newChat]);
+    const updatedChats = [...chatList, newChat];
+    setChatList(updatedChats);
 
     // 3. Le decimos a React cuál es el nuevo ID activo y a qué vista ir
     setActiveChatId(newId);
@@ -234,6 +235,12 @@ export default function App() {
       setActiveLeftPanel(null);
     } else {
       setActiveLeftPanel('chats');
+    }
+
+    if (isAuthenticated) {
+      saveChatToServer(newChat);
+    } else {
+      persistIfOffline(updatedChats, newId);
     }
   }
 
@@ -375,6 +382,14 @@ export default function App() {
 
     // 4. Llamamos a la API
     try {
+      if (isAuthenticated) {
+        const chatToSync = chatsWithUserMsg.find((chat) => chat.id === activeChatId);
+        if (chatToSync) {
+          // Solo asegurar el documento Chat; no sembrar Thinking/user aquí (van por createMessage).
+          await saveChatToServer({ ...chatToSync, messages: [] });
+        }
+      }
+
       // Le pasamos los mensajes originales (sin el "pensando") a la API
       const response = await fetchChatResponse(
         activeChatId,
@@ -503,6 +518,7 @@ export default function App() {
 
     // 5. Eliminar mensajes antiguos del backend de forma silenciosa
     if (isAuthenticated) {
+      await saveChatToServer({ ...currentChat, messages: [] });
       messagesToDeleteFromBackend.forEach(msg => {
         if (msg._id) {
           deleteMessageFromServer(activeChatId, msg._id);
