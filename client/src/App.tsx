@@ -75,11 +75,17 @@ export default function App() {
     }
   }
 
-  async function materializeOnlineWelcomeChat(): Promise<Chat> {
+  async function materializeOnlineWelcomeChat(userId: string): Promise<Chat> {
     const template = getTutorialChat()[0];
+    // Id estable por usuario: recargas / Strict Mode hacen upsert del mismo chat, no duplicados.
+    const baseTime = Date.now() - template.messages.length * 1000;
     const welcome: Chat = {
       ...template,
-      id: 'chat-' + Date.now(),
+      id: `welcome-${userId}`,
+      messages: template.messages.map((msg, index) => ({
+        ...msg,
+        createdAt: new Date(baseTime + index * 1000).toISOString(),
+      })),
     };
     await saveChatToServer(welcome);
     return welcome;
@@ -98,6 +104,8 @@ export default function App() {
   }, [activeRightPanel]);
 
   useEffect(() => {
+    let cancelled = false;
+
     async function initializeApp() {
       const localChats = loadLocalChats() || [];
       const localActiveId = loadLocalActiveChatId() || '';
@@ -107,12 +115,14 @@ export default function App() {
       // faltaba (storage limpio parcial, otro perfil, etc.) la cookie quedaba viva
       // pero la UI se quedaba en modo offline: login visible y mensajes sin cargar.
       try {
-        const sessionActive = await checkSession();
-        if (sessionActive) {
+        const session = await checkSession();
+        if (session.authenticated) {
           localStorage.setItem('isLoggedIn', 'true');
-          setIsAuthenticated(true);
+          if (!cancelled) setIsAuthenticated(true);
 
-          const serverChats = await loadChatsFromServer();
+          let serverChats = await loadChatsFromServer();
+          if (cancelled) return;
+
           if (serverChats && serverChats.length > 0) {
             // Online: solo state. No escribir chats del servidor en localStorage.
             setChatList(serverChats);
@@ -124,8 +134,22 @@ export default function App() {
             return;
           }
 
-          // Sesión activa pero sin chats: materializar welcome real en Mongo (+ mensajes).
-          const welcome = await materializeOnlineWelcomeChat();
+          // Sesión activa pero sin chats: materializar welcome real (id estable por userId).
+          if (!session.userId) {
+            console.error('Sesión activa sin userId; no se puede materializar welcome.');
+            return;
+          }
+          // Re-check por carrera (Strict Mode / doble mount) antes de crear.
+          serverChats = await loadChatsFromServer();
+          if (cancelled) return;
+          if (serverChats && serverChats.length > 0) {
+            setChatList(serverChats);
+            setActiveChatId(serverChats[0].id);
+            return;
+          }
+
+          const welcome = await materializeOnlineWelcomeChat(session.userId);
+          if (cancelled) return;
           setChatList([welcome]);
           setActiveChatId(welcome.id);
           return;
@@ -135,6 +159,8 @@ export default function App() {
       } catch (error) {
         console.error("Error en la carga inicial de sesión o chats del servidor:", error);
       }
+
+      if (cancelled) return;
 
       // Offline: usar chats locales; si vacíos, tutorial + persistir.
       let initialChats = localChats;
@@ -150,6 +176,9 @@ export default function App() {
     }
 
     initializeApp();
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   useEffect(() => {
@@ -309,8 +338,13 @@ export default function App() {
         setChatList(serverChats);
         setActiveChatId(serverChats[0].id);
       } else {
-        // Cuenta nueva: welcome real en servidor. No pisar chats locales en disco.
-        const welcome = await materializeOnlineWelcomeChat();
+        // Cuenta nueva: welcome real en servidor (id estable). No pisar chats locales.
+        const session = await checkSession();
+        if (!session.userId) {
+          console.error('Sesión activa sin userId; no se puede materializar welcome.');
+          return;
+        }
+        const welcome = await materializeOnlineWelcomeChat(session.userId);
         setChatList([welcome]);
         setActiveChatId(welcome.id);
       }

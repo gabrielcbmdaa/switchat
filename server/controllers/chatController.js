@@ -5,12 +5,14 @@ const { fetchFromProvider } = require('../services/providerService');
 exports.createMessage = async (req, res) => {
     const abortController = new AbortController();
 
+    // Usar res.close (no req.close): con body JSON, req 'close' dispara al terminar
+    // de parsear el body y abortaría en falso antes de llamar al proveedor.
     const abortOnClientDisconnect = () => {
         if (!res.writableEnded && !abortController.signal.aborted) {
             abortController.abort();
         }
     };
-    req.on('close', abortOnClientDisconnect);
+    res.on('close', abortOnClientDisconnect);
 
     try {
         // 1. Extraemos los datos que vienen del frontend (incluyendo la clave de API efímera si fue enviada)
@@ -139,7 +141,7 @@ exports.createMessage = async (req, res) => {
             error: error.message
         });
     } finally {
-        req.off('close', abortOnClientDisconnect);
+        res.off('close', abortOnClientDisconnect);
     }
 };
 
@@ -177,7 +179,7 @@ exports.getMessages = async (req, res) => {
 
         // Buscamos los mensajes más recientes ordenados descendente
         const dbMessages = await Message.find(query)
-            .sort({ createdAt: -1 })
+            .sort({ createdAt: -1, _id: -1 })
             .limit(limit);
 
         // Traducimos el formato de Mongoose al frontend (role/parts) y los revertimos
@@ -216,17 +218,22 @@ exports.syncChat = async (req, res) => {
         if (Array.isArray(messages) && messages.length > 0) {
             const existingCount = await Message.countDocuments({ chatId: chatFields.id });
             if (existingCount === 0) {
+                // Timestamps escalonados: insertMany en el mismo ms desordena al ordenar por createdAt.
+                const baseTime = Date.now() - messages.length * 1000;
                 const docs = messages
-                    .map((msg) => {
+                    .map((msg, index) => {
                         const text = msg?.parts?.[0]?.text;
                         if (!text || typeof text !== 'string') return null;
                         const sender = msg.role === 'user' ? 'user' : 'ai';
+                        const createdAt = msg.createdAt
+                            ? new Date(msg.createdAt)
+                            : new Date(baseTime + index * 1000);
                         return {
                             chatId: chatFields.id,
                             sender,
                             content: text,
-                            ...(msg.model ? { model: msg.model } : {}),
-                            ...(msg.createdAt ? { createdAt: new Date(msg.createdAt) } : {})
+                            createdAt,
+                            ...(msg.model ? { model: msg.model } : {})
                         };
                     })
                     .filter(Boolean);

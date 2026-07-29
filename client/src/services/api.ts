@@ -24,15 +24,18 @@ async function apiFetch(endpoint: string, options: RequestInit = {}): Promise<Re
 // Autenticación & Sesión de Usuario
 // ============================================================================
 
-export async function checkSession(): Promise<boolean> {
+export async function checkSession(): Promise<{ authenticated: boolean; userId?: string }> {
   try {
     const response = await apiFetch('/auth/me');
-    if (!response.ok) return false;
+    if (!response.ok) return { authenticated: false };
     const data = await response.json();
-    return Boolean(data.authenticated);
+    return {
+      authenticated: Boolean(data.authenticated),
+      userId: data.userId ? String(data.userId) : undefined,
+    };
   } catch (error) {
     console.error('❌ Error [checkSession]:', error);
-    return false;
+    return { authenticated: false };
   }
 }
 
