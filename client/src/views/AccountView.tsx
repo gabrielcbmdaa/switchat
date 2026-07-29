@@ -24,12 +24,9 @@ export default function ConfigView({ isAuthenticated, onAuthSuccess, onLogoutAct
 
     const handleAuth = async (isSignUp: boolean) => {
         try {
-            await loginOrRegister(email, password, isSignUp); // 👈 Ya no guardamos la respuesta en una variable 'data'
-            if (isSignUp) {
-                alert("¡Registro exitoso! Ya puedes ingresar.");
-            } else {
-                onAuthSuccess();
-            }
+            // El registro también deja la sesión iniciada (cookie), igual que el login.
+            await loginOrRegister(email, password, isSignUp);
+            onAuthSuccess();
         } catch (err: unknown) {
             const errorMessage = err instanceof Error ? err.message : String(err);
             alert("Error: " + errorMessage);

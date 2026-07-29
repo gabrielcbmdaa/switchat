@@ -2,6 +2,22 @@ const User = require('../models/User'); // Traemos el "molde" del usuario
 const bcrypt = require('bcrypt');   // Traemos la herramienta de seguridad
 const jwt = require('jsonwebtoken')
 
+// Firma el JWT y lo guarda en una cookie HttpOnly (usado en registro y login).
+function issueSessionCookie(res, user) {
+  const token = jwt.sign(
+    { id: user._id },
+    process.env.JWT_SECRET,
+    { expiresIn: '7d' } // La pulsera expira en 7 días
+  );
+
+  res.cookie('token', token, {
+    httpOnly: true,                                // 👈 Protege contra XSS (JS no puede leer esta cookie)
+    secure: process.env.NODE_ENV === 'production', // 👈 Solo HTTPS en producción (en desarrollo permite HTTP)
+    sameSite: 'strict',                            // 👈 Protege contra CSRF (la cookie no se envía desde otros sitios)
+    maxAge: 7 * 24 * 60 * 60 * 1000               // 👈 Expira en 7 días (igual que el token)
+  });
+}
+
 // Lógica para Registrar un nuevo usuario
 exports.register = async (req, res) => {
   try {
@@ -28,7 +44,9 @@ exports.register = async (req, res) => {
     // 5. Guardar el nuevo usuario de forma definitiva en MongoDB Atlas
     await newUser.save();
 
-    // 6. Responder al cliente que todo salió perfecto (Status 201: Created)
+    // 6. Iniciar sesión automáticamente: mismo mecanismo de cookie que el login.
+    issueSessionCookie(res, newUser);
+
     res.status(201).json({ message: 'Usuario registrado con éxito de forma segura' });
 
   } catch (error) {
@@ -54,19 +72,8 @@ exports.login = async (req, res) => {
       return res.status(400).json({ message: 'Credenciales incorrectas' });
     }
 
-    const token = jwt.sign(
-      { id: user._id },
-      process.env.JWT_SECRET,
-      { expiresIn: '7d' } // La pulsera expira en 7 días
-    );
-
     // Paso C: Si todo está bien, guardar el token en una cookie HttpOnly y responder éxito
-    res.cookie('token', token, {
-      httpOnly: true,                                // 👈 Protege contra XSS (JS no puede leer esta cookie)
-      secure: process.env.NODE_ENV === 'production', // 👈 Solo HTTPS en producción (en desarrollo permite HTTP)
-      sameSite: 'strict',                            // 👈 Protege contra CSRF (la cookie no se envía desde otros sitios)
-      maxAge: 7 * 24 * 60 * 60 * 1000               // 👈 Expira en 7 días (igual que el token)
-    });
+    issueSessionCookie(res, user);
 
     res.status(200).json({
       message: '¡Inicio de sesión exitoso! Bienvenido.'
