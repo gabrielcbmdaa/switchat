@@ -199,19 +199,43 @@ exports.getMessages = async (req, res) => {
 };
 
 // 🔄 1. SINCRONIZAR CHAT (Crear o Actualizar)
+// Si el body trae messages[] y el chat aún no tiene mensajes en Message, los siembra una sola vez.
 exports.syncChat = async (req, res) => {
     try {
-        const updatedChat = req.body;
-        delete updatedChat._id; // Evitamos romper MongoDB
+        const { messages, ...chatFields } = req.body;
+        delete chatFields._id; // Evitamos romper MongoDB / schema Chat (messages no pertenece aquí)
 
-        updatedChat.userId = req.user.id; // Aseguramos que el chat quede asociado al usuario correcto
+        chatFields.userId = req.user.id;
 
-        // Mongoose buscará por el 'id' del chat y lo actualizará, si no existe lo crea (upsert)
         const chat = await Chat.findOneAndUpdate(
-            { id: updatedChat.id },
-            { $set: updatedChat },
+            { id: chatFields.id, userId: req.user.id },
+            { $set: chatFields },
             { upsert: true, returnDocument: 'after' }
         );
+
+        if (Array.isArray(messages) && messages.length > 0) {
+            const existingCount = await Message.countDocuments({ chatId: chatFields.id });
+            if (existingCount === 0) {
+                const docs = messages
+                    .map((msg) => {
+                        const text = msg?.parts?.[0]?.text;
+                        if (!text || typeof text !== 'string') return null;
+                        const sender = msg.role === 'user' ? 'user' : 'ai';
+                        return {
+                            chatId: chatFields.id,
+                            sender,
+                            content: text,
+                            ...(msg.model ? { model: msg.model } : {}),
+                            ...(msg.createdAt ? { createdAt: new Date(msg.createdAt) } : {})
+                        };
+                    })
+                    .filter(Boolean);
+
+                if (docs.length > 0) {
+                    await Message.insertMany(docs);
+                }
+            }
+        }
 
         res.json({ message: 'Chat synchronized successfully', chat });
     } catch (error) {
