@@ -75,6 +75,16 @@ export default function App() {
     }
   }
 
+  async function materializeOnlineWelcomeChat(): Promise<Chat> {
+    const template = getTutorialChat()[0];
+    const welcome: Chat = {
+      ...template,
+      id: 'chat-' + Date.now(),
+    };
+    await saveChatToServer(welcome);
+    return welcome;
+  }
+
   useEffect(() => {
     if (activeLeftPanel !== null) {
       return initResizer('left');
@@ -114,10 +124,10 @@ export default function App() {
             return;
           }
 
-          // Sesión activa pero sin chats en servidor: tutorial solo en memoria.
-          const tutorialChats = getTutorialChat();
-          setChatList(tutorialChats);
-          setActiveChatId('tutorial-welcome');
+          // Sesión activa pero sin chats: materializar welcome real en Mongo (+ mensajes).
+          const welcome = await materializeOnlineWelcomeChat();
+          setChatList([welcome]);
+          setActiveChatId(welcome.id);
           return;
         }
 
@@ -292,10 +302,10 @@ export default function App() {
         setChatList(serverChats);
         setActiveChatId(serverChats[0].id);
       } else {
-        // Cuenta nueva: tutorial solo en state. No pisar chats locales en disco.
-        const tutorialChats = getTutorialChat();
-        setChatList(tutorialChats);
-        setActiveChatId('tutorial-welcome');
+        // Cuenta nueva: welcome real en servidor. No pisar chats locales en disco.
+        const welcome = await materializeOnlineWelcomeChat();
+        setChatList([welcome]);
+        setActiveChatId(welcome.id);
       }
     } catch (error) {
       console.error("Error al cargar chats del servidor:", error);
