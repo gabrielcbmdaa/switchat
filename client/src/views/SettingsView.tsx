@@ -1,7 +1,5 @@
 import { useState } from "react";
 import styles from './SettingsView.module.css'
-import DefaultInput from "../components/DefaultInput";
-import DefaultButton from "../components/DefaultButton";
 import { getModelConfig, getProviderIconId, MODEL_REGISTRY } from "../config/models.config";
 
 interface SettingViewProps {
@@ -13,53 +11,6 @@ interface SettingViewProps {
 }
 
 export default function SettingView({ currentModel, onModelChange, systemPrompt, onSystemPromptChange, onClose }: SettingViewProps) {
-    const [apiKey, setApiKey] = useState('');
-    const [showProviderSelectorForApiKey, setShowProviderSelectorForApiKey] = useState(false);
-
-    const [savedApiKeys, setSavedApiKeys] = useState<{ key: string, provider: string }[]>(() => {
-        const stored = localStorage.getItem('savedApiKeys');
-        if (stored) {
-            try {
-                return JSON.parse(stored);
-            } catch (e) {
-                console.error("Error parsing savedApiKeys:", e);
-            }
-        }
-
-        const migrated: { key: string, provider: string }[] = [];
-        const gemini = localStorage.getItem('geminiApiKey');
-        const anthropic = localStorage.getItem('anthropicApiKey');
-        const openai = localStorage.getItem('openaiApiKey');
-
-        if (gemini) migrated.push({ key: gemini, provider: 'Google' });
-        if (anthropic) migrated.push({ key: anthropic, provider: 'Anthropic' });
-        if (openai) migrated.push({ key: openai, provider: 'OpenAI' });
-
-        if (migrated.length > 0) {
-            localStorage.setItem('savedApiKeys', JSON.stringify(migrated));
-        }
-
-        return migrated;
-    });
-
-    const [activeKeys, setActiveKeys] = useState<Record<string, string>>(() => ({
-        google: localStorage.getItem('geminiApiKey') || '',
-        anthropic: localStorage.getItem('anthropicApiKey') || '',
-        openai: localStorage.getItem('openaiApiKey') || ''
-    }));
-
-    const getActiveKey = (providerName: string) => {
-        return activeKeys[providerName.toLowerCase()] || '';
-    };
-
-    const setActiveKeyForProvider = (providerName: string, key: string) => {
-        const p = providerName.toLowerCase();
-        if (p === 'google') localStorage.setItem('geminiApiKey', key);
-        else if (p === 'anthropic') localStorage.setItem('anthropicApiKey', key);
-        else if (p === 'openai') localStorage.setItem('openaiApiKey', key);
-
-        setActiveKeys(prev => ({ ...prev, [p]: key }));
-    };
     // 1. Derivamos los niveles directamente del modelo actual (Estado Derivado)
     const config = getModelConfig(currentModel);
     const thinkingLevels = config ? ['off', ...config.thinkingLevels] : [];
@@ -93,38 +44,6 @@ export default function SettingView({ currentModel, onModelChange, systemPrompt,
     };
 
     const [searchQuery, setSearchQuery] = useState('');
-
-    const handleSaveApiKeyInitiate = () => {
-        if (apiKey.trim() === '') return;
-        setShowProviderSelectorForApiKey(true);
-    };
-
-    const saveKeyWithProvider = (providerName: string) => {
-        const trimmedKey = apiKey.trim();
-        if (!trimmedKey) return;
-
-        const exists = savedApiKeys.some(k => k.key === trimmedKey && k.provider === providerName);
-        if (!exists) {
-            const newList = [...savedApiKeys, { key: trimmedKey, provider: providerName }];
-            setSavedApiKeys(newList);
-            localStorage.setItem('savedApiKeys', JSON.stringify(newList));
-        }
-
-        setActiveKeyForProvider(providerName, trimmedKey);
-
-        setApiKey('');
-        setShowProviderSelectorForApiKey(false);
-    };
-
-    const handleDeleteApiKey = (keyToDelete: string, provider: string) => {
-        const updated = savedApiKeys.filter(k => !(k.key === keyToDelete && k.provider === provider));
-        setSavedApiKeys(updated);
-        localStorage.setItem('savedApiKeys', JSON.stringify(updated));
-
-        if (getActiveKey(provider) === keyToDelete) {
-            setActiveKeyForProvider(provider, '');
-        }
-    };
 
     const availableModels = Object.keys(MODEL_REGISTRY);
     const filteredModels = availableModels.filter(model =>
@@ -211,86 +130,6 @@ export default function SettingView({ currentModel, onModelChange, systemPrompt,
                         value={systemPrompt}
                         onChange={(e) => onSystemPromptChange(e.target.value)}
                     />
-                </div>
-                {/* API KEY */}
-                <div className={styles.apiKeySection}>
-                    <div className={styles.apiKeyContainer}>
-                        <label className={styles.configLabel} htmlFor="apiKeyInput">API Key</label>
-                        <DefaultInput
-                            id="apiKeyInput"
-                            type="password"
-                            placeholder="Paste your API key here..."
-                            value={apiKey}
-                            onChange={(e) => {
-                                setApiKey(e.target.value);
-                                if (showProviderSelectorForApiKey && e.target.value === '') {
-                                    setShowProviderSelectorForApiKey(false);
-                                }
-                            }}
-                        />
-                        {!showProviderSelectorForApiKey ? (
-                            <DefaultButton
-                                onClick={handleSaveApiKeyInitiate}
-                                title="Save API Key"
-                            />
-                        ) : (
-                            <div className={styles.providerButtonsContainer}>
-                                <DefaultButton
-                                    iconId="icon-google"
-                                    iconSize={16}
-                                    title="Google"
-                                    onClick={() => saveKeyWithProvider('Google')}
-                                />
-                                <DefaultButton
-                                    iconId="icon-anthropic"
-                                    iconSize={16}
-                                    title="Anthropic"
-                                    onClick={() => saveKeyWithProvider('Anthropic')}
-                                />
-                                <DefaultButton
-                                    iconId="icon-openai"
-                                    iconSize={16}
-                                    title="OpenAI"
-                                    onClick={() => saveKeyWithProvider('OpenAI')}
-                                />
-                            </div>
-                        )}
-                    </div>
-
-                    {savedApiKeys.length > 0 && (
-                        <div className={styles.apiKeysListContainer}>
-                            {savedApiKeys.map((item, index) => {
-                                const isActive = getActiveKey(item.provider) === item.key;
-                                const iconId = `icon-${item.provider.toLowerCase()}`;
-                                return (
-                                    <div
-                                        key={index}
-                                        className={styles.apiKeyDropdownItem}
-                                        onClick={() => setActiveKeyForProvider(item.provider, item.key)}
-                                    >
-                                        <div className={styles.apiKeyItemContent}>
-                                            <span className={`${styles.activeDot} ${isActive ? styles.activeDotVisible : ''}`} />
-                                            <svg className={styles.providerIcon} width="16" height="16">
-                                                <use xlinkHref={`#${iconId}`} />
-                                            </svg>
-                                            <span className={styles.apiKeyText}>
-                                                {item.key.length > 10 ? `${item.key.slice(0, 5)}...${item.key.slice(-4)}` : item.key}
-                                            </span>
-                                        </div>
-                                        <button
-                                            type="button"
-                                            className={styles.deleteApiKeyBtn}
-                                            onClick={(e) => {
-                                                e.stopPropagation();
-                                                handleDeleteApiKey(item.key, item.provider);
-                                            }}
-                                            title="Delete API Key"
-                                        >✕</button>
-                                    </div>
-                                );
-                            })}
-                        </div>
-                    )}
                 </div>
                 {/* REASONING — Solo se muestra si el modelo soporta thinking */}
                 {thinkingLevels.length > 0 && (

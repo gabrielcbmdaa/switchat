@@ -176,8 +176,8 @@
 
 .systemPromptTextarea {
     width: 100%;
-    min-height: 90px;
-    max-height: 220px;
+    min-height: 220px;
+    max-height: 440px;
     box-sizing: border-box;
     background-color: transparent;
     color: #858585;
@@ -194,126 +194,6 @@
 .systemPromptTextarea::placeholder {
     color: #858585;
     opacity: 0.6;
-}
-
-/* ============================================================
-   4. API KEY SECTION
-   ============================================================ */
-.apiKeySection {
-    width: 100%;
-    display: flex;
-    flex-direction: column;
-    gap: 10px;
-    align-items: flex-start;
-}
-
-.apiKeyContainer {
-    width: 100%;
-    display: flex;
-    align-items: center;
-    justify-content: flex-start;
-    gap: 10px;
-}
-
-.providerButtonsContainer {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    flex-shrink: 0;
-}
-
-.apiKeysListContainer {
-    position: relative;
-    width: 100%;
-    height: 180px;
-    overflow-y: auto;
-    background-color: #191919;
-    border: 1px solid #858585;
-    border-radius: 20px;
-    padding: 6px 0;
-}
-
-.apiKeyDropdownItem {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    cursor: pointer;
-    margin: 0 6px;
-    padding: 0 10px;
-    height: 32px;
-    border-radius: 20px;
-    transition: background-color 0.2s ease;
-}
-
-.apiKeyDropdownItem:hover {
-    background-color: #858585;
-}
-
-.apiKeyDropdownItem:hover .apiKeyText {
-    color: #191919;
-}
-
-.apiKeyDropdownItem:hover .providerIcon {
-    fill: #191919;
-    color: #191919;
-}
-
-.apiKeyDropdownItem:hover .deleteApiKeyBtn {
-    color: #191919;
-}
-
-.apiKeyDropdownItem:hover .deleteApiKeyBtn:hover {
-    background-color: #191919;
-    color: #858585;
-}
-
-.apiKeyItemContent {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    flex: 1;
-    overflow: hidden;
-}
-
-.activeDot {
-    width: 6px;
-    height: 6px;
-    border-radius: 50%;
-    background-color: transparent;
-    flex-shrink: 0;
-    transition: background-color 0.2s ease;
-}
-
-.activeDotVisible {
-    background-color: #858585;
-}
-
-.apiKeyDropdownItem:hover .activeDotVisible {
-    background-color: #191919;
-}
-
-.apiKeyText {
-    color: #858585;
-    font-size: 13px;
-    font-family: monospace;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-}
-
-.deleteApiKeyBtn {
-    height: 24px;
-    width: 24px;
-    background-color: transparent;
-    border: none;
-    color: #858585;
-    font-size: 10px;
-    cursor: pointer;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    border-radius: 50%;
-    transition: all 0.2s ease;
 }
 
 /* ============================================================
