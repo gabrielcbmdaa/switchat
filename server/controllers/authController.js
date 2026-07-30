@@ -84,6 +84,43 @@ exports.login = async (req, res) => {
   }
 };
 
+// Cambia el email del usuario autenticado (requiere confirmar con la contraseña actual)
+exports.updateEmail = async (req, res) => {
+  try {
+    const { newEmail, currentPassword } = req.body;
+
+    const user = await User.findById(req.user.id);
+    if (!user) {
+      return res.status(401).json({ message: 'Usuario no encontrado' });
+    }
+
+    const isMatch = await bcrypt.compare(currentPassword, user.password);
+    if (!isMatch) {
+      return res.status(400).json({ message: 'Contraseña incorrecta' });
+    }
+
+    const normalizedEmail = String(newEmail || '').trim().toLowerCase();
+    if (!normalizedEmail) {
+      return res.status(400).json({ message: 'El correo electrónico es obligatorio' });
+    }
+
+    const existingUser = await User.findOne({
+      email: normalizedEmail,
+      _id: { $ne: req.user.id }
+    });
+    if (existingUser) {
+      return res.status(400).json({ message: 'El correo electrónico ya está registrado' });
+    }
+
+    user.email = normalizedEmail;
+    await user.save();
+
+    res.status(200).json({ message: 'Correo actualizado con éxito', email: user.email });
+  } catch (error) {
+    res.status(500).json({ message: 'Hubo un error en el servidor', error: error.message });
+  }
+};
+
 // Limpia la cookie del token en el navegador del usuario
 exports.logout = (req, res) => {
   res.clearCookie('token', {

@@ -9,6 +9,9 @@ router.post('/register', authController.register);
 // Ventanilla de Login
 router.post('/login', authController.login);
 
+// Cambiar email (requiere sesión activa)
+router.patch('/email', authMiddleware, authController.updateEmail);
+
 // Cerrar sesión
 router.post('/logout', authController.logout);
 
