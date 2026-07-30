@@ -24,7 +24,7 @@ async function apiFetch(endpoint: string, options: RequestInit = {}): Promise<Re
 // Autenticación & Sesión de Usuario
 // ============================================================================
 
-export async function checkSession(): Promise<{ authenticated: boolean; userId?: string }> {
+export async function checkSession(): Promise<{ authenticated: boolean; userId?: string; email?: string }> {
   try {
     const response = await apiFetch('/auth/me');
     if (!response.ok) return { authenticated: false };
@@ -32,6 +32,7 @@ export async function checkSession(): Promise<{ authenticated: boolean; userId?:
     return {
       authenticated: Boolean(data.authenticated),
       userId: data.userId ? String(data.userId) : undefined,
+      email: data.email ? String(data.email) : undefined,
     };
   } catch (error) {
     console.error('❌ Error [checkSession]:', error);
@@ -61,6 +62,44 @@ export async function logoutFromServer(): Promise<boolean> {
   } catch (error) {
     console.error('❌ Error [logoutFromServer]:', error);
     return false;
+  }
+}
+
+export async function updateEmail(newEmail: string, currentPassword: string): Promise<{ email: string }> {
+  const response = await apiFetch('/auth/email', {
+    method: 'PATCH',
+    body: JSON.stringify({ newEmail, currentPassword }),
+  });
+
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    throw new Error(data.message || 'No se pudo actualizar el correo');
+  }
+
+  return { email: data.email };
+}
+
+export async function updatePassword(newPassword: string, currentPassword: string): Promise<void> {
+  const response = await apiFetch('/auth/password', {
+    method: 'PATCH',
+    body: JSON.stringify({ newPassword, currentPassword }),
+  });
+
+  if (!response.ok) {
+    const data = await response.json().catch(() => ({}));
+    throw new Error(data.message || 'No se pudo actualizar la contraseña');
+  }
+}
+
+export async function deleteAccountFromServer(currentPassword: string): Promise<void> {
+  const response = await apiFetch('/auth/account', {
+    method: 'DELETE',
+    body: JSON.stringify({ currentPassword }),
+  });
+
+  if (!response.ok) {
+    const data = await response.json().catch(() => ({}));
+    throw new Error(data.message || 'No se pudo eliminar la cuenta');
   }
 }
 
