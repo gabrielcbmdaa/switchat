@@ -95,7 +95,15 @@ exports.logout = (req, res) => {
 };
 
 // Valida si la sesión sigue activa (el middleware ya comprobó el JWT)
-exports.me = (req, res) => {
-  // Si llegó aquí es porque el token fue válido en el middleware
-  res.status(200).json({ authenticated: true, userId: req.user.id });
+exports.me = async (req, res) => {
+  try {
+    // Si llegó aquí es porque el token fue válido en el middleware
+    const user = await User.findById(req.user.id);
+    if (!user) {
+      return res.status(401).json({ authenticated: false });
+    }
+    res.status(200).json({ authenticated: true, userId: req.user.id, email: user.email });
+  } catch (error) {
+    res.status(500).json({ message: 'Hubo un error en el servidor', error: error.message });
+  }
 };
