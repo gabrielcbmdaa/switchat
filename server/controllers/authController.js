@@ -121,6 +121,35 @@ exports.updateEmail = async (req, res) => {
   }
 };
 
+// Cambia la contraseña del usuario autenticado (requiere confirmar con la contraseña actual)
+exports.updatePassword = async (req, res) => {
+  try {
+    const { newPassword, currentPassword } = req.body;
+
+    const user = await User.findById(req.user.id);
+    if (!user) {
+      return res.status(401).json({ message: 'Usuario no encontrado' });
+    }
+
+    const isMatch = await bcrypt.compare(currentPassword, user.password);
+    if (!isMatch) {
+      return res.status(400).json({ message: 'Contraseña incorrecta' });
+    }
+
+    if (!newPassword || newPassword.length < 6) {
+      return res.status(400).json({ message: 'La contraseña debe tener al menos 6 caracteres' });
+    }
+
+    const salt = await bcrypt.genSalt(10);
+    user.password = await bcrypt.hash(newPassword, salt);
+    await user.save();
+
+    res.status(200).json({ message: 'Contraseña actualizada con éxito' });
+  } catch (error) {
+    res.status(500).json({ message: 'Hubo un error en el servidor', error: error.message });
+  }
+};
+
 // Limpia la cookie del token en el navegador del usuario
 exports.logout = (req, res) => {
   res.clearCookie('token', {

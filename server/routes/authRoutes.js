@@ -12,6 +12,9 @@ router.post('/login', authController.login);
 // Cambiar email (requiere sesión activa)
 router.patch('/email', authMiddleware, authController.updateEmail);
 
+// Cambiar contraseña (requiere sesión activa)
+router.patch('/password', authMiddleware, authController.updatePassword);
+
 // Cerrar sesión
 router.post('/logout', authController.logout);
 
