@@ -1,4 +1,6 @@
 const User = require('../models/User'); // Traemos el "molde" del usuario
+const Chat = require('../models/Chat');
+const Message = require('../models/Message');
 const bcrypt = require('bcrypt');   // Traemos la herramienta de seguridad
 const jwt = require('jsonwebtoken')
 
@@ -145,6 +147,40 @@ exports.updatePassword = async (req, res) => {
     await user.save();
 
     res.status(200).json({ message: 'Contraseña actualizada con éxito' });
+  } catch (error) {
+    res.status(500).json({ message: 'Hubo un error en el servidor', error: error.message });
+  }
+};
+
+// Elimina permanentemente la cuenta del usuario autenticado y todos sus datos
+exports.deleteAccount = async (req, res) => {
+  try {
+    const { currentPassword } = req.body;
+
+    const user = await User.findById(req.user.id);
+    if (!user) {
+      return res.status(401).json({ message: 'Usuario no encontrado' });
+    }
+
+    const isMatch = await bcrypt.compare(currentPassword, user.password);
+    if (!isMatch) {
+      return res.status(400).json({ message: 'Contraseña incorrecta' });
+    }
+
+    const userChats = await Chat.find({ userId: req.user.id }).select('id');
+    const chatIds = userChats.map((chat) => chat.id);
+
+    await Message.deleteMany({ chatId: { $in: chatIds } });
+    await Chat.deleteMany({ userId: req.user.id });
+    await User.findByIdAndDelete(req.user.id);
+
+    res.clearCookie('token', {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'strict'
+    });
+
+    res.status(200).json({ message: 'Cuenta eliminada con éxito' });
   } catch (error) {
     res.status(500).json({ message: 'Hubo un error en el servidor', error: error.message });
   }

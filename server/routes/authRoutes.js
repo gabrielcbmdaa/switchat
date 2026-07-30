@@ -15,6 +15,9 @@ router.patch('/email', authMiddleware, authController.updateEmail);
 // Cambiar contraseña (requiere sesión activa)
 router.patch('/password', authMiddleware, authController.updatePassword);
 
+// Eliminar cuenta permanentemente (requiere sesión activa)
+router.delete('/account', authMiddleware, authController.deleteAccount);
+
 // Cerrar sesión
 router.post('/logout', authController.logout);
 
