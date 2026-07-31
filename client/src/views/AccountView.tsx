@@ -119,6 +119,7 @@ export default function ConfigView({ isAuthenticated, onAuthSuccess, onLogoutAct
 
     const [deletePassword, setDeletePassword] = useState('');
     const [confirmingDelete, setConfirmingDelete] = useState(false);
+    const [isDeleting, setIsDeleting] = useState(false);
 
     useEffect(() => {
         let timer: ReturnType<typeof setTimeout>;
@@ -135,19 +136,23 @@ export default function ConfigView({ isAuthenticated, onAuthSuccess, onLogoutAct
         }
 
         if (!deletePassword) {
+            alert('Por favor, ingresa tu contraseña actual');
             setConfirmingDelete(false);
             return;
         }
 
+        setIsDeleting(true);
         try {
             await deleteAccountFromServer(deletePassword);
             setDeletePassword('');
             setConfirmingDelete(false);
+            setIsDeleting(false);
             onLogoutAction();
         } catch (err: unknown) {
             const errorMessage = err instanceof Error ? err.message : String(err);
             alert('Error: ' + errorMessage);
             setConfirmingDelete(false);
+            setIsDeleting(false);
         }
     };
 
@@ -279,6 +284,7 @@ export default function ConfigView({ isAuthenticated, onAuthSuccess, onLogoutAct
                                 iconId={confirmingDelete ? 'icon-confirm' : 'icon-trash'}
                                 title={confirmingDelete ? 'Click again to confirm' : 'Delete account'}
                                 onClick={handleDeleteAccount}
+                                disabled={isDeleting}
                             />
                         </div>
                     </div>
