@@ -1,6 +1,6 @@
 // src/views/ConfigView.tsx
-import { useState } from 'react';
-import { loginOrRegister } from '../services/api'; // Asegúrate de que la ruta sea correcta
+import { useState, useEffect } from 'react';
+import { loginOrRegister, checkSession, updateEmail, updatePassword } from '../services/api'; // Asegúrate de que la ruta sea correcta
 import styles from './AccountView.module.css'
 import DefaultInput from '../components/DefaultInput';
 import DefaultButton from '../components/DefaultButton';
@@ -74,6 +74,49 @@ export default function ConfigView({ isAuthenticated, onAuthSuccess, onLogoutAct
         }
     };
 
+    const [currentEmail, setCurrentEmail] = useState('');
+    const [newEmailValue, setNewEmailValue] = useState('');
+    const [emailCurrentPassword, setEmailCurrentPassword] = useState('');
+    const [newPasswordValue, setNewPasswordValue] = useState('');
+    const [passwordCurrentPassword, setPasswordCurrentPassword] = useState('');
+
+    useEffect(() => {
+        if (!isAuthenticated) {
+            setCurrentEmail('');
+            return;
+        }
+        checkSession().then((session) => {
+            if (session.email) setCurrentEmail(session.email);
+        });
+    }, [isAuthenticated]);
+
+    const handleUpdateEmail = async () => {
+        if (!newEmailValue.trim() || !emailCurrentPassword) return;
+        try {
+            const { email } = await updateEmail(newEmailValue.trim(), emailCurrentPassword);
+            setCurrentEmail(email);
+            setNewEmailValue('');
+            setEmailCurrentPassword('');
+            alert('Correo actualizado con éxito');
+        } catch (err: unknown) {
+            const errorMessage = err instanceof Error ? err.message : String(err);
+            alert('Error: ' + errorMessage);
+        }
+    };
+
+    const handleUpdatePassword = async () => {
+        if (!newPasswordValue || !passwordCurrentPassword) return;
+        try {
+            await updatePassword(newPasswordValue, passwordCurrentPassword);
+            setNewPasswordValue('');
+            setPasswordCurrentPassword('');
+            alert('Contraseña actualizada con éxito');
+        } catch (err: unknown) {
+            const errorMessage = err instanceof Error ? err.message : String(err);
+            alert('Error: ' + errorMessage);
+        }
+    };
+
     const handleSaveApiKeyInitiate = () => {
         if (apiKey.trim() === '') return;
         setShowProviderSelectorForApiKey(true);
@@ -144,6 +187,52 @@ export default function ConfigView({ isAuthenticated, onAuthSuccess, onLogoutAct
                 >
                     Sign Out
                 </button>
+            )}
+
+            {isAuthenticated && (
+                <div className={styles.accountSettingsSection}>
+                    <span className={styles.currentEmailText}>{currentEmail}</span>
+
+                    <div className={styles.accountSettingsRow}>
+                        <DefaultInput
+                            type="email"
+                            placeholder="New email"
+                            value={newEmailValue}
+                            onChange={(e) => setNewEmailValue(e.target.value)}
+                        />
+                        <DefaultInput
+                            type="password"
+                            placeholder="Current password"
+                            value={emailCurrentPassword}
+                            onChange={(e) => setEmailCurrentPassword(e.target.value)}
+                        />
+                        <DefaultButton
+                            iconId="icon-confirm"
+                            title="Update email"
+                            onClick={handleUpdateEmail}
+                        />
+                    </div>
+
+                    <div className={styles.accountSettingsRow}>
+                        <DefaultInput
+                            type="password"
+                            placeholder="New password"
+                            value={newPasswordValue}
+                            onChange={(e) => setNewPasswordValue(e.target.value)}
+                        />
+                        <DefaultInput
+                            type="password"
+                            placeholder="Current password"
+                            value={passwordCurrentPassword}
+                            onChange={(e) => setPasswordCurrentPassword(e.target.value)}
+                        />
+                        <DefaultButton
+                            iconId="icon-confirm"
+                            title="Update password"
+                            onClick={handleUpdatePassword}
+                        />
+                    </div>
+                </div>
             )}
 
             {/* API KEY */}
