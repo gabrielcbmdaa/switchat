@@ -81,10 +81,7 @@ export default function ConfigView({ isAuthenticated, onAuthSuccess, onLogoutAct
     const [passwordCurrentPassword, setPasswordCurrentPassword] = useState('');
 
     useEffect(() => {
-        if (!isAuthenticated) {
-            setCurrentEmail('');
-            return;
-        }
+        if (!isAuthenticated) return;
         checkSession().then((session) => {
             if (session.email) setCurrentEmail(session.email);
         });
