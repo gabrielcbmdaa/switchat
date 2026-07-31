@@ -1,6 +1,6 @@
 // src/views/ConfigView.tsx
 import { useState, useEffect } from 'react';
-import { loginOrRegister, checkSession, updateEmail, updatePassword } from '../services/api'; // Asegúrate de que la ruta sea correcta
+import { loginOrRegister, checkSession, updateEmail, updatePassword, deleteAccountFromServer } from '../services/api'; // Asegúrate de que la ruta sea correcta
 import styles from './AccountView.module.css'
 import DefaultInput from '../components/DefaultInput';
 import DefaultButton from '../components/DefaultButton';
@@ -114,6 +114,40 @@ export default function ConfigView({ isAuthenticated, onAuthSuccess, onLogoutAct
         } catch (err: unknown) {
             const errorMessage = err instanceof Error ? err.message : String(err);
             alert('Error: ' + errorMessage);
+        }
+    };
+
+    const [deletePassword, setDeletePassword] = useState('');
+    const [confirmingDelete, setConfirmingDelete] = useState(false);
+
+    useEffect(() => {
+        let timer: ReturnType<typeof setTimeout>;
+        if (confirmingDelete) {
+            timer = setTimeout(() => setConfirmingDelete(false), 5000);
+        }
+        return () => clearTimeout(timer);
+    }, [confirmingDelete]);
+
+    const handleDeleteAccount = async () => {
+        if (!confirmingDelete) {
+            setConfirmingDelete(true);
+            return;
+        }
+
+        if (!deletePassword) {
+            setConfirmingDelete(false);
+            return;
+        }
+
+        try {
+            await deleteAccountFromServer(deletePassword);
+            setDeletePassword('');
+            setConfirmingDelete(false);
+            onLogoutAction();
+        } catch (err: unknown) {
+            const errorMessage = err instanceof Error ? err.message : String(err);
+            alert('Error: ' + errorMessage);
+            setConfirmingDelete(false);
         }
     };
 
@@ -231,6 +265,22 @@ export default function ConfigView({ isAuthenticated, onAuthSuccess, onLogoutAct
                             title="Update password"
                             onClick={handleUpdatePassword}
                         />
+                    </div>
+
+                    <div className={styles.dangerZone}>
+                        <div className={styles.accountSettingsRow}>
+                            <DefaultInput
+                                type="password"
+                                placeholder="Current password"
+                                value={deletePassword}
+                                onChange={(e) => setDeletePassword(e.target.value)}
+                            />
+                            <DefaultButton
+                                iconId={confirmingDelete ? 'icon-confirm' : 'icon-trash'}
+                                title={confirmingDelete ? 'Click again to confirm' : 'Delete account'}
+                                onClick={handleDeleteAccount}
+                            />
+                        </div>
                     </div>
                 </div>
             )}
