@@ -187,112 +187,10 @@ export default function ConfigView({ isAuthenticated, onAuthSuccess, onLogoutAct
 
     return (
         <div className={styles.accountViewContainer}>
-            {/* --- SECCIÓN 1: CUENTA --- */}
-            {!isAuthenticated ? (
-                <form
-                    className={styles.authForm}
-                    onSubmit={(e) => {
-                        e.preventDefault();
-                        handleAuth(false); // Iniciar sesión al presionar Enter en los campos
-                    }}
-                >
-                    <DefaultInput
-                        type="email"
-                        placeholder="Your email"
-                        value={email}
-                        onChange={(e) => setEmail(e.target.value)} // 👈 Vinculamos la escritura al estado
-                        required
-                    />
-                    <DefaultInput
-                        type="password"
-                        placeholder="Password"
-                        value={password}
-                        onChange={(e) => setPassword(e.target.value)} // 👈 Vinculamos la escritura al estado
-                        required
-                    />
-                    <div className={styles.buttonAuthContainer}>
-                        {/* Tipo submit para aprovechar el comportamiento nativo de HTML */}
-                        <button type="submit" className={styles.btnAuth}>Sign In</button>
-                        <button type="button" className={styles.btnAuth} onClick={() => handleAuth(true)}>Sign Up</button>
-                    </div>
-                </form>
-            ) : (
-                <button
-                    onClick={onLogoutAction}
-                    className={styles.btnAuth}
-                >
-                    Sign Out
-                </button>
-            )}
-
-            {isAuthenticated && (
-                <div className={styles.accountSettingsSection}>
-                    <span className={styles.currentEmailText}>{currentEmail}</span>
-
-                    <div className={styles.accountSettingsRow}>
-                        <DefaultInput
-                            type="email"
-                            placeholder="New email"
-                            value={newEmailValue}
-                            onChange={(e) => setNewEmailValue(e.target.value)}
-                        />
-                        <DefaultInput
-                            type="password"
-                            placeholder="Current password"
-                            value={emailCurrentPassword}
-                            onChange={(e) => setEmailCurrentPassword(e.target.value)}
-                        />
-                        <DefaultButton
-                            iconId="icon-confirm"
-                            title="Update email"
-                            onClick={handleUpdateEmail}
-                        />
-                    </div>
-
-                    <div className={styles.accountSettingsRow}>
-                        <DefaultInput
-                            type="password"
-                            placeholder="New password"
-                            value={newPasswordValue}
-                            onChange={(e) => setNewPasswordValue(e.target.value)}
-                        />
-                        <DefaultInput
-                            type="password"
-                            placeholder="Current password"
-                            value={passwordCurrentPassword}
-                            onChange={(e) => setPasswordCurrentPassword(e.target.value)}
-                        />
-                        <DefaultButton
-                            iconId="icon-confirm"
-                            title="Update password"
-                            onClick={handleUpdatePassword}
-                        />
-                    </div>
-
-                    <div className={styles.dangerZone}>
-                        <span className={styles.currentEmailText}>Delete account — permanently removes your account and all your chats</span>
-                        <div className={styles.accountSettingsRow}>
-                            <DefaultInput
-                                type="password"
-                                placeholder="Current password"
-                                value={deletePassword}
-                                onChange={(e) => setDeletePassword(e.target.value)}
-                            />
-                            <DefaultButton
-                                iconId={confirmingDelete ? 'icon-confirm' : 'icon-trash'}
-                                title={confirmingDelete ? 'Click again to confirm' : 'Delete account'}
-                                onClick={handleDeleteAccount}
-                                disabled={isDeleting}
-                            />
-                        </div>
-                    </div>
-                </div>
-            )}
-
             {/* API KEY */}
             <div className={styles.apiKeySection}>
                 <div className={styles.apiKeyContainer}>
-                    <label className={styles.configLabel} htmlFor="apiKeyInput">API Key</label>
+                    <label className={styles.configLabel} htmlFor="apiKeyInput">API Keys</label>
                     <DefaultInput
                         id="apiKeyInput"
                         type="password"
@@ -369,6 +267,117 @@ export default function ConfigView({ isAuthenticated, onAuthSuccess, onLogoutAct
                     </div>
                 )}
             </div>
+
+            {isAuthenticated && (
+                <div className={styles.accountSettingsSection}>
+                    <div className={styles.emailSection}>
+                        <div className={styles.currentEmailRow}>
+                            <label className={styles.configLabel}>Email</label>
+                            <div className={styles.currentEmailPill}>{currentEmail}</div>
+                        </div>
+                        <DefaultInput
+                            type="email"
+                            placeholder="New email"
+                            value={newEmailValue}
+                            onChange={(e) => setNewEmailValue(e.target.value)}
+                        />
+                        <div className={styles.accountSettingsRow}>
+                            <DefaultInput
+                                type="password"
+                                placeholder="Password"
+                                value={emailCurrentPassword}
+                                onChange={(e) => setEmailCurrentPassword(e.target.value)}
+                            />
+                            <DefaultButton
+                                iconId="icon-confirm"
+                                title="Update email"
+                                onClick={handleUpdateEmail}
+                            />
+                        </div>
+                    </div>
+                    <div className={styles.emailSection}>
+                        <div className={styles.currentEmailRow}>
+                            <label className={styles.configLabel}>Password</label>
+                            <DefaultInput
+                                type="password"
+                                placeholder="New password"
+                                value={newPasswordValue}
+                                onChange={(e) => setNewPasswordValue(e.target.value)}
+                            />
+                        </div>
+                        <div className={styles.accountSettingsRow}>
+                            <DefaultInput
+                                type="password"
+                                placeholder="Current password"
+                                value={passwordCurrentPassword}
+                                onChange={(e) => setPasswordCurrentPassword(e.target.value)}
+                            />
+                            <DefaultButton
+                                iconId="icon-confirm"
+                                title="Update password"
+                                onClick={handleUpdatePassword}
+                            />
+                        </div>
+                    </div>
+                    {/* --- SECCIÓN 3: ELIMINAR CUENTA --- */}
+                    <div className={styles.dangerZone}>
+                        <p className={styles.currentEmailText}>
+                            <label>Delete account</label> Permanently removes your account and all your chats, messages and settings
+                        </p>
+                        <div className={styles.accountSettingsRow}>
+                            <DefaultInput
+                                type="password"
+                                placeholder="Current password"
+                                value={deletePassword}
+                                onChange={(e) => setDeletePassword(e.target.value)}
+                            />
+                            <DefaultButton
+                                iconId={confirmingDelete ? 'icon-confirm' : 'icon-trash'}
+                                title={confirmingDelete ? 'Click again to confirm' : 'Delete account'}
+                                onClick={handleDeleteAccount}
+                                disabled={isDeleting}
+                            />
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {!isAuthenticated ? (
+                <form
+                    className={styles.authForm}
+                    onSubmit={(e) => {
+                        e.preventDefault();
+                        handleAuth(false); // Iniciar sesión al presionar Enter en los campos
+                    }}
+                >
+                    <DefaultInput
+                        type="email"
+                        placeholder="Your email"
+                        value={email}
+                        onChange={(e) => setEmail(e.target.value)} // 👈 Vinculamos la escritura al estado
+                        required
+                    />
+                    <DefaultInput
+                        type="password"
+                        placeholder="Password"
+                        value={password}
+                        onChange={(e) => setPassword(e.target.value)} // 👈 Vinculamos la escritura al estado
+                        required
+                    />
+                    <div className={styles.buttonAuthContainer}>
+                        {/* Tipo submit para aprovechar el comportamiento nativo de HTML */}
+                        <button type="submit" className={styles.btnAuth}>Sign In</button>
+                        <button type="button" className={styles.btnAuth} onClick={() => handleAuth(true)}>Sign Up</button>
+                    </div>
+                </form>
+            ) : (
+                <button
+                    onClick={onLogoutAction}
+                    className={styles.btnAuth}
+                >
+                    Sign Out
+                </button>
+            )}
         </div>
     );
 }
