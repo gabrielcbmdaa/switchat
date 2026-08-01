@@ -270,6 +270,7 @@ export default function ConfigView({ isAuthenticated, onAuthSuccess, onLogoutAct
                     </div>
 
                     <div className={styles.dangerZone}>
+                        <span className={styles.currentEmailText}>Delete account — permanently removes your account and all your chats</span>
                         <div className={styles.accountSettingsRow}>
                             <DefaultInput
                                 type="password"
