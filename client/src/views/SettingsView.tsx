@@ -7,10 +7,12 @@ interface SettingViewProps {
     onModelChange: (model: string) => void;
     systemPrompt: string;
     onSystemPromptChange: (value: string) => void;
+    systemPromptEnabled: boolean;
+    onSystemPromptEnabledChange: (value: boolean) => void;
     onClose?: () => void;
 }
 
-export default function SettingView({ currentModel, onModelChange, systemPrompt, onSystemPromptChange, onClose }: SettingViewProps) {
+export default function SettingView({ currentModel, onModelChange, systemPrompt, onSystemPromptChange, systemPromptEnabled, onSystemPromptEnabledChange, onClose }: SettingViewProps) {
     // 1. Derivamos los niveles directamente del modelo actual (Estado Derivado)
     const config = getModelConfig(currentModel);
     const thinkingLevels = config ? ['off', ...config.thinkingLevels] : [];
@@ -122,7 +124,20 @@ export default function SettingView({ currentModel, onModelChange, systemPrompt,
                 </div>
                 {/* SYSTEM PROMPT */}
                 <div className={styles.systemPromptContainer}>
-                    <label className={styles.configLabel} htmlFor="systemPromptInput">System Prompt</label>
+                    <div className={styles.systemPromptHeader}>
+                        <label className={styles.configLabel} htmlFor="systemPromptInput">System Prompt</label>
+                        <button
+                            type="button"
+                            role="switch"
+                            aria-checked={systemPromptEnabled}
+                            aria-label="System Prompt"
+                            title={systemPromptEnabled ? 'Turn off system prompt' : 'Turn on system prompt'}
+                            className={`${styles.toggleSwitch} ${systemPromptEnabled ? styles.toggleSwitchOn : ''}`}
+                            onClick={() => onSystemPromptEnabledChange(!systemPromptEnabled)}
+                        >
+                            <span className={styles.toggleKnob} />
+                        </button>
+                    </div>
                     <textarea
                         id="systemPromptInput"
                         className={styles.systemPromptTextarea}

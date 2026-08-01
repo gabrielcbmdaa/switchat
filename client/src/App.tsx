@@ -324,6 +324,23 @@ export default function App() {
     }
   }
 
+  function handleSystemPromptEnabledChange(isEnabled: boolean) {
+    const updatedChats = chatList.map((chat) => {
+      if (chat.id === activeChatId) {
+        return { ...chat, systemPromptEnabled: isEnabled };
+      }
+      return chat;
+    });
+
+    setChatList(updatedChats);
+    persistIfOffline(updatedChats, activeChatId);
+
+    const updatedChat = updatedChats.find((chat) => chat.id === activeChatId);
+    if (updatedChat && isAuthenticated) {
+      saveChatToServer(updatedChat);
+    }
+  }
+
   async function handleAuthSuccess() {
     localStorage.setItem('isLoggedIn', 'true');
     setActiveLeftPanel('chats');
@@ -430,7 +447,8 @@ export default function App() {
         [...currentChat.messages, userMessage],
         model,
         isAuthenticated,
-        currentChat.systemPrompt,
+        // El system prompt solo viaja si el interruptor del chat está encendido
+        currentChat.systemPromptEnabled === false ? undefined : currentChat.systemPrompt,
         controller.signal
       );
 
@@ -567,7 +585,8 @@ export default function App() {
         historyUpToUser,
         model,
         isAuthenticated,
-        currentChat.systemPrompt,
+        // El system prompt solo viaja si el interruptor del chat está encendido
+        currentChat.systemPromptEnabled === false ? undefined : currentChat.systemPrompt,
         controller.signal
       );
 
@@ -717,6 +736,8 @@ export default function App() {
                   }}
                   systemPrompt={currentChat?.systemPrompt ?? ''}
                   onSystemPromptChange={handleSystemPromptChange}
+                  systemPromptEnabled={currentChat?.systemPromptEnabled !== false}
+                  onSystemPromptEnabledChange={handleSystemPromptEnabledChange}
                 />
               )}
               {activeRightPanel === 'notes' && (

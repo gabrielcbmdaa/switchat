@@ -17,6 +17,7 @@ export interface Chat {
   draft: string;
   messages: Message[];
   systemPrompt?: string;
+  systemPromptEnabled?: boolean;
 }
 
 export interface GeminiModel {
