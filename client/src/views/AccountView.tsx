@@ -121,7 +121,7 @@ export default function ConfigView({ isAuthenticated, onAuthSuccess, onLogoutAct
     useEffect(() => {
         let timer: ReturnType<typeof setTimeout>;
         if (confirmingDelete) {
-            timer = setTimeout(() => setConfirmingDelete(false), 5000);
+            timer = setTimeout(() => setConfirmingDelete(false), 10000);
         }
         return () => clearTimeout(timer);
     }, [confirmingDelete]);
@@ -321,23 +321,28 @@ export default function ConfigView({ isAuthenticated, onAuthSuccess, onLogoutAct
                     </div>
                     {/* --- SECCIÓN 3: ELIMINAR CUENTA --- */}
                     <div className={styles.dangerZone}>
-                        <p className={styles.currentEmailText}>
-                            <label>Delete account</label> Permanently removes your account and all your chats, messages and settings
-                        </p>
-                        <div className={styles.accountSettingsRow}>
+                        <div className={styles.currentEmailRow}>
+                            <label className={styles.configLabel}>Delete account</label>
                             <DefaultInput
                                 type="password"
-                                placeholder="Current password"
+                                placeholder="Password"
                                 value={deletePassword}
                                 onChange={(e) => setDeletePassword(e.target.value)}
                             />
-                            <DefaultButton
-                                iconId={confirmingDelete ? 'icon-confirm' : 'icon-trash'}
-                                title={confirmingDelete ? 'Click again to confirm' : 'Delete account'}
-                                onClick={handleDeleteAccount}
-                                disabled={isDeleting}
-                            />
                         </div>
+                        {confirmingDelete && (
+                            <p className={styles.dangerZoneWarning}>
+                                Permanently removes your account and all your chats, messages and settings
+                            </p>
+                        )}
+                        <button
+                            type="button"
+                            className={styles.btnDelete}
+                            onClick={handleDeleteAccount}
+                            disabled={isDeleting}
+                        >
+                            {confirmingDelete ? 'Press again to confirm' : 'Delete account'}
+                        </button>
                     </div>
                 </div>
             )}

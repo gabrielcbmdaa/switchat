@@ -4,7 +4,7 @@
   display: flex;
   align-items: center;
   flex-direction: column;
-  gap: 10px;
+  gap: 20px;
   padding: 10px;
 }
 
@@ -189,18 +189,8 @@
     width: 100%;
     display: flex;
     flex-direction: column;
-    gap: 10px;
+    gap: 20px;
     align-items: flex-start;
-}
-
-.currentEmailText {
-    font-size: 13px;
-    color: #858585;
-    font-family: monospace;
-}
-
-.currentEmailText label {
-    font-weight: 500;
 }
 
 .emailSection {
@@ -248,5 +238,36 @@
     flex-direction: column;
     gap: 10px;
     align-items: flex-start;
-    padding-top: 10px;
+}
+
+.dangerZoneWarning {
+    width: 100%;
+    font-size: 13px;
+    color: #858585;
+    font-family: monospace;
+    text-align: center;
+}
+
+.btnDelete {
+    width: 100%;
+    height: 30px;
+    background-color: transparent;
+    color: #858585;
+    border: 1px solid #858585;
+    border-radius: 20px;
+    cursor: pointer;
+    font-family: inherit;
+    font-size: 14px;
+    outline: none;
+    transition: background-color 0.3s ease, color 0.3s ease;
+}
+
+.btnDelete:hover:not(:disabled),
+.btnDelete:focus-visible:not(:disabled) {
+    background-color: #858585;
+    color: #191919;
+}
+
+.btnDelete:disabled {
+    cursor: not-allowed;
 }
