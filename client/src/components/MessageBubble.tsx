@@ -34,6 +34,7 @@ export default function MessageBubble({ msg, isUser, onDelete, onRetry }: Messag
         <div className={`${styles.messageWrapper} ${isUser ? styles.userWrapper : styles.geminiWrapper}`}>
             <div
                 className={`${styles.messageBubble} ${isUser ? styles.userBubble : styles.geminiBubble}`}
+                data-message-bubble
                 dangerouslySetInnerHTML={htmlContent}
             />
             <div className={styles.messageActions}>
