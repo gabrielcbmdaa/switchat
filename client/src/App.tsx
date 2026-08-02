@@ -307,6 +307,16 @@ export default function App() {
     }
   }
 
+  function handleReplyWithSelection(text: string) {
+    // Prefijo "> " por línea: el modelo lo lee como una cita
+    const quote = text.split('\n').map((line) => `> ${line}`).join('\n');
+    const current = currentChat?.draft ?? '';
+    // Mismo criterio de separador que appendToNotes (utils/storage.ts)
+    const separator = current.trim() ? '\n\n' : '';
+
+    handleDraftChange(`${current.trimEnd()}${separator}${quote}\n\n`);
+  }
+
   function handleSystemPromptChange(newSystemPrompt: string) {
     const updatedChats = chatList.map((chat) => {
       if (chat.id === activeChatId) {
@@ -659,7 +669,7 @@ export default function App() {
     <>
       {/* 1. Inyectamos los símbolos en el DOM */}
       <SvgIcons />
-      <SelectionToolbar />
+      <SelectionToolbar onReply={handleReplyWithSelection} />
       <div className="app-container" id='app-container'>
         {(activeLeftPanel !== null || activeRightPanel !== null) && (
           <div

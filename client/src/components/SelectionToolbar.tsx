@@ -2,12 +2,16 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import styles from './SelectionToolbar.module.css';
 import { appendToNotes } from '../utils/storage';
 
-// Medidas aproximadas del botón, para centrarlo sobre la selección
-const TOOLBAR_W = 150;
-const TOOLBAR_H = 32;
+// Medidas aproximadas del toolbar, para centrarlo sobre la selección
+const TOOLBAR_W = 230;
+const TOOLBAR_H = 36;
 const GAP = 8;
 
-// Coloca el botón centrado sobre la selección, sin salirse del viewport.
+interface SelectionToolbarProps {
+    onReply: (text: string) => void;
+}
+
+// Coloca el toolbar centrado sobre la selección, sin salirse del viewport.
 // Devuelve null si el rect ya no es válido o quedó fuera de pantalla.
 function positionFor(rect: DOMRect): { x: number; y: number } | null {
     // Rect vacío: el rango se invalidó (ej. re-render durante el streaming)
@@ -23,7 +27,7 @@ function positionFor(rect: DOMRect): { x: number; y: number } | null {
     return { x, y };
 }
 
-export default function SelectionToolbar() {
+export default function SelectionToolbar({ onReply }: SelectionToolbarProps) {
     const [toolbar, setToolbar] = useState<{ x: number; y: number; text: string } | null>(null);
     // Guardamos el rango para poder recalcular la posición al hacer scroll
     const rangeRef = useRef<Range | null>(null);
@@ -68,6 +72,14 @@ export default function SelectionToolbar() {
         // Limpiar la selección de texto
         window.getSelection()?.removeAllRanges();
     }, [toolbar]);
+
+    const handleReply = useCallback(() => {
+        if (!toolbar) return;
+
+        onReply(toolbar.text);
+        setToolbar(null);
+        window.getSelection()?.removeAllRanges();
+    }, [toolbar, onReply]);
 
     useEffect(() => {
         // pointerup cubre mouse y touch: es cuando la selección queda finalizada
@@ -129,18 +141,28 @@ export default function SelectionToolbar() {
     if (!toolbar) return null;
 
     return (
-        <button
-            className={styles.selectionButton}
+        <div
+            className={styles.selectionToolbar}
             style={{ left: toolbar.x, top: toolbar.y }}
             // Sin esto el navegador colapsa la selección al presionar,
-            // el botón se oculta y el onClick nunca llega a dispararse.
+            // el toolbar se oculta y el onClick nunca llega a dispararse.
             onMouseDown={(e) => e.preventDefault()}
-            onClick={handleSendToNotes}
         >
-            <svg width="14" height="14" style={{ color: 'currentColor' }}>
-                <use xlinkHref="#icon-draft" />
-            </svg>
-            Send to Notes
-        </button>
+            <button className={styles.toolbarButton} onClick={handleSendToNotes}>
+                <svg width="14" height="14" style={{ color: 'currentColor' }}>
+                    <use xlinkHref="#icon-draft" />
+                </svg>
+                Send to Notes
+            </button>
+
+            <span className={styles.divider} />
+
+            <button className={styles.toolbarButton} onClick={handleReply}>
+                <svg width="14" height="14" style={{ color: 'currentColor' }}>
+                    <use xlinkHref="#icon-back" />
+                </svg>
+                Reply
+            </button>
+        </div>
     );
 }

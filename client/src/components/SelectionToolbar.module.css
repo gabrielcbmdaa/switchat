@@ -1,29 +1,46 @@
-.selectionButton {
+.selectionToolbar {
     position: fixed;
     z-index: 10000;
     display: flex;
     align-items: center;
-    gap: 8px;
-    padding: 6px 14px;
+    gap: 2px;
+    padding: 4px;
     background-color: #222222;
     border: 1px solid #333333;
+    border-radius: 999px;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.5);
+    animation: selectionFadeIn 0.12s ease-out;
+}
+
+.toolbarButton {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 12px;
+    background: transparent;
+    border: none;
     border-radius: 999px;
     color: #858585;
     font-size: 13px;
     font-family: 'Space Grotesk', sans-serif;
     white-space: nowrap;
     cursor: pointer;
-    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.5);
     transition: background-color 0.15s ease, color 0.15s ease;
-    animation: selectionFadeIn 0.12s ease-out;
 }
 
-.selectionButton:hover {
+.toolbarButton:hover {
     background-color: #858585;
     color: #191919;
 }
 
-.selectionButton svg {
+.toolbarButton svg {
+    flex-shrink: 0;
+}
+
+.divider {
+    width: 1px;
+    height: 16px;
+    background-color: #333333;
     flex-shrink: 0;
 }
 
