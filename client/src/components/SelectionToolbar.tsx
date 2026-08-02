@@ -75,10 +75,21 @@ export default function SelectionToolbar() {
             if (window.getSelection()?.isCollapsed) setToolbar(null);
         };
 
+        // keyup cubre la selección con Shift + flechas
+        const handleKeyUp = (e: KeyboardEvent) => {
+            if (e.key === 'Escape') {
+                setToolbar(null);
+                return;
+            }
+            evaluateSelection();
+        };
+
         document.addEventListener('pointerup', evaluateSelection);
+        document.addEventListener('keyup', handleKeyUp);
         document.addEventListener('selectionchange', handleSelectionChange);
         return () => {
             document.removeEventListener('pointerup', evaluateSelection);
+            document.removeEventListener('keyup', handleKeyUp);
             document.removeEventListener('selectionchange', handleSelectionChange);
         };
     }, [evaluateSelection]);
