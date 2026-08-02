@@ -308,13 +308,14 @@ export default function App() {
   }
 
   function handleReplyWithSelection(text: string) {
-    // Prefijo "> " por línea: el modelo lo lee como una cita
-    const quote = text.split('\n').map((line) => `> ${line}`).join('\n');
+    // La cita va toda seguida en una línea: colapsamos los saltos de la selección
+    const quote = ` > ${text.replace(/\s+/g, ' ').trim()}`;
     const current = currentChat?.draft ?? '';
-    // Mismo criterio de separador que appendToNotes (utils/storage.ts)
-    const separator = current.trim() ? '\n\n' : '';
 
-    handleDraftChange(`${current.trimEnd()}${separator}${quote}\n\n`);
+    handleDraftChange(`${current.trimEnd()}${quote}`);
+
+    // Avisamos al PromptInput para que se enfoque con el cursor al final
+    window.dispatchEvent(new CustomEvent('focusPrompt'));
   }
 
   function handleSystemPromptChange(newSystemPrompt: string) {

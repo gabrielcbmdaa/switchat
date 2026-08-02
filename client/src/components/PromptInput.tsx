@@ -54,6 +54,25 @@ export default function PromptInput({
         return () => observer.disconnect();
     }, [reportHeight, onHeightChange]);
 
+    // Escuchar el evento global "focusPrompt" disparado al responder a una selección
+    useEffect(() => {
+        const handleFocusPrompt = () => {
+            // setTimeout 0: esperamos al re-render con el draft nuevo, si no
+            // el cursor caería al final del texto viejo
+            setTimeout(() => {
+                const textarea = textareaRef.current;
+                if (!textarea) return;
+
+                textarea.focus();
+                const end = textarea.value.length;
+                textarea.setSelectionRange(end, end);
+            }, 0);
+        };
+
+        window.addEventListener('focusPrompt', handleFocusPrompt);
+        return () => window.removeEventListener('focusPrompt', handleFocusPrompt);
+    }, []);
+
     const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
         if (e.key === 'Enter' && !e.shiftKey) {
             e.preventDefault(); // Evita el salto de línea
