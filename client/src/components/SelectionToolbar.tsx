@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import styles from './SelectionToolbar.module.css';
 import { appendToNotes } from '../utils/storage';
 
@@ -7,8 +7,26 @@ const TOOLBAR_W = 150;
 const TOOLBAR_H = 32;
 const GAP = 8;
 
+// Coloca el botón centrado sobre la selección, sin salirse del viewport.
+// Devuelve null si el rect ya no es válido o quedó fuera de pantalla.
+function positionFor(rect: DOMRect): { x: number; y: number } | null {
+    // Rect vacío: el rango se invalidó (ej. re-render durante el streaming)
+    if (!rect.width && !rect.height) return null;
+    if (rect.bottom < 0 || rect.top > window.innerHeight) return null;
+
+    let y = rect.top - TOOLBAR_H - GAP;
+    if (y < GAP) y = rect.bottom + GAP; // sin sitio arriba → debajo
+
+    const rawX = rect.left + rect.width / 2 - TOOLBAR_W / 2;
+    const x = Math.max(GAP, Math.min(rawX, window.innerWidth - TOOLBAR_W - GAP));
+
+    return { x, y };
+}
+
 export default function SelectionToolbar() {
     const [toolbar, setToolbar] = useState<{ x: number; y: number; text: string } | null>(null);
+    // Guardamos el rango para poder recalcular la posición al hacer scroll
+    const rangeRef = useRef<Range | null>(null);
 
     const evaluateSelection = useCallback(() => {
         const selection = window.getSelection();
@@ -29,13 +47,14 @@ export default function SelectionToolbar() {
             return;
         }
 
-        const rect = range.getBoundingClientRect();
+        const position = positionFor(range.getBoundingClientRect());
+        if (!position) {
+            setToolbar(null);
+            return;
+        }
 
-        setToolbar({
-            x: rect.left + rect.width / 2 - TOOLBAR_W / 2, // centrado sobre la selección
-            y: rect.top - TOOLBAR_H - GAP,                 // justo encima
-            text: selectedText,
-        });
+        rangeRef.current = range.cloneRange();
+        setToolbar({ ...position, text: selectedText });
     }, []);
 
     const handleSendToNotes = useCallback(() => {
@@ -63,6 +82,38 @@ export default function SelectionToolbar() {
             document.removeEventListener('selectionchange', handleSelectionChange);
         };
     }, [evaluateSelection]);
+
+    const isOpen = toolbar !== null;
+
+    // Mientras el botón está visible, lo mantenemos pegado a la selección
+    useEffect(() => {
+        if (!isOpen) return;
+
+        let frame = 0;
+        const reposition = () => {
+            cancelAnimationFrame(frame);
+            frame = requestAnimationFrame(() => {
+                const range = rangeRef.current;
+                if (!range) return;
+
+                const position = positionFor(range.getBoundingClientRect());
+                if (!position) {
+                    setToolbar(null); // la selección salió de pantalla
+                    return;
+                }
+                setToolbar((prev) => (prev ? { ...prev, ...position } : prev));
+            });
+        };
+
+        // capture: true porque el scroll del contenedor de mensajes no burbujea hasta document
+        document.addEventListener('scroll', reposition, { capture: true, passive: true });
+        window.addEventListener('resize', reposition);
+        return () => {
+            cancelAnimationFrame(frame);
+            document.removeEventListener('scroll', reposition, { capture: true });
+            window.removeEventListener('resize', reposition);
+        };
+    }, [isOpen]);
 
     if (!toolbar) return null;
 
