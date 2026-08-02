@@ -11,7 +11,6 @@ import SettingView from './views/SettingsView';
 import MessageView from './views/MessageView';
 import NotesView from './views/NotesView';
 import { getModelConfig } from './config/models.config';
-import ContextMenu from './components/ContextMenu';
 import SelectionToolbar from './components/SelectionToolbar';
 
 export default function App() {
@@ -660,7 +659,6 @@ export default function App() {
     <>
       {/* 1. Inyectamos los símbolos en el DOM */}
       <SvgIcons />
-      <ContextMenu />
       <SelectionToolbar />
       <div className="app-container" id='app-container'>
         {(activeLeftPanel !== null || activeRightPanel !== null) && (

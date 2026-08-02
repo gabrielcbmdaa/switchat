@@ -17,7 +17,7 @@ export default function NotesView({ onClose }: NotesViewProps) {
         localStorage.setItem('switchat_notes', value);
     };
 
-    // Escuchar el evento global "sendToNotes" disparado desde el ContextMenu
+    // Escuchar el evento global "sendToNotes" disparado desde el SelectionToolbar
     useEffect(() => {
         const handleSendToNotes = (e: Event) => {
             // El detail ya trae el texto completo actualizado (persistido por appendToNotes).

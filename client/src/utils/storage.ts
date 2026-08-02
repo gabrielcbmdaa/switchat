@@ -24,7 +24,7 @@ export function getTutorialChat(): Chat[] {
             },
             {
                 role: "model",
-                parts: [{ text: "## Chats, Notes y atajos útiles\n\n- **Chats:** lista a la izquierda — crea, renombra o elimina conversaciones.\n- **Notes:** panel a la derecha para apuntes. Selecciona texto en un mensaje → menú contextual → **Send to Notes**.\n- Los borradores del cuadro de mensaje se guardan por chat.\n\nCuando estés listo: configura tu key, abre un chat nuevo y escribe. Este tutorial puedes dejarlo o borrarlo cuando quieras. ¡A chatear!" }]
+                parts: [{ text: "## Chats, Notes y atajos útiles\n\n- **Chats:** lista a la izquierda — crea, renombra o elimina conversaciones.\n- **Notes:** panel a la derecha para apuntes. Selecciona texto en un mensaje → botón **Send to Notes**.\n- Los borradores del cuadro de mensaje se guardan por chat.\n\nCuando estés listo: configura tu key, abre un chat nuevo y escribe. Este tutorial puedes dejarlo o borrarlo cuando quieras. ¡A chatear!" }]
             }
         ]
     }];
@@ -56,7 +56,7 @@ export function saveToLocalDisk(chatList: Chat[], activeChatId: string) {
 }
 
 // 4. Notas: localStorage es la fuente de verdad, así que funciona aunque
-// NotesView no esté montada (ej. al enviar texto desde el ContextMenu).
+// NotesView no esté montada (ej. al enviar texto desde el SelectionToolbar).
 export function appendToNotes(text: string) {
     const prev = localStorage.getItem('switchat_notes') || '';
     const separator = prev.trim() ? '\n\n' : '';
