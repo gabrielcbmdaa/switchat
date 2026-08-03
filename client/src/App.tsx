@@ -12,7 +12,7 @@ import MessageView from './views/MessageView';
 import NotesView from './views/NotesView';
 import { getModelConfig } from './config/models.config';
 import SelectionToolbar from './components/SelectionToolbar';
-import { isMobileViewport } from './utils/uiPreferences';
+import { isMobileViewport, loadPanelView, savePanelView, loadPanelOpen, savePanelOpen } from './utils/uiPreferences';
 import type { LeftPanelView, RightPanelView } from './utils/uiPreferences';
 
 export default function App() {
@@ -20,10 +20,11 @@ export default function App() {
   const [activeChatId, setActiveChatId] = useState<string>('');
   // La vista activa y el estado abierto/cerrado van por separado: así colapsar
   // un panel no olvida en qué vista estaba.
-  const [leftPanelView, setLeftPanelView] = useState<LeftPanelView>('chats');
-  const [rightPanelView, setRightPanelView] = useState<RightPanelView>('settings');
-  const [isLeftPanelOpen, setIsLeftPanelOpen] = useState<boolean>(() => !isMobileViewport());
-  const [isRightPanelOpen, setIsRightPanelOpen] = useState<boolean>(() => !isMobileViewport());
+  const [leftPanelView, setLeftPanelView] = useState<LeftPanelView>(() => loadPanelView('left', 'chats'));
+  const [rightPanelView, setRightPanelView] = useState<RightPanelView>(() => loadPanelView('right', 'settings'));
+  // En móvil los paneles son drawers de 85vw: arrancan siempre cerrados para no tapar el chat.
+  const [isLeftPanelOpen, setIsLeftPanelOpen] = useState<boolean>(() => !isMobileViewport() && loadPanelOpen('left', true));
+  const [isRightPanelOpen, setIsRightPanelOpen] = useState<boolean>(() => !isMobileViewport() && loadPanelOpen('right', true));
   const activeLeftPanel = isLeftPanelOpen ? leftPanelView : null;
   const activeRightPanel = isRightPanelOpen ? rightPanelView : null;
   const [hasMoreMap, setHasMoreMap] = useState<Record<string, boolean>>({});
@@ -49,6 +50,22 @@ export default function App() {
   useEffect(() => {
     isAuthenticatedRef.current = isAuthenticated;
   }, [isAuthenticated]);
+
+  useEffect(() => {
+    savePanelView('left', leftPanelView);
+  }, [leftPanelView]);
+
+  useEffect(() => {
+    savePanelView('right', rightPanelView);
+  }, [rightPanelView]);
+
+  useEffect(() => {
+    savePanelOpen('left', isLeftPanelOpen);
+  }, [isLeftPanelOpen]);
+
+  useEffect(() => {
+    savePanelOpen('right', isRightPanelOpen);
+  }, [isRightPanelOpen]);
 
   function clearDraftSyncTimer() {
     if (draftSyncTimerRef.current) {
