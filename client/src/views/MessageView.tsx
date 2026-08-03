@@ -64,9 +64,15 @@ export default function MessageView({
         prevMessagesLengthRef.current = messages.length;
     }, [messages, token]);
     const visibleMessages = token ? messages : messages.slice(-visibleCount);
+    const hasMessages = messages.length > 0;
     // Determinar si hay más mensajes que cargar
     // Si hay sesión (token), nos guiamos por el mapa del servidor. Si no, por el total local.
-    const hasMoreMessages = token ? (hasMoreMap[chatId] !== false) : (visibleCount < messages.length);
+    // Un chat sin mensajes nunca tiene historial anterior que pedir.
+    const hasMoreMessages = hasMessages && (token ? (hasMoreMap[chatId] !== false) : (visibleCount < messages.length));
+    // Online los mensajes llegan por fetch diferido: mientras no sepamos si el chat
+    // tiene historial, no podemos afirmar que esté vacío (si no, parpadea la vista vacía).
+    const isAwaitingHistory = Boolean(token) && !hasMessages && hasMoreMap[chatId] !== false;
+    const showEmptyState = !hasMessages && !isAwaitingHistory;
     // Función para solicitar más mensajes
     const loadMore = () => {
         if (!hasMoreMessages || isLoadingMoreRef.current) return;
@@ -151,6 +157,18 @@ export default function MessageView({
         }
     }, []);
 
+    const promptInput = (
+        <PromptInput
+            draft={draft}
+            onDraftChange={onDraftChange}
+            onSendMessage={onSendMessage}
+            isGenerating={isGenerating}
+            onStopGeneration={onStopGeneration}
+            onHeightChange={handlePromptHeightChange}
+            variant={showEmptyState ? 'centered' : 'docked'}
+        />
+    );
+
     return (
         <div className={styles.messageViewWrapper}>
             <DefaultButton
@@ -171,39 +189,42 @@ export default function MessageView({
                 title={isRightSidebarOpen ? "Ocultar barra derecha" : "Mostrar barra derecha"}
             />
 
-            <div
-                ref={containerRef}
-                className={styles.messageViewContainer}
-                onScroll={handleScroll}
-                style={{ paddingBottom: promptHeight + 16 }}
-            >
-                {hasMoreMessages && (
-                    <button className={styles.loadMoreButton} onClick={loadMore}>
-                        Cargar mensajes anteriores
-                    </button>
-                )}
-                {visibleMessages.map((msg, index) => {
-                    // Calcular el índice real en el array completo de messages
-                    const realIndex = token ? index : (messages.length - visibleCount + index);
-                    return (
-                        <MessageBubble
-                            key={index}
-                            msg={msg}
-                            isUser={msg.role === 'user'}
-                            onDelete={() => onDeleteMessage(realIndex)}
-                            onRetry={() => onRetryMessage(realIndex)}
-                        />
-                    );
-                })}
-            </div>
-            <PromptInput
-                draft={draft}
-                onDraftChange={onDraftChange}
-                onSendMessage={onSendMessage}
-                isGenerating={isGenerating}
-                onStopGeneration={onStopGeneration}
-                onHeightChange={handlePromptHeightChange}
-            />
+            {showEmptyState ? (
+                <div className={styles.emptyStateContainer}>
+                    <h1 className={styles.emptyStateTitle}>Switchat</h1>
+                    <p className={styles.emptyStateSubtitle}>¿En qué estás pensando?</p>
+                    {promptInput}
+                </div>
+            ) : (
+                <>
+                    <div
+                        ref={containerRef}
+                        className={styles.messageViewContainer}
+                        onScroll={handleScroll}
+                        style={{ paddingBottom: promptHeight + 16 }}
+                    >
+                        {hasMoreMessages && (
+                            <button className={styles.loadMoreButton} onClick={loadMore}>
+                                Cargar mensajes anteriores
+                            </button>
+                        )}
+                        {visibleMessages.map((msg, index) => {
+                            // Calcular el índice real en el array completo de messages
+                            const realIndex = token ? index : (messages.length - visibleCount + index);
+                            return (
+                                <MessageBubble
+                                    key={index}
+                                    msg={msg}
+                                    isUser={msg.role === 'user'}
+                                    onDelete={() => onDeleteMessage(realIndex)}
+                                    onRetry={() => onRetryMessage(realIndex)}
+                                />
+                            );
+                        })}
+                    </div>
+                    {promptInput}
+                </>
+            )}
         </div>
     );
 }

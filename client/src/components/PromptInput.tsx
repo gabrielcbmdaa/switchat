@@ -8,6 +8,8 @@ interface PromptInputProps {
     isGenerating?: boolean;
     onStopGeneration?: () => void;
     onHeightChange?: (height: number) => void; // Callback para reportar la altura
+    // 'docked' va anclado al fondo del chat; 'centered' fluye dentro de la vista vacía
+    variant?: 'docked' | 'centered';
 }
 
 export default function PromptInput({
@@ -17,6 +19,7 @@ export default function PromptInput({
     isGenerating = false,
     onStopGeneration,
     onHeightChange,
+    variant = 'docked',
 }: PromptInputProps) {
     const textareaRef = useRef<HTMLTextAreaElement>(null);
     const containerRef = useRef<HTMLDivElement>(null);
@@ -82,7 +85,10 @@ export default function PromptInput({
     };
 
     return (
-        <div ref={containerRef} className={styles.promptInputContainer}>
+        <div
+            ref={containerRef}
+            className={`${styles.promptInputContainer} ${variant === 'centered' ? styles.promptInputCentered : ''}`}
+        >
             <textarea
                 ref={textareaRef}
                 value={draft}

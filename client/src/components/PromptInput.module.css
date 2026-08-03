@@ -12,6 +12,15 @@
     padding: 0px 8px 0px 16px;
 }
 
+/* Variante centrada: el composer deja de estar anclado y fluye con la vista vacía */
+.promptInputCentered {
+    position: static;
+    transform: none;
+    width: 100%;
+    max-width: 720px;
+    margin: 0 auto;
+}
+
 .promptTextarea {
     flex: 1;
     height: 100%;
