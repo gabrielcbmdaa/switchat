@@ -12,16 +12,20 @@ import MessageView from './views/MessageView';
 import NotesView from './views/NotesView';
 import { getModelConfig } from './config/models.config';
 import SelectionToolbar from './components/SelectionToolbar';
+import { isMobileViewport } from './utils/uiPreferences';
+import type { LeftPanelView, RightPanelView } from './utils/uiPreferences';
 
 export default function App() {
   const [chatList, setChatList] = useState<Chat[]>([]);
   const [activeChatId, setActiveChatId] = useState<string>('');
-  const [activeLeftPanel, setActiveLeftPanel] = useState<'chats' | 'account' | null>(() => {
-    return typeof window !== 'undefined' && window.innerWidth < 768 ? null : 'chats';
-  });
-  const [activeRightPanel, setActiveRightPanel] = useState<'settings' | 'notes' | null>(() => {
-    return typeof window !== 'undefined' && window.innerWidth < 768 ? null : 'settings';
-  });
+  // La vista activa y el estado abierto/cerrado van por separado: así colapsar
+  // un panel no olvida en qué vista estaba.
+  const [leftPanelView, setLeftPanelView] = useState<LeftPanelView>('chats');
+  const [rightPanelView, setRightPanelView] = useState<RightPanelView>('settings');
+  const [isLeftPanelOpen, setIsLeftPanelOpen] = useState<boolean>(() => !isMobileViewport());
+  const [isRightPanelOpen, setIsRightPanelOpen] = useState<boolean>(() => !isMobileViewport());
+  const activeLeftPanel = isLeftPanelOpen ? leftPanelView : null;
+  const activeRightPanel = isRightPanelOpen ? rightPanelView : null;
   const [hasMoreMap, setHasMoreMap] = useState<Record<string, boolean>>({});
   const currentChat = chatList.find((chat) => chat.id === activeChatId);
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false);
@@ -67,6 +71,12 @@ export default function App() {
     if (chat && isAuthenticatedRef.current) {
       syncChatDraftToServer(chat);
     }
+  }
+
+  // En móvil el panel izquierdo es un drawer que tapa el chat: al navegar lo cerramos.
+  function showLeftPanel(view: LeftPanelView) {
+    setLeftPanelView(view);
+    setIsLeftPanelOpen(!isMobileViewport());
   }
 
   function persistIfOffline(chats: Chat[], activeId: string) {
@@ -260,11 +270,7 @@ export default function App() {
 
     // 3. Le decimos a React cuál es el nuevo ID activo y a qué vista ir
     setActiveChatId(newId);
-    if (window.innerWidth < 768) {
-      setActiveLeftPanel(null);
-    } else {
-      setActiveLeftPanel('chats');
-    }
+    showLeftPanel('chats');
 
     if (isAuthenticated) {
       saveChatToServer(newChat);
@@ -280,11 +286,7 @@ export default function App() {
     }
 
     setActiveChatId(clickedChatId);
-    if (window.innerWidth < 768) {
-      setActiveLeftPanel(null);
-    } else {
-      setActiveLeftPanel('chats');
-    }
+    showLeftPanel('chats');
     persistIfOffline(chatList, clickedChatId);
   }
 
@@ -354,7 +356,7 @@ export default function App() {
 
   async function handleAuthSuccess() {
     localStorage.setItem('isLoggedIn', 'true');
-    setActiveLeftPanel('chats');
+    setLeftPanelView('chats');
     setIsAuthenticated(true);
     setChatList([]);
     setActiveChatId('');
@@ -380,11 +382,7 @@ export default function App() {
       console.error("Error al cargar chats del servidor:", error);
     }
 
-    if (window.innerWidth < 768) {
-      setActiveLeftPanel(null);
-    } else {
-      setActiveLeftPanel('chats');
-    }
+    showLeftPanel('chats');
   }
 
   async function resetSessionToDefault() {
@@ -405,11 +403,7 @@ export default function App() {
 
     setChatList(localChats);
     setActiveChatId(localActiveId);
-    if (window.innerWidth < 768) {
-      setActiveLeftPanel(null);
-    } else {
-      setActiveLeftPanel('chats');
-    }
+    showLeftPanel('chats');
   }
 
   async function handleSendMessage() {
@@ -676,8 +670,8 @@ export default function App() {
           <div
             className="backdrop-overlay"
             onClick={() => {
-              setActiveLeftPanel(null);
-              setActiveRightPanel(null);
+              setIsLeftPanelOpen(false);
+              setIsRightPanelOpen(false);
             }}
           />
         )}
@@ -703,8 +697,8 @@ export default function App() {
                 />
               )}
               <Toolbar
-                onNavChats={() => setActiveLeftPanel('chats')}
-                onNavAccount={() => setActiveLeftPanel('account')}
+                onNavChats={() => setLeftPanelView('chats')}
+                onNavAccount={() => setLeftPanelView('account')}
               />
             </aside>
 
@@ -729,8 +723,8 @@ export default function App() {
             onStopGeneration={handleStopGeneration}
             isLeftSidebarOpen={activeLeftPanel !== null}
             isRightSidebarOpen={activeRightPanel !== null}
-            onToggleLeftSidebar={() => setActiveLeftPanel((prev) => (prev ? null : 'chats'))}
-            onToggleRightSidebar={() => setActiveRightPanel((prev) => (prev ? null : 'settings'))}
+            onToggleLeftSidebar={() => setIsLeftPanelOpen((prev) => !prev)}
+            onToggleRightSidebar={() => setIsRightPanelOpen((prev) => !prev)}
           />
         </main>
 
@@ -755,8 +749,8 @@ export default function App() {
                 <NotesView />
               )}
               <Toolbar
-                onNavNotes={() => setActiveRightPanel('notes')}
-                onNavConfig={() => setActiveRightPanel('settings')}
+                onNavNotes={() => setRightPanelView('notes')}
+                onNavConfig={() => setRightPanelView('settings')}
               />
             </aside>
           </>
