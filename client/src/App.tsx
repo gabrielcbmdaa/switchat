@@ -15,6 +15,12 @@ import SelectionToolbar from './components/SelectionToolbar';
 import { isMobileViewport, loadPanelView, savePanelView, loadPanelOpen, savePanelOpen } from './utils/uiPreferences';
 import type { LeftPanelView, RightPanelView } from './utils/uiPreferences';
 
+// El chat nuevo lleva su id real desde el principio: cuando se materialice al enviar
+// el primer mensaje no hay que reasignar nada.
+function createDraftChat(): Chat {
+  return { id: 'chat-' + Date.now(), title: 'New conversation', messages: [], draft: '' };
+}
+
 export default function App() {
   const [chatList, setChatList] = useState<Chat[]>([]);
   const [activeChatId, setActiveChatId] = useState<string>('');
@@ -28,7 +34,14 @@ export default function App() {
   const activeLeftPanel = isLeftPanelOpen ? leftPanelView : null;
   const activeRightPanel = isRightPanelOpen ? rightPanelView : null;
   const [hasMoreMap, setHasMoreMap] = useState<Record<string, boolean>>({});
-  const currentChat = chatList.find((chat) => chat.id === activeChatId);
+  // Chat en borrador: vive solo en memoria hasta que se envía el primer mensaje.
+  // No está en chatList, no se persiste y no aparece en la barra lateral.
+  const [draftChat, setDraftChat] = useState<Chat | null>(null);
+  const isDraftChat = draftChat?.id === activeChatId;
+  const currentChat = chatList.find((chat) => chat.id === activeChatId)
+    ?? (draftChat && draftChat.id === activeChatId ? draftChat : undefined);
+  // El borrador no existe en el servidor: solo los chats materializados se sincronizan.
+  const syncableChat = isDraftChat ? undefined : currentChat;
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false);
   const [isGenerating, setIsGenerating] = useState<boolean>(false);
   const abortControllerRef = useRef<AbortController | null>(null);
@@ -44,8 +57,8 @@ export default function App() {
   });
 
   useEffect(() => {
-    currentChatRef.current = currentChat;
-  }, [currentChat]);
+    currentChatRef.current = syncableChat;
+  }, [syncableChat]);
 
   useEffect(() => {
     isAuthenticatedRef.current = isAuthenticated;
@@ -98,7 +111,10 @@ export default function App() {
 
   function persistIfOffline(chats: Chat[], activeId: string) {
     if (!isAuthenticatedRef.current) {
-      saveToLocalDisk(chats, activeId);
+      // Un id que no está en la lista (el borrador) se guarda como vacío: al recargar
+      // volvemos a la vista de chat nuevo en vez de quedarnos sin chat activo.
+      const persistedActiveId = chats.some((chat) => chat.id === activeId) ? activeId : '';
+      saveToLocalDisk(chats, persistedActiveId);
     }
   }
 
@@ -108,12 +124,30 @@ export default function App() {
     if (!currentChat) return undefined;
 
     const updatedChat = update(currentChat);
+
+    if (isDraftChat) {
+      // El chat todavía no existe: solo memoria, nada que persistir ni sincronizar.
+      setDraftChat(updatedChat);
+      return updatedChat;
+    }
+
     const updatedChats = chatList.map((chat) => (chat.id === activeChatId ? updatedChat : chat));
 
     setChatList(updatedChats);
     persistIfOffline(updatedChats, activeChatId);
 
     return updatedChat;
+  }
+
+  // Abre la vista de chat nuevo. El chat no se crea aquí: nace al enviar el primer mensaje.
+  function startDraftChat(chats: Chat[] = chatList) {
+    const chat = createDraftChat();
+
+    setDraftChat(chat);
+    setActiveChatId(chat.id);
+    persistIfOffline(chats, chat.id);
+
+    return chat;
   }
 
   async function materializeOnlineWelcomeChat(userId: string): Promise<Chat> {
@@ -213,7 +247,15 @@ export default function App() {
       }
 
       setChatList(initialChats);
-      setActiveChatId(initialActiveId);
+      if (initialActiveId && initialChats.some((chat) => chat.id === initialActiveId)) {
+        setActiveChatId(initialActiveId);
+      } else {
+        // Sin chat activo válido (p. ej. se cerró la app en la vista de chat nuevo)
+        const draft = createDraftChat();
+        setDraftChat(draft);
+        setActiveChatId(draft.id);
+        saveToLocalDisk(initialChats, '');
+      }
     }
 
     initializeApp();
@@ -241,6 +283,7 @@ export default function App() {
   useEffect(() => { // Carga inicial de los últimos 6 mensajes cuando cambia el chat activo
     if (!activeChatId) return;
     if (!isAuthenticated) return; // En modo offline no hacemos peticiones
+    if (isDraftChat) return; // El borrador aún no existe en el servidor
 
     const activeChat = chatList.find(c => c.id === activeChatId);
     if (activeChat && (!activeChat.messages || activeChat.messages.length === 0) && hasMoreMap[activeChatId] !== false) {
@@ -258,7 +301,7 @@ export default function App() {
         }
       });
     }
-  }, [activeChatId, chatList, hasMoreMap, isAuthenticated]);
+  }, [activeChatId, chatList, hasMoreMap, isAuthenticated, isDraftChat]);
 
   async function handleLoadMoreMessages(chatId: string) {
     if (!isAuthenticated) return;
@@ -288,34 +331,20 @@ export default function App() {
   }
 
   function handleCreateNewChat() {
-    flushDraftSyncToServer(currentChat);
+    flushDraftSyncToServer(syncableChat);
 
-    // 1. Creamos el nuevo dato exactamente igual que antes
-    const newId = 'chat-' + Date.now();
-    const newChat = { id: newId, title: 'New conversation', messages: [], draft: '' };
-
-    // 2. En lugar de hacer .push(), le pasamos la nueva lista completa a React
-    // (...chatList significa: "copia todos los chats que ya tenías y agrégale el nuevo")
-    const updatedChats = [...chatList, newChat];
-    setChatList(updatedChats);
-
-    // 3. Le decimos a React cuál es el nuevo ID activo y a qué vista ir
-    setActiveChatId(newId);
+    startDraftChat();
     showLeftPanel('chats');
-
-    if (isAuthenticated) {
-      saveChatToServer(newChat);
-    } else {
-      persistIfOffline(updatedChats, newId);
-    }
   }
 
   function handleSelectChat(clickedChatId: string) {
     if (clickedChatId !== activeChatId) {
       // Sync the chat we're leaving (with its current draft), not the destination
-      flushDraftSyncToServer(currentChat);
+      flushDraftSyncToServer(syncableChat);
     }
 
+    // Salir de la vista de chat nuevo descarta el borrador sin dejar rastro
+    setDraftChat(null);
     setActiveChatId(clickedChatId);
     showLeftPanel('chats');
     persistIfOffline(chatList, clickedChatId);
@@ -324,7 +353,7 @@ export default function App() {
   function handleDraftChange(newDraft: string) {
     const updatedChat = updateActiveChat((chat) => ({ ...chat, draft: newDraft }));
 
-    if (updatedChat) {
+    if (updatedChat && !isDraftChat) {
       scheduleDraftSyncToServer(updatedChat);
     }
   }
@@ -343,7 +372,7 @@ export default function App() {
   function handleSystemPromptChange(newSystemPrompt: string) {
     const updatedChat = updateActiveChat((chat) => ({ ...chat, systemPrompt: newSystemPrompt }));
 
-    if (updatedChat && isAuthenticated) {
+    if (updatedChat && isAuthenticated && !isDraftChat) {
       saveChatToServer(updatedChat);
     }
   }
@@ -351,7 +380,7 @@ export default function App() {
   function handleSystemPromptEnabledChange(isEnabled: boolean) {
     const updatedChat = updateActiveChat((chat) => ({ ...chat, systemPromptEnabled: isEnabled }));
 
-    if (updatedChat && isAuthenticated) {
+    if (updatedChat && isAuthenticated && !isDraftChat) {
       saveChatToServer(updatedChat);
     }
   }
@@ -362,6 +391,7 @@ export default function App() {
     setIsAuthenticated(true);
     setChatList([]);
     setActiveChatId('');
+    setDraftChat(null);
 
     try {
       const serverChats = await loadChatsFromServer();
@@ -405,6 +435,7 @@ export default function App() {
 
     setChatList(localChats);
     setActiveChatId(localActiveId);
+    setDraftChat(null);
     showLeftPanel('chats');
   }
 
@@ -413,6 +444,10 @@ export default function App() {
     if (!currentChat || !currentChat.draft.trim() || isGenerating) return;
     clearDraftSyncTimer(); // Avoid syncing a stale draft after send clears it
     const promptText = currentChat.draft.trim();
+    // Fijamos el chat destino: durante los await el chat activo puede cambiar
+    const chatId = currentChat.id;
+    // Enviar el primer mensaje es el acto de nacimiento del borrador: aquí entra en la lista
+    const baseChats = isDraftChat ? [...chatList, currentChat] : chatList;
 
     // 2. Preparamos el mensaje del usuario y el mensaje temporal de "pensando"
     const userMessage: Message = { role: "user", parts: [{ text: promptText }], createdAt: new Date().toISOString() };
@@ -428,12 +463,13 @@ export default function App() {
     }
 
     // Actualizamos la lista de chats en React (y limpiamos el borrador)
-    const chatsWithUserMsg = chatList.map(chat =>
-      chat.id === activeChatId
+    const chatsWithUserMsg = baseChats.map(chat =>
+      chat.id === chatId
         ? { ...chat, messages: updatedMessages, title: newTitle, draft: '' }
         : chat
     );
     setChatList(chatsWithUserMsg);
+    setDraftChat(null); // Ya vive en chatList: deja de ser borrador
     const controller = new AbortController();
     abortControllerRef.current = controller;
     setIsGenerating(true);
@@ -441,16 +477,16 @@ export default function App() {
     // 4. Llamamos a la API
     try {
       if (isAuthenticated) {
-        const chatToSync = chatsWithUserMsg.find((chat) => chat.id === activeChatId);
+        const chatToSync = chatsWithUserMsg.find((chat) => chat.id === chatId);
         if (chatToSync) {
-          // Solo asegurar el documento Chat; no sembrar Thinking/user aquí (van por createMessage).
+          // Crea el documento Chat si aún no existe; no sembrar Thinking/user aquí (van por createMessage).
           await saveChatToServer({ ...chatToSync, messages: [] });
         }
       }
 
       // Le pasamos los mensajes originales (sin el "pensando") a la API
       const response = await fetchChatResponse(
-        activeChatId,
+        chatId,
         [...currentChat.messages, userMessage],
         model,
         isAuthenticated,
@@ -467,32 +503,35 @@ export default function App() {
       ];
 
       const finalChats = chatsWithUserMsg.map(chat =>
-        chat.id === activeChatId
+        chat.id === chatId
           ? { ...chat, messages: updatedMessages }
           : chat
       );
 
       setChatList(finalChats);
-      persistIfOffline(finalChats, activeChatId);
+      persistIfOffline(finalChats, chatId);
 
     } catch (error) {
       const err = error as Error;
       if (err.name === 'AbortError') {
         updatedMessages = [...currentChat.messages, userMessage];
         const abortedChats = chatsWithUserMsg.map(chat =>
-          chat.id === activeChatId
+          chat.id === chatId
             ? { ...chat, messages: updatedMessages }
             : chat
         );
         setChatList(abortedChats);
-        persistIfOffline(abortedChats, activeChatId);
+        persistIfOffline(abortedChats, chatId);
       } else if (err.message === 'SESSION_EXPIRED') {
         resetSessionToDefault(); // Implementarás esto luego
         alert("Session expired. Please log in again.");
       } else {
         // Reemplazamos "pensando" por el error
         updatedMessages = [...currentChat.messages, userMessage, { role: "model" as const, parts: [{ text: `Error: ${err.message}` }], createdAt: new Date().toISOString() }];
-        setChatList(chatsWithUserMsg.map(chat => chat.id === activeChatId ? { ...chat, messages: updatedMessages } : chat));
+        const failedChats = chatsWithUserMsg.map(chat => chat.id === chatId ? { ...chat, messages: updatedMessages } : chat);
+        setChatList(failedChats);
+        // Un chat recién nacido cuyo primer envío falla también debe quedar en disco
+        persistIfOffline(failedChats, chatId);
       }
     } finally {
       if (abortControllerRef.current === controller) {
@@ -505,12 +544,17 @@ export default function App() {
   function handleDeleteChat(chatId: string) {
     if (!chatId) return;
     const updatedChats = chatList.filter(chat => chat.id !== chatId);
-    const newActiveId = chatId === activeChatId
-      ? (updatedChats.length > 0 ? updatedChats[0].id : '')
-      : activeChatId;
     setChatList(updatedChats);
-    setActiveChatId(newActiveId);
-    persistIfOffline(updatedChats, newActiveId);
+
+    if (chatId === activeChatId && updatedChats.length === 0) {
+      // Sin chats a los que caer: abrimos la vista de chat nuevo
+      startDraftChat(updatedChats);
+    } else {
+      const newActiveId = chatId === activeChatId ? updatedChats[0].id : activeChatId;
+      setActiveChatId(newActiveId);
+      persistIfOffline(updatedChats, newActiveId);
+    }
+
     if (isAuthenticated) {
       deleteChatFromServer(chatId);
     }
@@ -713,6 +757,7 @@ export default function App() {
             key={activeChatId}
             messages={currentChat?.messages || []}
             chatId={activeChatId}
+            isNewChat={isDraftChat}
             hasMoreMap={hasMoreMap}
             onLoadMore={() => handleLoadMoreMessages(activeChatId)}
             onDeleteMessage={handleDeleteMessage}

@@ -60,9 +60,17 @@ export default function Sidebar({ chatList, activeChatId, onChatClick, onCreateN
         }
     };
 
+    // El chat nuevo aún no está en la lista: si nada está activo, lo está la vista New Chat
+    const isNewChatActive = !chatList.some((chat) => chat.id === activeChatId);
+
     return (
         <div className={styles.sidebarContainer}>
-            <button className={styles.newChatButton} onClick={onCreateNewChat}>
+            <button
+                className={styles.newChatButton}
+                style={{ paddingLeft: isNewChatActive ? '6px' : '26px' }}
+                onClick={onCreateNewChat}
+            >
+                {isNewChatActive && <div className={styles.point}></div>}
                 New Chat
             </button>
             {/* Usamos .map() en lugar de .forEach() para imprimir el HTML */}
