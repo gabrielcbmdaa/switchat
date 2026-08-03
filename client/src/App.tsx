@@ -102,6 +102,20 @@ export default function App() {
     }
   }
 
+  // Punto único para editar el chat activo: aplica el cambio en la lista y persiste
+  // offline. Devuelve el chat ya actualizado para que quien llame decida su sync.
+  function updateActiveChat(update: (chat: Chat) => Chat): Chat | undefined {
+    if (!currentChat) return undefined;
+
+    const updatedChat = update(currentChat);
+    const updatedChats = chatList.map((chat) => (chat.id === activeChatId ? updatedChat : chat));
+
+    setChatList(updatedChats);
+    persistIfOffline(updatedChats, activeChatId);
+
+    return updatedChat;
+  }
+
   async function materializeOnlineWelcomeChat(userId: string): Promise<Chat> {
     const template = getTutorialChat()[0];
     // Id estable por usuario: recargas / Strict Mode hacen upsert del mismo chat, no duplicados.
@@ -308,19 +322,8 @@ export default function App() {
   }
 
   function handleDraftChange(newDraft: string) {
-    // En React, para modificar un elemento dentro de una lista, usamos .map()
-    // Recorremos los chats, modificamos solo el activo y dejamos los demás intactos
-    const updatedChats = chatList.map((chat) => {
-      if (chat.id === activeChatId) {
-        return { ...chat, draft: newDraft }; // Copia el chat y actualiza su borrador
-      }
-      return chat;
-    });
+    const updatedChat = updateActiveChat((chat) => ({ ...chat, draft: newDraft }));
 
-    setChatList(updatedChats);
-    persistIfOffline(updatedChats, activeChatId);
-
-    const updatedChat = updatedChats.find((chat) => chat.id === activeChatId);
     if (updatedChat) {
       scheduleDraftSyncToServer(updatedChat);
     }
@@ -338,34 +341,16 @@ export default function App() {
   }
 
   function handleSystemPromptChange(newSystemPrompt: string) {
-    const updatedChats = chatList.map((chat) => {
-      if (chat.id === activeChatId) {
-        return { ...chat, systemPrompt: newSystemPrompt };
-      }
-      return chat;
-    });
+    const updatedChat = updateActiveChat((chat) => ({ ...chat, systemPrompt: newSystemPrompt }));
 
-    setChatList(updatedChats);
-    persistIfOffline(updatedChats, activeChatId);
-
-    const updatedChat = updatedChats.find((chat) => chat.id === activeChatId);
     if (updatedChat && isAuthenticated) {
       saveChatToServer(updatedChat);
     }
   }
 
   function handleSystemPromptEnabledChange(isEnabled: boolean) {
-    const updatedChats = chatList.map((chat) => {
-      if (chat.id === activeChatId) {
-        return { ...chat, systemPromptEnabled: isEnabled };
-      }
-      return chat;
-    });
+    const updatedChat = updateActiveChat((chat) => ({ ...chat, systemPromptEnabled: isEnabled }));
 
-    setChatList(updatedChats);
-    persistIfOffline(updatedChats, activeChatId);
-
-    const updatedChat = updatedChats.find((chat) => chat.id === activeChatId);
     if (updatedChat && isAuthenticated) {
       saveChatToServer(updatedChat);
     }
