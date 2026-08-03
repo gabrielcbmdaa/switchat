@@ -189,6 +189,86 @@ export async function deleteMessageFromServer(chatId: string, messageId: string)
 // Servicios de IA / Completado de Mensajes
 // ============================================================================
 
+const TITLE_CONTEXT_LIMIT = 500;
+
+/**
+ * Prompt único para titular un chat: lo usan tanto el camino online como el offline.
+ */
+function buildTitlePrompt(promptText: string, replyText: string): string {
+  return [
+    'Genera un título breve (máximo 5 palabras) para esta conversación, en el mismo idioma que escribe el usuario.',
+    'Responde solo con el título: sin comillas, sin markdown y sin punto final.',
+    '',
+    `Usuario: ${promptText.slice(0, TITLE_CONTEXT_LIMIT)}`,
+    `Asistente: ${replyText.slice(0, TITLE_CONTEXT_LIMIT)}`,
+  ].join('\n');
+}
+
+/**
+ * Los modelos suelen añadir comillas, markdown o una frase de cortesía: nos quedamos
+ * con la primera línea limpia y acotada para que quepa en la barra lateral.
+ */
+function sanitizeTitle(rawTitle: string): string {
+  const firstLine = rawTitle.split('\n').map((line) => line.trim()).find(Boolean) || '';
+
+  return firstLine
+    .replace(/^#+\s*/, '')
+    .replace(/\*+/g, '')
+    .replace(/^["'«“¿¡]+|["'»”]+$/g, '')
+    .replace(/[.…]+$/, '')
+    .trim()
+    .slice(0, 60);
+}
+
+/**
+ * Pide al modelo activo un título para el chat tras el primer intercambio.
+ * Nunca lanza: si algo falla el chat se queda con su título provisional.
+ */
+export async function generateChatTitle(
+  chatId: string,
+  promptText: string,
+  replyText: string,
+  model: string,
+  useServer: boolean
+): Promise<string | null> {
+  const config = getModelConfig(model);
+  const provider = (config?.provider || 'google').toLowerCase();
+  const messages: Message[] = [{ role: 'user', parts: [{ text: buildTitlePrompt(promptText, replyText) }] }];
+
+  try {
+    let rawTitle: string;
+
+    if (useServer) {
+      const userApiKey = getApiKeyForProvider(provider);
+      const headers: Record<string, string> = {};
+      if (userApiKey) {
+        headers['x-user-api-key'] = userApiKey;
+      }
+
+      const response = await apiFetch(`/chats/${chatId}/title`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({ messages, model: model.toLowerCase(), provider }),
+      });
+
+      if (!response.ok) throw new Error('El servidor no pudo generar el título');
+
+      const data = await response.json();
+      rawTitle = data.text || '';
+    } else {
+      const { text } = await fetchFromProvider(model, messages, 'off');
+      rawTitle = text || '';
+    }
+
+    return sanitizeTitle(rawTitle) || null;
+
+  } catch (error) {
+    const err = error as Error;
+    console.warn('⚠️ Error [generateChatTitle]:', err.message);
+    return null;
+  }
+}
+
 export async function fetchChatResponse(
   chatId: string,
   messagesHistory: Message[],

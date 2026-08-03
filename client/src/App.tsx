@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import type { Chat, Message } from './types';
 import { loadLocalChats, loadLocalActiveChatId, saveToLocalDisk, getTutorialChat } from './utils/storage';
-import { loadChatsFromServer, fetchChatResponse, saveChatToServer, syncChatDraftToServer, deleteChatFromServer, deleteMessageFromServer, fetchChatMessagesFromServer, checkSession, logoutFromServer } from './services/api';
+import { loadChatsFromServer, fetchChatResponse, generateChatTitle, saveChatToServer, syncChatDraftToServer, deleteChatFromServer, deleteMessageFromServer, fetchChatMessagesFromServer, checkSession, logoutFromServer } from './services/api';
 import Sidebar from './components/Sidebar';
 import { SvgIcons } from './components/SvgIcons';
 import { initResizer } from './utils/resizer';
@@ -48,6 +48,9 @@ export default function App() {
   const draftSyncTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const currentChatRef = useRef(currentChat);
   const isAuthenticatedRef = useRef(isAuthenticated);
+  // Espejo del estado para los callbacks que resuelven después de un await
+  const chatListRef = useRef(chatList);
+  const activeChatIdRef = useRef(activeChatId);
   const [model, setModel] = useState<string>(() => {
     const savedModel = localStorage.getItem('model');
     if (savedModel && getModelConfig(savedModel)) {
@@ -63,6 +66,11 @@ export default function App() {
   useEffect(() => {
     isAuthenticatedRef.current = isAuthenticated;
   }, [isAuthenticated]);
+
+  useEffect(() => {
+    chatListRef.current = chatList;
+    activeChatIdRef.current = activeChatId;
+  }, [chatList, activeChatId]);
 
   useEffect(() => {
     savePanelView('left', leftPanelView);
@@ -148,6 +156,23 @@ export default function App() {
     persistIfOffline(chats, chat.id);
 
     return chat;
+  }
+
+  // El título llega después de un await: leemos el estado por referencia para no pisar
+  // los cambios ocurridos mientras el modelo lo generaba.
+  function applyGeneratedTitle(chatId: string, title: string) {
+    const chats = chatListRef.current;
+    const targetChat = chats.find((chat) => chat.id === chatId);
+    if (!targetChat || targetChat.title === title) return;
+
+    const updatedChats = chats.map((chat) => (chat.id === chatId ? { ...chat, title } : chat));
+
+    setChatList(updatedChats);
+    persistIfOffline(updatedChats, activeChatIdRef.current);
+
+    if (isAuthenticatedRef.current) {
+      saveChatToServer({ ...targetChat, title, messages: [] });
+    }
   }
 
   async function materializeOnlineWelcomeChat(userId: string): Promise<Chat> {
@@ -446,6 +471,7 @@ export default function App() {
     const promptText = currentChat.draft.trim();
     // Fijamos el chat destino: durante los await el chat activo puede cambiar
     const chatId = currentChat.id;
+    const isFirstMessage = currentChat.messages.length === 0;
     // Enviar el primer mensaje es el acto de nacimiento del borrador: aquí entra en la lista
     const baseChats = isDraftChat ? [...chatList, currentChat] : chatList;
 
@@ -457,8 +483,8 @@ export default function App() {
     let updatedMessages = [...currentChat.messages, userMessage, thinkingMessage];
     let newTitle = currentChat.title;
 
-    // Si es el primer mensaje, cambiamos el título
-    if (currentChat.messages.length === 0) {
+    // Título provisional mientras el modelo genera el definitivo
+    if (isFirstMessage) {
       newTitle = promptText.substring(0, 20) + "...";
     }
 
@@ -510,6 +536,14 @@ export default function App() {
 
       setChatList(finalChats);
       persistIfOffline(finalChats, chatId);
+
+      // El título real se pide en segundo plano: no debe retrasar la respuesta en pantalla
+      if (isFirstMessage) {
+        generateChatTitle(chatId, promptText, response.text, model, isAuthenticated)
+          .then((title) => {
+            if (title) applyGeneratedTitle(chatId, title);
+          });
+      }
 
     } catch (error) {
       const err = error as Error;
