@@ -11,7 +11,7 @@ import SettingView from './views/SettingsView';
 import MessageView from './views/MessageView';
 import NotesView from './views/NotesView';
 import DocsView from './views/DocsView';
-import { getModelConfig } from './config/models.config';
+import { loadDefaultModel, saveDefaultModel, resolveReasoningLevel } from './utils/modelPreferences';
 import SelectionToolbar from './components/SelectionToolbar';
 import { isMobileViewport, loadPanelView, savePanelView, loadPanelOpen, savePanelOpen } from './utils/uiPreferences';
 import type { LeftPanelView, RightPanelView } from './utils/uiPreferences';
@@ -52,13 +52,10 @@ export default function App() {
   // Espejo del estado para los callbacks que resuelven después de un await
   const chatListRef = useRef(chatList);
   const activeChatIdRef = useRef(activeChatId);
-  const [model, setModel] = useState<string>(() => {
-    const savedModel = localStorage.getItem('model');
-    if (savedModel && getModelConfig(savedModel)) {
-      return savedModel;
-    }
-    return 'gemini-3.5-flash';
-  });
+  const [model, setModel] = useState<string>(loadDefaultModel);
+  const [reasoningLevel, setReasoningLevel] = useState<string>(() =>
+    resolveReasoningLevel(model, localStorage.getItem('reasoningLevel') ?? undefined)
+  );
 
   useEffect(() => {
     currentChatRef.current = syncableChat;
@@ -395,6 +392,19 @@ export default function App() {
     window.dispatchEvent(new CustomEvent('focusPrompt'));
   }
 
+  function handleModelChange(newModel: string) {
+    setModel(newModel);
+    saveDefaultModel(newModel);
+    // Los niveles de reasoning no son universales: al cambiar de modelo hay que
+    // revalidar el actual antes de que llegue al proveedor nuevo.
+    handleReasoningChange(resolveReasoningLevel(newModel, reasoningLevel));
+  }
+
+  function handleReasoningChange(level: string) {
+    setReasoningLevel(level);
+    localStorage.setItem('reasoningLevel', level);
+  }
+
   function handleSystemPromptChange(newSystemPrompt: string) {
     const updatedChat = updateActiveChat((chat) => ({ ...chat, systemPrompt: newSystemPrompt }));
 
@@ -516,6 +526,7 @@ export default function App() {
         chatId,
         [...currentChat.messages, userMessage],
         model,
+        reasoningLevel,
         isAuthenticated,
         // El system prompt solo viaja si el interruptor del chat está encendido
         currentChat.systemPromptEnabled === false ? undefined : currentChat.systemPrompt,
@@ -670,6 +681,7 @@ export default function App() {
         activeChatId,
         historyUpToUser,
         model,
+        reasoningLevel,
         isAuthenticated,
         // El system prompt solo viaja si el interruptor del chat está encendido
         currentChat.systemPromptEnabled === false ? undefined : currentChat.systemPrompt,
@@ -818,10 +830,9 @@ export default function App() {
               {activeRightPanel === 'settings' && (
                 <SettingView
                   currentModel={model}
-                  onModelChange={(newModel) => {
-                    setModel(newModel);
-                    localStorage.setItem('model', newModel);
-                  }}
+                  onModelChange={handleModelChange}
+                  reasoningLevel={reasoningLevel}
+                  onReasoningChange={handleReasoningChange}
                   systemPrompt={currentChat?.systemPrompt ?? ''}
                   onSystemPromptChange={handleSystemPromptChange}
                   systemPromptEnabled={currentChat?.systemPromptEnabled !== false}

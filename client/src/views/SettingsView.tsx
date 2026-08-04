@@ -1,10 +1,13 @@
 import { useState } from "react";
 import styles from './SettingsView.module.css'
-import { getModelConfig, getProviderIconId, MODEL_REGISTRY } from "../config/models.config";
+import { getProviderIconId, MODEL_REGISTRY } from "../config/models.config";
+import { getThinkingLevels } from "../utils/modelPreferences";
 
 interface SettingViewProps {
     currentModel: string;
     onModelChange: (model: string) => void;
+    reasoningLevel: string;
+    onReasoningChange: (level: string) => void;
     systemPrompt: string;
     onSystemPromptChange: (value: string) => void;
     systemPromptEnabled: boolean;
@@ -12,38 +15,13 @@ interface SettingViewProps {
     onClose?: () => void;
 }
 
-export default function SettingView({ currentModel, onModelChange, systemPrompt, onSystemPromptChange, systemPromptEnabled, onSystemPromptEnabledChange, onClose }: SettingViewProps) {
-    // 1. Derivamos los niveles directamente del modelo actual (Estado Derivado)
-    const config = getModelConfig(currentModel);
-    const thinkingLevels = config ? ['off', ...config.thinkingLevels] : [];
-
-    const [prevModel, setPrevModel] = useState(currentModel);
-    const [reasoningLevel, setReasoningLevel] = useState<number>(() => {
-        const stored = localStorage.getItem('reasoningLevel');
-        if (stored && thinkingLevels.includes(stored)) {
-            return thinkingLevels.indexOf(stored);
-        }
-        return 0;
-    });
-
-    // 2. Si el modelo cambia, ajustamos el reasoningLevel durante el render (evita cascada de useEffect)
-    if (currentModel !== prevModel) {
-        setPrevModel(currentModel);
-        if (thinkingLevels.length > 0) {
-            const stored = localStorage.getItem('reasoningLevel');
-            if (stored && thinkingLevels.includes(stored)) {
-                setReasoningLevel(thinkingLevels.indexOf(stored));
-            } else {
-                setReasoningLevel(0);
-                localStorage.setItem('reasoningLevel', thinkingLevels[0]);
-            }
-        }
-    }
-
-    const handleReasoningChange = (val: number) => {
-        setReasoningLevel(val);
-        localStorage.setItem('reasoningLevel', thinkingLevels[val]);
-    };
+export default function SettingView({ currentModel, onModelChange, reasoningLevel, onReasoningChange, systemPrompt, onSystemPromptChange, systemPromptEnabled, onSystemPromptEnabledChange, onClose }: SettingViewProps) {
+    // El panel no guarda nada: los niveles salen del modelo y el valor llega ya
+    // resuelto desde arriba, que es quien decide a quién pertenece.
+    const thinkingLevels = getThinkingLevels(currentModel);
+    // El slider trabaja con índices, pero fuera de aquí solo viaja la etiqueta:
+    // el índice significa cosas distintas según el modelo.
+    const sliderValue = Math.max(0, thinkingLevels.indexOf(reasoningLevel));
 
     const [searchQuery, setSearchQuery] = useState('');
 
@@ -152,7 +130,7 @@ export default function SettingView({ currentModel, onModelChange, systemPrompt,
                         <div className={styles.reasoningHeader}>
                             <label className={styles.configLabel} htmlFor="reasoningInput">Reasoning</label>
                             <span className={styles.reasoningValueLabel}>
-                                {thinkingLevels[reasoningLevel]}
+                                {thinkingLevels[sliderValue]}
                             </span>
                         </div>
                         <input
@@ -161,8 +139,8 @@ export default function SettingView({ currentModel, onModelChange, systemPrompt,
                             min="0"
                             max={thinkingLevels.length - 1}
                             step="1"
-                            value={reasoningLevel}
-                            onChange={(e) => handleReasoningChange(Number(e.target.value))}
+                            value={sliderValue}
+                            onChange={(e) => onReasoningChange(thinkingLevels[Number(e.target.value)])}
                             className={styles.reasoningSlider}
                         />
                     </div>

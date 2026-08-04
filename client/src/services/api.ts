@@ -274,6 +274,7 @@ export async function fetchChatResponse(
   chatId: string,
   messagesHistory: Message[],
   model: string,
+  reasoningLevel: string,
   useServer: boolean,
   systemPrompt?: string,
   signal?: AbortSignal
@@ -281,7 +282,6 @@ export async function fetchChatResponse(
   const modelLowerCase = model.toLowerCase();
   const config = getModelConfig(model);
   const provider = (config?.provider || 'google').toLowerCase();
-  const reasoningLevel = localStorage.getItem('reasoningLevel') || 'off';
 
   const thinkingBudget = config?.thinkingBudgets?.[reasoningLevel] || 4096;
 
