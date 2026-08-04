@@ -23,6 +23,11 @@ function issueSessionCookie(res, user) {
 // Lógica para Registrar un nuevo usuario
 exports.register = async (req, res) => {
   try {
+    // 0. Si el registro está deshabilitado por configuración, frenar antes de tocar la DB
+    if (process.env.REGISTRATION_ENABLED === 'false') {
+      return res.status(403).json({ message: 'El registro de nuevas cuentas está deshabilitado' });
+    }
+
     // 1. Extraer el email y la password que el usuario mandó en la petición
     const { email, password } = req.body;
 

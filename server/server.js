@@ -74,6 +74,10 @@ async function startServer() {
             } else {
                 console.log('ℹ️ [Config] Sin API Keys globales en server/.env. Las peticiones utilizarán las claves efímeras enviadas por cada cliente.');
             }
+
+            if (process.env.REGISTRATION_ENABLED === 'false') {
+                console.log('🔒 [Config] Registro de nuevas cuentas DESHABILITADO (REGISTRATION_ENABLED=false).');
+            }
         });
 
     } catch (error) {
