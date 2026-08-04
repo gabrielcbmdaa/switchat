@@ -7,6 +7,7 @@ const ChatSchema = new mongoose.Schema({
     title: { type: String, default: 'Nuevo Chat' },
     systemPrompt: { type: String, default: '' },
     systemPromptEnabled: { type: Boolean, default: true },
+    model: { type: String, default: '' },
     createdAt: { type: Date, default: Date.now }
 });
 

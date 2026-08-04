@@ -18,6 +18,9 @@ export interface Chat {
   messages: Message[];
   systemPrompt?: string;
   systemPromptEnabled?: boolean;
+  // Ausente en los chats creados antes de que el modelo fuera por chat:
+  // quien lo lea debe resolverlo contra la preferencia global.
+  model?: string;
 }
 
 export interface GeminiModel {

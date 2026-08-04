@@ -19,7 +19,7 @@ import type { LeftPanelView, RightPanelView } from './utils/uiPreferences';
 // El chat nuevo lleva su id real desde el principio: cuando se materialice al enviar
 // el primer mensaje no hay que reasignar nada.
 function createDraftChat(): Chat {
-  return { id: 'chat-' + Date.now(), title: 'New conversation', messages: [], draft: '' };
+  return { id: 'chat-' + Date.now(), title: 'New conversation', messages: [], draft: '', model: loadDefaultModel() };
 }
 
 export default function App() {
@@ -52,9 +52,13 @@ export default function App() {
   // Espejo del estado para los callbacks que resuelven después de un await
   const chatListRef = useRef(chatList);
   const activeChatIdRef = useRef(activeChatId);
-  const [model, setModel] = useState<string>(loadDefaultModel);
+  // Preferencia global: solo decide con qué modelo nacen los chats nuevos.
+  // El modelo que se usa de verdad es el del chat activo.
+  const [defaultModel, setDefaultModel] = useState<string>(loadDefaultModel);
+  // Los chats de antes del cambio llegan sin modelo (o con '' desde Mongo).
+  const activeModel = currentChat?.model || defaultModel;
   const [reasoningLevel, setReasoningLevel] = useState<string>(() =>
-    resolveReasoningLevel(model, localStorage.getItem('reasoningLevel') ?? undefined)
+    resolveReasoningLevel(loadDefaultModel(), localStorage.getItem('reasoningLevel') ?? undefined)
   );
 
   useEffect(() => {
@@ -393,8 +397,16 @@ export default function App() {
   }
 
   function handleModelChange(newModel: string) {
-    setModel(newModel);
+    const updatedChat = updateActiveChat((chat) => ({ ...chat, model: newModel }));
+
+    if (updatedChat && isAuthenticated && !isDraftChat) {
+      saveChatToServer(updatedChat);
+    }
+
+    // El último modelo elegido pasa a ser con el que nacen los chats nuevos.
+    setDefaultModel(newModel);
     saveDefaultModel(newModel);
+
     // Los niveles de reasoning no son universales: al cambiar de modelo hay que
     // revalidar el actual antes de que llegue al proveedor nuevo.
     handleReasoningChange(resolveReasoningLevel(newModel, reasoningLevel));
@@ -499,10 +511,12 @@ export default function App() {
       newTitle = promptText.substring(0, 20) + "...";
     }
 
-    // Actualizamos la lista de chats en React (y limpiamos el borrador)
+    // Actualizamos la lista de chats en React (y limpiamos el borrador).
+    // Sellamos el modelo: un chat de antes de este cambio venía sin él y seguía
+    // arrastrando la preferencia global; al primer envío pasa a tener el suyo.
     const chatsWithUserMsg = baseChats.map(chat =>
       chat.id === chatId
-        ? { ...chat, messages: updatedMessages, title: newTitle, draft: '' }
+        ? { ...chat, messages: updatedMessages, title: newTitle, draft: '', model: activeModel }
         : chat
     );
     setChatList(chatsWithUserMsg);
@@ -525,7 +539,7 @@ export default function App() {
       const response = await fetchChatResponse(
         chatId,
         [...currentChat.messages, userMessage],
-        model,
+        activeModel,
         reasoningLevel,
         isAuthenticated,
         // El system prompt solo viaja si el interruptor del chat está encendido
@@ -537,7 +551,7 @@ export default function App() {
       updatedMessages = [
         ...currentChat.messages,
         { ...userMessage, _id: response.userMessageId },
-        { role: "model", parts: [{ text: response.text }], _id: response.aiMessageId, createdAt: new Date().toISOString(), model }
+        { role: "model", parts: [{ text: response.text }], _id: response.aiMessageId, createdAt: new Date().toISOString(), model: activeModel }
       ];
 
       const finalChats = chatsWithUserMsg.map(chat =>
@@ -551,7 +565,7 @@ export default function App() {
 
       // El título real se pide en segundo plano: no debe retrasar la respuesta en pantalla
       if (isFirstMessage) {
-        generateChatTitle(chatId, promptText, response.text, model, isAuthenticated)
+        generateChatTitle(chatId, promptText, response.text, activeModel, isAuthenticated)
           .then((title) => {
             if (title) applyGeneratedTitle(chatId, title);
           });
@@ -680,7 +694,7 @@ export default function App() {
       const response = await fetchChatResponse(
         activeChatId,
         historyUpToUser,
-        model,
+        activeModel,
         reasoningLevel,
         isAuthenticated,
         // El system prompt solo viaja si el interruptor del chat está encendido
@@ -692,7 +706,7 @@ export default function App() {
       updatedMessages = [
         ...historyUpToUser.slice(0, -1),
         { ...userMessage, _id: response.userMessageId || userMessage._id },
-        { role: "model", parts: [{ text: response.text }], _id: response.aiMessageId, createdAt: new Date().toISOString(), model }
+        { role: "model", parts: [{ text: response.text }], _id: response.aiMessageId, createdAt: new Date().toISOString(), model: activeModel }
       ];
 
       const finalChats = chatsWithThinking.map(chat =>
@@ -829,7 +843,7 @@ export default function App() {
             <aside className="settings-section" id='settings-section' aria-label="Panel secundario">
               {activeRightPanel === 'settings' && (
                 <SettingView
-                  currentModel={model}
+                  currentModel={activeModel}
                   onModelChange={handleModelChange}
                   reasoningLevel={reasoningLevel}
                   onReasoningChange={handleReasoningChange}
