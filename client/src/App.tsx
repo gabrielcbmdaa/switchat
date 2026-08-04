@@ -10,6 +10,7 @@ import AccountView from './views/AccountView';
 import SettingView from './views/SettingsView';
 import MessageView from './views/MessageView';
 import NotesView from './views/NotesView';
+import DocsView from './views/DocsView';
 import { getModelConfig } from './config/models.config';
 import SelectionToolbar from './components/SelectionToolbar';
 import { isMobileViewport, loadPanelView, savePanelView, loadPanelOpen, savePanelOpen } from './utils/uiPreferences';
@@ -829,9 +830,13 @@ export default function App() {
               {activeRightPanel === 'notes' && (
                 <NotesView />
               )}
+              {activeRightPanel === 'docs' && (
+                <DocsView />
+              )}
               <Toolbar
                 onNavNotes={() => setRightPanelView('notes')}
                 onNavConfig={() => setRightPanelView('settings')}
+                onNavDocs={() => setRightPanelView('docs')}
               />
             </aside>
           </>
