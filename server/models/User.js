@@ -13,6 +13,10 @@ const UserSchema = new mongoose.Schema({
     type: String,
     required: [true, 'La contraseña es obligatoria'],
     minlength: [6, 'La contraseña debe tener al menos 6 caracteres']
+  },
+  acceptedTermsAt: {
+    type: Date,
+    default: null
   }
 }, {
   // 2. Opciones de configuración del molde

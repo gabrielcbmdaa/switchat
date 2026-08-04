@@ -29,7 +29,12 @@ exports.register = async (req, res) => {
     }
 
     // 1. Extraer el email y la password que el usuario mandó en la petición
-    const { email, password } = req.body;
+    const { email, password, acceptedTerms } = req.body;
+
+    // 1b. El registro exige haber aceptado los términos y la política de privacidad
+    if (acceptedTerms !== true) {
+      return res.status(400).json({ message: 'Debes aceptar los términos y la política de privacidad' });
+    }
 
     // 2. Verificar si el correo ya existe en la base de datos
     const existingUser = await User.findOne({ email });
@@ -45,7 +50,8 @@ exports.register = async (req, res) => {
     // 4. Crear la instancia del usuario usando el modelo con la clave encriptada
     const newUser = new User({
       email,
-      password: hashedPassword // Reemplazamos la clave original por la versión ultra segura
+      password: hashedPassword, // Reemplazamos la clave original por la versión ultra segura
+      acceptedTermsAt: new Date()
     });
 
     // 5. Guardar el nuevo usuario de forma definitiva en MongoDB Atlas
