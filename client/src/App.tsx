@@ -55,11 +55,10 @@ export default function App() {
   // Preferencia global: solo decide con qué modelo nacen los chats nuevos.
   // El modelo que se usa de verdad es el del chat activo.
   const [defaultModel, setDefaultModel] = useState<string>(loadDefaultModel);
-  // Los chats de antes del cambio llegan sin modelo (o con '' desde Mongo).
+  // Los chats de antes del cambio llegan sin ajustes (o con '' desde Mongo): el modelo
+  // cae en la preferencia global y el nivel en el defaultThinking del modelo.
   const activeModel = currentChat?.model || defaultModel;
-  const [reasoningLevel, setReasoningLevel] = useState<string>(() =>
-    resolveReasoningLevel(loadDefaultModel(), localStorage.getItem('reasoningLevel') ?? undefined)
-  );
+  const activeReasoning = resolveReasoningLevel(activeModel, currentChat?.reasoningLevel);
 
   useEffect(() => {
     currentChatRef.current = syncableChat;
@@ -397,7 +396,11 @@ export default function App() {
   }
 
   function handleModelChange(newModel: string) {
-    const updatedChat = updateActiveChat((chat) => ({ ...chat, model: newModel }));
+    // Los niveles de reasoning no son universales: el nivel se revalida contra el
+    // modelo nuevo y viaja con él en la misma edición, para no dejar al chat un
+    // instante con un nivel que su proveedor no entiende.
+    const nextReasoning = resolveReasoningLevel(newModel, activeReasoning);
+    const updatedChat = updateActiveChat((chat) => ({ ...chat, model: newModel, reasoningLevel: nextReasoning }));
 
     if (updatedChat && isAuthenticated && !isDraftChat) {
       saveChatToServer(updatedChat);
@@ -406,15 +409,14 @@ export default function App() {
     // El último modelo elegido pasa a ser con el que nacen los chats nuevos.
     setDefaultModel(newModel);
     saveDefaultModel(newModel);
-
-    // Los niveles de reasoning no son universales: al cambiar de modelo hay que
-    // revalidar el actual antes de que llegue al proveedor nuevo.
-    handleReasoningChange(resolveReasoningLevel(newModel, reasoningLevel));
   }
 
   function handleReasoningChange(level: string) {
-    setReasoningLevel(level);
-    localStorage.setItem('reasoningLevel', level);
+    const updatedChat = updateActiveChat((chat) => ({ ...chat, reasoningLevel: level }));
+
+    if (updatedChat && isAuthenticated && !isDraftChat) {
+      saveChatToServer(updatedChat);
+    }
   }
 
   function handleSystemPromptChange(newSystemPrompt: string) {
@@ -512,11 +514,11 @@ export default function App() {
     }
 
     // Actualizamos la lista de chats en React (y limpiamos el borrador).
-    // Sellamos el modelo: un chat de antes de este cambio venía sin él y seguía
-    // arrastrando la preferencia global; al primer envío pasa a tener el suyo.
+    // Sellamos modelo y nivel: un chat de antes de este cambio venía sin ellos y
+    // los resolvía en cada render; al primer envío pasa a tener los suyos.
     const chatsWithUserMsg = baseChats.map(chat =>
       chat.id === chatId
-        ? { ...chat, messages: updatedMessages, title: newTitle, draft: '', model: activeModel }
+        ? { ...chat, messages: updatedMessages, title: newTitle, draft: '', model: activeModel, reasoningLevel: activeReasoning }
         : chat
     );
     setChatList(chatsWithUserMsg);
@@ -540,7 +542,7 @@ export default function App() {
         chatId,
         [...currentChat.messages, userMessage],
         activeModel,
-        reasoningLevel,
+        activeReasoning,
         isAuthenticated,
         // El system prompt solo viaja si el interruptor del chat está encendido
         currentChat.systemPromptEnabled === false ? undefined : currentChat.systemPrompt,
@@ -695,7 +697,7 @@ export default function App() {
         activeChatId,
         historyUpToUser,
         activeModel,
-        reasoningLevel,
+        activeReasoning,
         isAuthenticated,
         // El system prompt solo viaja si el interruptor del chat está encendido
         currentChat.systemPromptEnabled === false ? undefined : currentChat.systemPrompt,
@@ -845,7 +847,7 @@ export default function App() {
                 <SettingView
                   currentModel={activeModel}
                   onModelChange={handleModelChange}
-                  reasoningLevel={reasoningLevel}
+                  reasoningLevel={activeReasoning}
                   onReasoningChange={handleReasoningChange}
                   systemPrompt={currentChat?.systemPrompt ?? ''}
                   onSystemPromptChange={handleSystemPromptChange}
