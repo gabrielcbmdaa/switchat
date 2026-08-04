@@ -765,6 +765,7 @@ export default function App() {
                   isAuthenticated={isAuthenticated}
                   onAuthSuccess={handleAuthSuccess}
                   onLogoutAction={resetSessionToDefault}
+                  onOpenTerms={() => { setRightPanelView('docs'); setIsRightPanelOpen(true); }}
                 />
               )}
               {activeLeftPanel === 'chats' && (

@@ -9,11 +9,14 @@ interface ConfigViewProps {
     isAuthenticated: boolean;
     onAuthSuccess: () => void;
     onLogoutAction: () => void;
+    onOpenTerms: () => void;
 }
 
-export default function ConfigView({ isAuthenticated, onAuthSuccess, onLogoutAction }: ConfigViewProps) {
+export default function ConfigView({ isAuthenticated, onAuthSuccess, onLogoutAction, onOpenTerms }: ConfigViewProps) {
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
+    const [showTermsConsent, setShowTermsConsent] = useState(false);
+    const [acceptedTerms, setAcceptedTerms] = useState(false);
 
     const [apiKey, setApiKey] = useState('');
     const [showProviderSelectorForApiKey, setShowProviderSelectorForApiKey] = useState(false);
@@ -66,12 +69,20 @@ export default function ConfigView({ isAuthenticated, onAuthSuccess, onLogoutAct
     const handleAuth = async (isSignUp: boolean) => {
         try {
             // El registro también deja la sesión iniciada (cookie), igual que el login.
-            await loginOrRegister(email, password, isSignUp);
+            await loginOrRegister(email, password, isSignUp, acceptedTerms);
             onAuthSuccess();
         } catch (err: unknown) {
             const errorMessage = err instanceof Error ? err.message : String(err);
             alert("Error: " + errorMessage);
         }
+    };
+
+    const handleSignUpClick = () => {
+        if (!showTermsConsent) {
+            setShowTermsConsent(true);
+            return;
+        }
+        handleAuth(true);
     };
 
     const [currentEmail, setCurrentEmail] = useState('');
@@ -369,10 +380,38 @@ export default function ConfigView({ isAuthenticated, onAuthSuccess, onLogoutAct
                         onChange={(e) => setPassword(e.target.value)} // 👈 Vinculamos la escritura al estado
                         required
                     />
+                    {showTermsConsent && (
+                        <div className={styles.termsRow}>
+                            <input
+                                id="acceptTerms"
+                                type="checkbox"
+                                className={styles.termsCheckbox}
+                                checked={acceptedTerms}
+                                onChange={(e) => setAcceptedTerms(e.target.checked)}
+                            />
+                            <label htmlFor="acceptTerms" className={styles.termsText}>
+                                I accept the{' '}
+                                <button
+                                    type="button"
+                                    className={styles.termsLink}
+                                    onClick={(e) => { e.preventDefault(); onOpenTerms(); }}
+                                >
+                                    terms and privacy policy
+                                </button>
+                            </label>
+                        </div>
+                    )}
                     <div className={styles.buttonAuthContainer}>
                         {/* Tipo submit para aprovechar el comportamiento nativo de HTML */}
                         <button type="submit" className={styles.btnAuth}>Sign In</button>
-                        <button type="button" className={styles.btnAuth} onClick={() => handleAuth(true)}>Sign Up</button>
+                        <button
+                            type="button"
+                            className={styles.btnAuth}
+                            onClick={handleSignUpClick}
+                            disabled={showTermsConsent && !acceptedTerms}
+                        >
+                            Sign Up
+                        </button>
                     </div>
                 </form>
             ) : (

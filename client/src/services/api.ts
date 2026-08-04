@@ -40,11 +40,12 @@ export async function checkSession(): Promise<{ authenticated: boolean; userId?:
   }
 }
 
-export async function loginOrRegister(email: string, password: string, isSignUp: boolean) {
+export async function loginOrRegister(email: string, password: string, isSignUp: boolean, acceptedTerms = false) {
   const endpoint = isSignUp ? '/auth/register' : '/auth/login';
+  const body = isSignUp ? { email, password, acceptedTerms } : { email, password };
   const response = await apiFetch(endpoint, {
     method: 'POST',
-    body: JSON.stringify({ email, password }),
+    body: JSON.stringify(body),
   });
 
   if (!response.ok) {
