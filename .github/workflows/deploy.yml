@@ -23,7 +23,8 @@ jobs:
             cd ~/switchat
             
             # 2. Code Update
-            git pull origin main
+            git fetch origin
+            git reset --hard origin/main
             
             #3. Install dependencies
             pnpm install
