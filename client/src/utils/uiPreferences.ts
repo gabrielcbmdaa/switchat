@@ -18,6 +18,7 @@ export type PanelSide = 'left' | 'right';
 
 const VIEW_KEYS: Record<PanelSide, string> = { left: 'leftPanelView', right: 'rightPanelView' };
 const OPEN_KEYS: Record<PanelSide, string> = { left: 'leftPanelOpen', right: 'rightPanelOpen' };
+const ACTIVE_CHAT_KEY = 'activeChatId';
 
 // Safari en modo privado puede lanzar al escribir: la preferencia es opcional,
 // nunca debe tumbar la app.
@@ -54,6 +55,17 @@ export function loadPanelOpen(side: PanelSide, fallback: boolean): boolean {
     if (saved === 'true') return true;
     if (saved === 'false') return false;
     return fallback;
+}
+
+// Qué chat estabas mirando es una preferencia de esta pestaña, no un dato del chat:
+// se guarda siempre, con sesión o sin ella. Los chats online viven en Mongo, pero
+// cuál tenías abierto no es algo que el servidor deba saber.
+export function loadActiveChatId(): string {
+    return readItem(ACTIVE_CHAT_KEY) ?? '';
+}
+
+export function saveActiveChatId(chatId: string) {
+    writeItem(ACTIVE_CHAT_KEY, chatId);
 }
 
 export function savePanelOpen(side: PanelSide, isOpen: boolean) {

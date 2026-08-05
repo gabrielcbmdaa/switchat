@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import type { Chat, Message } from './types';
-import { loadLocalChats, loadLocalActiveChatId, saveToLocalDisk, getTutorialChat } from './utils/storage';
+import { loadLocalChats, saveToLocalDisk, getTutorialChat } from './utils/storage';
 import { loadChatsFromServer, fetchChatResponse, generateChatTitle, saveChatToServer, syncChatDraftToServer, deleteChatFromServer, deleteMessageFromServer, fetchChatMessagesFromServer, checkSession, logoutFromServer } from './services/api';
 import Sidebar from './components/Sidebar';
 import { SvgIcons } from './components/SvgIcons';
@@ -13,7 +13,7 @@ import NotesView from './views/NotesView';
 import DocsView from './views/DocsView';
 import { loadDefaultModel, saveDefaultModel, resolveReasoningLevel } from './utils/modelPreferences';
 import SelectionToolbar from './components/SelectionToolbar';
-import { isMobileViewport, loadPanelView, savePanelView, loadPanelOpen, savePanelOpen } from './utils/uiPreferences';
+import { isMobileViewport, loadPanelView, savePanelView, loadPanelOpen, savePanelOpen, loadActiveChatId, saveActiveChatId } from './utils/uiPreferences';
 import type { LeftPanelView, RightPanelView } from './utils/uiPreferences';
 
 // El chat nuevo lleva su id real desde el principio: cuando se materialice al enviar
@@ -89,6 +89,16 @@ export default function App() {
     savePanelOpen('right', isRightPanelOpen);
   }, [isRightPanelOpen]);
 
+  // El chat activo se guarda con sesión y sin ella: es una preferencia de UI, igual
+  // que los paneles de arriba. El id del borrador también se guarda; al recargar no
+  // estará en la lista y la carga inicial abrirá un chat nuevo, que es lo correcto.
+  useEffect(() => {
+    // Vacío solo durante el arranque, antes de elegir chat: escribirlo borraría la
+    // preferencia justo antes de poder restaurarla.
+    if (!activeChatId) return;
+    saveActiveChatId(activeChatId);
+  }, [activeChatId]);
+
   function clearDraftSyncTimer() {
     if (draftSyncTimerRef.current) {
       clearTimeout(draftSyncTimerRef.current);
@@ -118,12 +128,12 @@ export default function App() {
     setIsLeftPanelOpen(!isMobileViewport());
   }
 
-  function persistIfOffline(chats: Chat[], activeId: string) {
+  // Solo la lista de chats está sujeta a esta regla: online la fuente de verdad es
+  // Mongo y escribirla aquí pisaría los chats del modo offline. El chat activo se
+  // persiste aparte (ver el efecto de abajo) porque es una preferencia de UI.
+  function persistIfOffline(chats: Chat[]) {
     if (!isAuthenticatedRef.current) {
-      // Un id que no está en la lista (el borrador) se guarda como vacío: al recargar
-      // volvemos a la vista de chat nuevo en vez de quedarnos sin chat activo.
-      const persistedActiveId = chats.some((chat) => chat.id === activeId) ? activeId : '';
-      saveToLocalDisk(chats, persistedActiveId);
+      saveToLocalDisk(chats);
     }
   }
 
@@ -143,7 +153,7 @@ export default function App() {
     const updatedChats = chatList.map((chat) => (chat.id === activeChatId ? updatedChat : chat));
 
     setChatList(updatedChats);
-    persistIfOffline(updatedChats, activeChatId);
+    persistIfOffline(updatedChats);
 
     return updatedChat;
   }
@@ -154,7 +164,7 @@ export default function App() {
 
     setDraftChat(chat);
     setActiveChatId(chat.id);
-    persistIfOffline(chats, chat.id);
+    persistIfOffline(chats);
 
     return chat;
   }
@@ -169,7 +179,7 @@ export default function App() {
     const updatedChats = chats.map((chat) => (chat.id === chatId ? { ...chat, title } : chat));
 
     setChatList(updatedChats);
-    persistIfOffline(updatedChats, activeChatIdRef.current);
+    persistIfOffline(updatedChats);
 
     if (isAuthenticatedRef.current) {
       saveChatToServer({ ...targetChat, title, messages: [] });
@@ -209,7 +219,7 @@ export default function App() {
 
     async function initializeApp() {
       const localChats = loadLocalChats() || [];
-      const localActiveId = loadLocalActiveChatId() || '';
+      const localActiveId = loadActiveChatId() || '';
 
       // Siempre intentamos reatachar la sesión vía cookie HttpOnly (/auth/me).
       // Antes solo se hacía si existía localStorage.isLoggedIn, y si esa bandera
@@ -269,7 +279,7 @@ export default function App() {
       if (initialChats.length === 0) {
         initialChats = getTutorialChat();
         initialActiveId = 'tutorial-welcome';
-        saveToLocalDisk(initialChats, initialActiveId);
+        saveToLocalDisk(initialChats);
       }
 
       setChatList(initialChats);
@@ -280,7 +290,6 @@ export default function App() {
         const draft = createDraftChat();
         setDraftChat(draft);
         setActiveChatId(draft.id);
-        saveToLocalDisk(initialChats, '');
       }
     }
 
@@ -373,7 +382,7 @@ export default function App() {
     setDraftChat(null);
     setActiveChatId(clickedChatId);
     showLeftPanel('chats');
-    persistIfOffline(chatList, clickedChatId);
+    persistIfOffline(chatList);
   }
 
   function handleDraftChange(newDraft: string) {
@@ -474,11 +483,11 @@ export default function App() {
 
     // Restaurar chats offline intactos; solo persistir tutorial si no había ninguno.
     let localChats = loadLocalChats() || [];
-    let localActiveId = loadLocalActiveChatId() || '';
+    let localActiveId = loadActiveChatId() || '';
     if (localChats.length === 0) {
       localChats = getTutorialChat();
       localActiveId = 'tutorial-welcome';
-      saveToLocalDisk(localChats, localActiveId);
+      saveToLocalDisk(localChats);
     } else if (!localChats.some((chat) => chat.id === localActiveId)) {
       localActiveId = localChats[0].id;
     }
@@ -563,7 +572,7 @@ export default function App() {
       );
 
       setChatList(finalChats);
-      persistIfOffline(finalChats, chatId);
+      persistIfOffline(finalChats);
 
       // El título real se pide en segundo plano: no debe retrasar la respuesta en pantalla
       if (isFirstMessage) {
@@ -583,7 +592,7 @@ export default function App() {
             : chat
         );
         setChatList(abortedChats);
-        persistIfOffline(abortedChats, chatId);
+        persistIfOffline(abortedChats);
       } else if (err.message === 'SESSION_EXPIRED') {
         resetSessionToDefault(); // Implementarás esto luego
         alert("Session expired. Please log in again.");
@@ -593,7 +602,7 @@ export default function App() {
         const failedChats = chatsWithUserMsg.map(chat => chat.id === chatId ? { ...chat, messages: updatedMessages } : chat);
         setChatList(failedChats);
         // Un chat recién nacido cuyo primer envío falla también debe quedar en disco
-        persistIfOffline(failedChats, chatId);
+        persistIfOffline(failedChats);
       }
     } finally {
       if (abortControllerRef.current === controller) {
@@ -614,7 +623,7 @@ export default function App() {
     } else {
       const newActiveId = chatId === activeChatId ? updatedChats[0].id : activeChatId;
       setActiveChatId(newActiveId);
-      persistIfOffline(updatedChats, newActiveId);
+      persistIfOffline(updatedChats);
     }
 
     if (isAuthenticated) {
@@ -636,7 +645,7 @@ export default function App() {
         : chat
     );
     setChatList(updatedChats);
-    persistIfOffline(updatedChats, activeChatId);
+    persistIfOffline(updatedChats);
 
     // 2. Si hay sesión y el mensaje tiene _id, borrarlo del servidor en segundo plano
     if (isAuthenticated && messageToDelete._id) {
@@ -718,7 +727,7 @@ export default function App() {
       );
 
       setChatList(finalChats);
-      persistIfOffline(finalChats, activeChatId);
+      persistIfOffline(finalChats);
     } catch (error) {
       const err = error as Error;
       if (err.name === 'AbortError') {
@@ -729,7 +738,7 @@ export default function App() {
             : chat
         );
         setChatList(abortedChats);
-        persistIfOffline(abortedChats, activeChatId);
+        persistIfOffline(abortedChats);
       } else if (err.message === 'SESSION_EXPIRED') {
         resetSessionToDefault();
         alert("Session expired. Please log in again.");
@@ -761,7 +770,7 @@ export default function App() {
       return chat;
     });
     setChatList(updatedChats);
-    persistIfOffline(updatedChats, activeChatId);
+    persistIfOffline(updatedChats);
     const retitledChat = updatedChats.find((chat) => chat.id === chatId);
 
     if (retitledChat && isAuthenticated) {

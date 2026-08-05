@@ -30,8 +30,10 @@ export function getTutorialChat(): Chat[] {
     }];
 }
 
-// chatList / activeChatId en localStorage son solo para modo offline.
-// Los chats online viven en React state + MongoDB; no deben escribirse aquí.
+// chatList en localStorage es solo para modo offline: los chats online viven en
+// React state + MongoDB y no deben escribirse aquí. El chat activo NO sigue esta
+// regla —es una preferencia de UI y se guarda siempre—, por eso vive en
+// utils/uiPreferences.ts y no en este módulo.
 export function loadLocalChats(): Chat[] {
     const localData = localStorage.getItem('chatList');
 
@@ -45,13 +47,8 @@ export function loadLocalChats(): Chat[] {
     return JSON.parse(localData) as Chat[];
 }
 
-export function loadLocalActiveChatId() {
-    return localStorage.getItem('activeChatId') || '';
-}
-
 // 3. Función para guardar (ahora requiere que le pasemos los datos desde fuera)
-export function saveToLocalDisk(chatList: Chat[], activeChatId: string) {
-    localStorage.setItem('activeChatId', activeChatId);
+export function saveToLocalDisk(chatList: Chat[]) {
     localStorage.setItem('chatList', JSON.stringify(chatList));
 }
 
