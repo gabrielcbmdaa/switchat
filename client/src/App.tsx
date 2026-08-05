@@ -498,6 +498,99 @@ export default function App() {
     showLeftPanel('chats');
   }
 
+  // Núcleo común de enviar y reintentar: pinta el "Thinking...", le pide la respuesta
+  // al modelo y la reconcilia con la lista de chats. Enviar y reintentar solo se
+  // diferencian en el papeleo previo, así que eso se queda fuera y entra por parámetros.
+  //
+  // Convención que sostiene todo lo de abajo: historyToSend TERMINA siempre en el
+  // mensaje de usuario que provoca la respuesta. Por eso su último elemento es el que
+  // recibe el _id que devuelve el servidor, y por eso basta un slice(0, -1) para
+  // quedarse con lo anterior.
+  async function sendChatHistory(
+    historyToSend: Message[],
+    chats: Chat[],
+    chatId: string,
+    options: {
+      // Trabajo con el servidor que cada caso necesita antes de pedir la respuesta.
+      beforeRequest?: () => Promise<void>;
+      // El "y además" de quien llama: enviar lo usa para pedir el título del chat.
+      onSuccess?: (responseText: string) => void;
+    } = {}
+  ) {
+    // La convención de arriba, comprobada: sin mensaje de usuario al final no hay nada
+    // que responder, y seguir adelante dejaría dos respuestas del modelo seguidas y un
+    // _id de usuario pegado al mensaje equivocado.
+    const userMessage = historyToSend[historyToSend.length - 1];
+    if (!userMessage || userMessage.role !== 'user') return;
+
+    const targetChat = chats.find((chat) => chat.id === chatId);
+    const thinkingMessage = { role: "model" as const, parts: [{ text: "Thinking..." }], isTemporary: true, createdAt: new Date().toISOString() };
+
+    // Pintamos el "pensando" antes de nada para que la UI reaccione al instante
+    const chatsWithThinking = chats.map(chat =>
+      chat.id === chatId
+        ? { ...chat, messages: [...historyToSend, thinkingMessage] }
+        : chat
+    );
+    setChatList(chatsWithThinking);
+    const controller = new AbortController();
+    abortControllerRef.current = controller;
+    setIsGenerating(true);
+
+    // Todas las salidas de abajo escriben el mismo chat: lo único que cambia es con qué mensajes
+    const withMessages = (messages: Message[]) =>
+      chatsWithThinking.map(chat => chat.id === chatId ? { ...chat, messages } : chat);
+
+    try {
+      await options.beforeRequest?.();
+
+      const response = await fetchChatResponse(
+        chatId,
+        historyToSend,
+        activeModel,
+        activeReasoning,
+        isAuthenticated,
+        // El system prompt solo viaja si el interruptor del chat está encendido
+        targetChat?.systemPromptEnabled === false ? undefined : targetChat?.systemPrompt,
+        controller.signal
+      );
+
+      // Reemplazamos el "pensando" por la respuesta real y sellamos los _id de MongoDB.
+      // El || rescata el _id que el mensaje ya tuviera: al reintentar existe, al enviar no.
+      const finalChats = withMessages([
+        ...historyToSend.slice(0, -1),
+        { ...userMessage, _id: response.userMessageId || userMessage._id },
+        { role: "model", parts: [{ text: response.text }], _id: response.aiMessageId, createdAt: new Date().toISOString(), model: activeModel }
+      ]);
+
+      setChatList(finalChats);
+      persistIfOffline(finalChats);
+
+      options.onSuccess?.(response.text);
+    } catch (error) {
+      const err = error as Error;
+      if (err.name === 'AbortError') {
+        // Abortar deja la conversación tal y como se envió, sin respuesta
+        const abortedChats = withMessages(historyToSend);
+        setChatList(abortedChats);
+        persistIfOffline(abortedChats);
+      } else if (err.message === 'SESSION_EXPIRED') {
+        resetSessionToDefault();
+        alert("Session expired. Please log in again.");
+      } else {
+        // El error ocupa el sitio del "pensando", y también debe quedar en disco
+        const failedChats = withMessages([...historyToSend, { role: "model" as const, parts: [{ text: `Error: ${err.message}` }], createdAt: new Date().toISOString() }]);
+        setChatList(failedChats);
+        persistIfOffline(failedChats);
+      }
+    } finally {
+      if (abortControllerRef.current === controller) {
+        abortControllerRef.current = null;
+      }
+      setIsGenerating(false);
+    }
+  }
+
   async function handleSendMessage() {
     // 1. Validaciones iniciales (Reemplaza a tu document.getElementById)
     if (!currentChat || !currentChat.draft.trim() || isGenerating) return;
@@ -509,107 +602,38 @@ export default function App() {
     // Enviar el primer mensaje es el acto de nacimiento del borrador: aquí entra en la lista
     const baseChats = isDraftChat ? [...chatList, currentChat] : chatList;
 
-    // 2. Preparamos el mensaje del usuario y el mensaje temporal de "pensando"
+    // 2. El historial que viaja es el de siempre más lo que acabas de escribir
     const userMessage: Message = { role: "user", parts: [{ text: promptText }], createdAt: new Date().toISOString() };
-    const thinkingMessage = { role: "model" as const, parts: [{ text: "Thinking..." }], isTemporary: true, createdAt: new Date().toISOString() };
+    const historyToSend = [...currentChat.messages, userMessage];
 
-    // 3. Actualizamos el estado INMEDIATAMENTE para que la UI reaccione
-    let updatedMessages = [...currentChat.messages, userMessage, thinkingMessage];
-    let newTitle = currentChat.title;
-
-    // Título provisional mientras el modelo genera el definitivo
-    if (isFirstMessage) {
-      newTitle = promptText.substring(0, 20) + "...";
-    }
-
-    // Actualizamos la lista de chats en React (y limpiamos el borrador).
-    // Sellamos modelo y nivel: un chat de antes de este cambio venía sin ellos y
-    // los resolvía en cada render; al primer envío pasa a tener los suyos.
-    const chatsWithUserMsg = baseChats.map(chat =>
+    // 3. Papeleo de nacimiento, que reintentar no necesita: título provisional mientras
+    // el modelo genera el definitivo, borrador limpio, y modelo y nivel sellados (un chat
+    // de antes de este cambio venía sin ellos y los resolvía en cada render).
+    // Los mensajes no se tocan aquí: de eso se encarga sendChatHistory.
+    const newTitle = isFirstMessage ? promptText.substring(0, 20) + "..." : currentChat.title;
+    const sealedChats = baseChats.map(chat =>
       chat.id === chatId
-        ? { ...chat, messages: updatedMessages, title: newTitle, draft: '', model: activeModel, reasoningLevel: activeReasoning }
+        ? { ...chat, title: newTitle, draft: '', model: activeModel, reasoningLevel: activeReasoning }
         : chat
     );
-    setChatList(chatsWithUserMsg);
     setDraftChat(null); // Ya vive en chatList: deja de ser borrador
-    const controller = new AbortController();
-    abortControllerRef.current = controller;
-    setIsGenerating(true);
 
-    // 4. Llamamos a la API
-    try {
-      if (isAuthenticated) {
-        const chatToSync = chatsWithUserMsg.find((chat) => chat.id === chatId);
-        if (chatToSync) {
-          // Crea el documento Chat si aún no existe; no sembrar Thinking/user aquí (van por createMessage).
-          await saveChatToServer({ ...chatToSync, messages: [] });
-        }
-      }
-
-      // Le pasamos los mensajes originales (sin el "pensando") a la API
-      const response = await fetchChatResponse(
-        chatId,
-        [...currentChat.messages, userMessage],
-        activeModel,
-        activeReasoning,
-        isAuthenticated,
-        // El system prompt solo viaja si el interruptor del chat está encendido
-        currentChat.systemPromptEnabled === false ? undefined : currentChat.systemPrompt,
-        controller.signal
-      );
-
-      // Reemplazamos el mensaje "pensando" por la respuesta real, incluyendo los _id de MongoDB
-      updatedMessages = [
-        ...currentChat.messages,
-        { ...userMessage, _id: response.userMessageId },
-        { role: "model", parts: [{ text: response.text }], _id: response.aiMessageId, createdAt: new Date().toISOString(), model: activeModel }
-      ];
-
-      const finalChats = chatsWithUserMsg.map(chat =>
-        chat.id === chatId
-          ? { ...chat, messages: updatedMessages }
-          : chat
-      );
-
-      setChatList(finalChats);
-      persistIfOffline(finalChats);
-
-      // El título real se pide en segundo plano: no debe retrasar la respuesta en pantalla
-      if (isFirstMessage) {
-        generateChatTitle(chatId, promptText, response.text, activeModel, isAuthenticated)
+    await sendChatHistory(historyToSend, sealedChats, chatId, {
+      beforeRequest: async () => {
+        if (!isAuthenticated) return;
+        const chatToSync = sealedChats.find((chat) => chat.id === chatId);
+        // Crea el documento Chat si aún no existe; no sembrar Thinking/user aquí (van por createMessage).
+        if (chatToSync) await saveChatToServer({ ...chatToSync, messages: [] });
+      },
+      onSuccess: (responseText) => {
+        // El título real se pide en segundo plano: no debe retrasar la respuesta en pantalla
+        if (!isFirstMessage) return;
+        generateChatTitle(chatId, promptText, responseText, activeModel, isAuthenticated)
           .then((title) => {
             if (title) applyGeneratedTitle(chatId, title);
           });
-      }
-
-    } catch (error) {
-      const err = error as Error;
-      if (err.name === 'AbortError') {
-        updatedMessages = [...currentChat.messages, userMessage];
-        const abortedChats = chatsWithUserMsg.map(chat =>
-          chat.id === chatId
-            ? { ...chat, messages: updatedMessages }
-            : chat
-        );
-        setChatList(abortedChats);
-        persistIfOffline(abortedChats);
-      } else if (err.message === 'SESSION_EXPIRED') {
-        resetSessionToDefault(); // Implementarás esto luego
-        alert("Session expired. Please log in again.");
-      } else {
-        // Reemplazamos "pensando" por el error
-        updatedMessages = [...currentChat.messages, userMessage, { role: "model" as const, parts: [{ text: `Error: ${err.message}` }], createdAt: new Date().toISOString() }];
-        const failedChats = chatsWithUserMsg.map(chat => chat.id === chatId ? { ...chat, messages: updatedMessages } : chat);
-        setChatList(failedChats);
-        // Un chat recién nacido cuyo primer envío falla también debe quedar en disco
-        persistIfOffline(failedChats);
-      }
-    } finally {
-      if (abortControllerRef.current === controller) {
-        abortControllerRef.current = null;
-      }
-      setIsGenerating(false);
-    }
+      },
+    });
   }
 
   function handleDeleteChat(chatId: string) {
@@ -668,92 +692,28 @@ export default function App() {
     // Seguridad: Asegurarnos de que encontramos un mensaje de usuario
     if (userMessageIndex < 0 || currentChat.messages[userMessageIndex].role !== 'user') return;
 
-    const userMessage = currentChat.messages[userMessageIndex];
+    // Fijamos el chat destino: durante los await el chat activo puede cambiar
+    const chatId = currentChat.id;
+    const chatToSync = currentChat;
 
-    // 2. Tomar el historial exacto que queremos reenviar a la API
-    const historyUpToUser = currentChat.messages.slice(0, userMessageIndex + 1);
+    // 2. El historial que reenviamos acaba justo en ese mensaje de usuario
+    const historyToSend = currentChat.messages.slice(0, userMessageIndex + 1);
 
-    // 3. Bifurcación: Identificar los mensajes que serán descartados en el backend
+    // 3. Bifurcación: lo que venía después queda descartado y hay que borrarlo del backend
     const messagesToDeleteFromBackend = currentChat.messages.slice(userMessageIndex);
 
-    // 4. Preparar la UI agregando el estado de "Thinking..."
-    const thinkingMessage = { role: "model" as const, parts: [{ text: "Thinking..." }], isTemporary: true, createdAt: new Date().toISOString() };
-    let updatedMessages = [...historyUpToUser, thinkingMessage];
-
-    const chatsWithThinking = chatList.map(chat =>
-      chat.id === activeChatId
-        ? { ...chat, messages: updatedMessages }
-        : chat
-    );
-    setChatList(chatsWithThinking);
-    const controller = new AbortController();
-    abortControllerRef.current = controller;
-    setIsGenerating(true);
-
-    // 5. Eliminar mensajes antiguos del backend de forma silenciosa
-    if (isAuthenticated) {
-      await saveChatToServer({ ...currentChat, messages: [] });
-      messagesToDeleteFromBackend.forEach(msg => {
-        if (msg._id) {
-          deleteMessageFromServer(activeChatId, msg._id);
-        }
-      });
-    }
-
-    // 6. Hacer la petición a la API
-    try {
-      const response = await fetchChatResponse(
-        activeChatId,
-        historyUpToUser,
-        activeModel,
-        activeReasoning,
-        isAuthenticated,
-        // El system prompt solo viaja si el interruptor del chat está encendido
-        currentChat.systemPromptEnabled === false ? undefined : currentChat.systemPrompt,
-        controller.signal
-      );
-
-      // Reemplazamos "Thinking" por la respuesta y actualizamos los IDs
-      updatedMessages = [
-        ...historyUpToUser.slice(0, -1),
-        { ...userMessage, _id: response.userMessageId || userMessage._id },
-        { role: "model", parts: [{ text: response.text }], _id: response.aiMessageId, createdAt: new Date().toISOString(), model: activeModel }
-      ];
-
-      const finalChats = chatsWithThinking.map(chat =>
-        chat.id === activeChatId
-          ? { ...chat, messages: updatedMessages }
-          : chat
-      );
-
-      setChatList(finalChats);
-      persistIfOffline(finalChats);
-    } catch (error) {
-      const err = error as Error;
-      if (err.name === 'AbortError') {
-        updatedMessages = historyUpToUser;
-        const abortedChats = chatsWithThinking.map(chat =>
-          chat.id === activeChatId
-            ? { ...chat, messages: updatedMessages }
-            : chat
-        );
-        setChatList(abortedChats);
-        persistIfOffline(abortedChats);
-      } else if (err.message === 'SESSION_EXPIRED') {
-        resetSessionToDefault();
-        alert("Session expired. Please log in again.");
-      } else {
-        updatedMessages = [...historyUpToUser, { role: "model" as const, parts: [{ text: `Error: ${err.message}` }], createdAt: new Date().toISOString() }];
-        const retriedChats = chatsWithThinking.map(chat => chat.id === activeChatId ? { ...chat, messages: updatedMessages } : chat);
-        setChatList(retriedChats);
-        persistIfOffline(retriedChats);
-      }
-    } finally {
-      if (abortControllerRef.current === controller) {
-        abortControllerRef.current = null;
-      }
-      setIsGenerating(false);
-    }
+    await sendChatHistory(historyToSend, chatList, chatId, {
+      beforeRequest: async () => {
+        if (!isAuthenticated) return;
+        await saveChatToServer({ ...chatToSync, messages: [] });
+        // Silenciosa a propósito: si falla, el chat local ya es la versión buena
+        messagesToDeleteFromBackend.forEach(msg => {
+          if (msg._id) {
+            deleteMessageFromServer(chatId, msg._id);
+          }
+        });
+      },
+    });
   }
 
   function handleStopGeneration() {
