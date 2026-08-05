@@ -213,7 +213,7 @@ export default function MessageView({
                         )}
                         {visibleMessages.map((msg, index) => {
                             // Calcular el índice real en el array completo de messages
-                            const realIndex = token ? index : (messages.length - visibleCount + index);
+                            const realIndex = token ? index : (messages.length - visibleMessages.length + index);
                             return (
                                 <MessageBubble
                                     key={index}

@@ -744,7 +744,9 @@ export default function App() {
         alert("Session expired. Please log in again.");
       } else {
         updatedMessages = [...historyUpToUser, { role: "model" as const, parts: [{ text: `Error: ${err.message}` }], createdAt: new Date().toISOString() }];
-        setChatList(chatsWithThinking.map(chat => chat.id === activeChatId ? { ...chat, messages: updatedMessages } : chat));
+        const retriedChats = chatsWithThinking.map(chat => chat.id === activeChatId ? { ...chat, messages: updatedMessages } : chat);
+        setChatList(retriedChats);
+        persistIfOffline(retriedChats);
       }
     } finally {
       if (abortControllerRef.current === controller) {
