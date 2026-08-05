@@ -57,7 +57,7 @@
    ```bash
    cp .env.example .env
    ```
-   *Open .env and configure it with your variables*
+   *Open .env and configure it with your variables. Each one is documented in `server/.env.example` and tagged `[REQUIRED]` or `[OPTIONAL]` — only `MONGO_URI` and `JWT_SECRET` are required to start.*
 6. Start and use:
    ```bash
    pnpm start
@@ -116,6 +116,21 @@ switchat/
 - **JWT (JsonWebToken)** for session management and route protection.
 - **Bcrypt** for hashing user credentials.
 - Environment variables support via **dotenv**.
+
+---
+
+## 🚀 Deployment
+
+Pushing to `main` automatically deploys to the production VPS via GitHub Actions (`.github/workflows/deploy.yml`), which connects over SSH and runs:
+
+1. `git fetch origin` + `git reset --hard origin/main`
+2. `pnpm install`
+3. `pnpm build`
+4. `pm2 restart switchat`
+
+Requires these GitHub Secrets: `SSH_HOST`, `SSH_USER`, `SSH_PRIVATE_KEY`.
+
+> ⚠️ `server/.env` lives only on the server and is never updated by the workflow. New environment variables must be added manually via SSH, followed by `pm2 restart switchat --update-env`.
 
 ---
 
