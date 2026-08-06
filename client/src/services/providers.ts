@@ -93,7 +93,6 @@ interface GeminiPart {
 interface GeminiGenerationConfig {
     thinkingConfig?: {
         thinkingLevel?: string;
-        thinkingBudget?: number;
     };
 }
 
@@ -140,22 +139,26 @@ async function sendToGoogle(
         }));
 
     // Configurar opciones de generación y razonamiento (Thinking Config)
-    const generationConfig: GeminiGenerationConfig = {};
-    if (reasoningLevel !== 'off') {
-        const thinkingLevelMap: Record<string, string> = {
-            'minimal': 'MINIMAL',
-            'low': 'LOW',
-            'medium': 'MEDIUM',
-            'high': 'HIGH'
-        };
-        generationConfig.thinkingConfig = {
-            thinkingLevel: thinkingLevelMap[reasoningLevel] || 'HIGH'
-        };
-    } else {
-        generationConfig.thinkingConfig = {
-            thinkingBudget: 0
-        };
-    }
+    const thinkingLevelMap: Record<string, string> = {
+        'minimal': 'MINIMAL',
+        'low': 'LOW',
+        'medium': 'MEDIUM',
+        'high': 'HIGH'
+    };
+
+    // Gemini 3.x y 2.5 no entienden 'off': lo mínimo que aceptan es el nivel más bajo que
+    // el modelo declare en MODEL_REGISTRY (las listas van de menor a mayor). La forma
+    // antigua de apagarlo —thinkingConfig.thinkingBudget: 0— devuelve "Request contains
+    // an invalid argument" en estos modelos, y es lo que impedía generar títulos, que es
+    // el único sitio que pide 'off'.
+    const lowestSupportedLevel = getModelConfig(modelLowerCase)?.thinkingLevels?.[0] || 'low';
+    const effectiveLevel = reasoningLevel === 'off' ? lowestSupportedLevel : reasoningLevel;
+
+    const generationConfig: GeminiGenerationConfig = {
+        thinkingConfig: {
+            thinkingLevel: thinkingLevelMap[effectiveLevel] || 'HIGH'
+        }
+    };
 
     const googleRequestBody = {
         contents,
