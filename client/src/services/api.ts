@@ -1,6 +1,5 @@
 import type { Chat, Message } from "../types";
-import { getModelConfig } from "../config/models.config";
-import { fetchFromProvider, getApiKeyForProvider } from "./providers";
+import { fetchFromProvider } from "./providers";
 
 export const API_BACKEND_URL = '/api';
 
@@ -226,42 +225,16 @@ function sanitizeTitle(rawTitle: string): string {
  * Nunca lanza: si algo falla el chat se queda con su título provisional.
  */
 export async function generateChatTitle(
-  chatId: string,
   promptText: string,
   replyText: string,
-  model: string,
-  useServer: boolean
+  model: string
 ): Promise<string | null> {
-  const config = getModelConfig(model);
-  const provider = (config?.provider || 'google').toLowerCase();
   const messages: Message[] = [{ role: 'user', parts: [{ text: buildTitlePrompt(promptText, replyText) }] }];
 
   try {
-    let rawTitle: string;
-
-    if (useServer) {
-      const userApiKey = getApiKeyForProvider(provider);
-      const headers: Record<string, string> = {};
-      if (userApiKey) {
-        headers['x-user-api-key'] = userApiKey;
-      }
-
-      const response = await apiFetch(`/chats/${chatId}/title`, {
-        method: 'POST',
-        headers,
-        body: JSON.stringify({ messages, model: model.toLowerCase(), provider }),
-      });
-
-      if (!response.ok) throw new Error('El servidor no pudo generar el título');
-
-      const data = await response.json();
-      rawTitle = data.text || '';
-    } else {
-      const { text } = await fetchFromProvider(model, messages, 'off');
-      rawTitle = text || '';
-    }
-
-    return sanitizeTitle(rawTitle) || null;
+    // Sin thinking: titular es una tarea corta y no debe gastar presupuesto de razonamiento
+    const { text } = await fetchFromProvider(model, messages, 'off');
+    return sanitizeTitle(text || '') || null;
 
   } catch (error) {
     const err = error as Error;

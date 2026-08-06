@@ -1,6 +1,5 @@
 const Message = require('../models/Message');
 const Chat = require('../models/Chat');
-const { fetchFromProvider } = require('../services/providerService');
 
 // 💾 GUARDAR UN MENSAJE SUELTO
 // Escritura pura: el cliente llama al proveedor y nos manda el resultado. El cliente
@@ -49,36 +48,6 @@ exports.createMessage = async (req, res) => {
     } catch (error) {
         console.error("❌ Error en createMessage:", error);
         res.status(500).json({ message: 'Error al guardar el mensaje', error: error.message });
-    }
-};
-
-// ✨ GENERAR UN TÍTULO PARA EL CHAT
-// Proxy puro hacia el proveedor: no toca la colección Message ni el documento Chat.
-// El cliente arma el prompt (fuente única) y guarda el título con el sync habitual.
-exports.generateTitle = async (req, res) => {
-    try {
-        const { messages, model, provider } = req.body;
-        const userApiKey = req.headers['x-user-api-key'] || req.body.userApiKey;
-
-        if (!Array.isArray(messages) || messages.length === 0) {
-            return res.status(400).json({ message: 'Se requiere el historial para generar el título' });
-        }
-
-        // Sin thinking: titular es una tarea corta y no debe gastar presupuesto de razonamiento
-        const { text } = await fetchFromProvider({
-            model,
-            provider,
-            messagesHistory: messages,
-            reasoningLevel: 'off',
-            userApiKey
-        });
-
-        return res.json({ text });
-
-    } catch (error) {
-        // El título es un extra: no rompemos el chat por él, solo lo reportamos
-        console.warn(`⚠️ [chatController] No se pudo generar el título: ${error.apiErrorMessage || error.message}`);
-        return res.status(error.status || 500).json({ message: 'No se pudo generar el título del chat' });
     }
 };
 

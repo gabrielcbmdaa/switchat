@@ -669,7 +669,7 @@ export default function App() {
       onSuccess: (responseText) => {
         // El título real se pide en segundo plano: no debe retrasar la respuesta en pantalla
         if (!isFirstMessage) return;
-        generateChatTitle(chatId, promptText, responseText, activeModel, isAuthenticated)
+        generateChatTitle(promptText, responseText, activeModel)
           .then((title) => {
             if (title) applyGeneratedTitle(chatId, title);
           });
