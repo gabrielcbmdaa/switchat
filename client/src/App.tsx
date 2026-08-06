@@ -541,6 +541,13 @@ export default function App() {
     const withMessages = (messages: Message[]) =>
       chatsWithThinking.map(chat => chat.id === chatId ? { ...chat, messages } : chat);
 
+    // El prompt se guarda ANTES de generar para que cerrar la pestaña a mitad no se lleve
+    // lo que el usuario acaba de escribir: se pierde la respuesta, nunca la pregunta.
+    // Persistimos historyToSend y no chatsWithThinking a propósito: el "pensando" es
+    // isTemporary y en disco quedaría congelado y sin botón de reintentar (handleRetryMessage
+    // descarta los isTemporary). El estado que queda es el mismo que ya deja abortar.
+    persistIfOffline(withMessages(historyToSend));
+
     try {
       await options.beforeRequest?.();
 
