@@ -20,6 +20,70 @@ export function getApiKeyForProvider(providerName: string): string {
     return '';
 }
 
+/**
+ * Error de un proveedor con el contexto necesario para explicárselo al usuario.
+ * El `name` no puede ser 'AbortError': `sendChatHistory` lo usa para distinguir
+ * una cancelación voluntaria de un fallo real.
+ */
+export class ProviderError extends Error {
+    status: number;
+    provider: string;
+    model: string;
+
+    constructor(message: string, status: number, provider: string, model: string) {
+        super(message);
+        this.name = 'ProviderError';
+        this.status = status;
+        this.provider = provider;
+        this.model = model;
+    }
+}
+
+// Un cuerpo de error puede ser una página HTML entera; en el chat se renderiza como
+// markdown, así que lo recortamos antes de que inunde la conversación.
+const MAX_RAW_ERROR_LENGTH = 300;
+
+/**
+ * Traduce una respuesta HTTP fallida de un proveedor a un error accionable.
+ *
+ * Lee el cuerpo como texto ANTES de intentar parsearlo: un 502 de un proxy responde
+ * HTML, y hacer `response.json()` directamente lanza un "Unexpected token '<'" que
+ * tapa el fallo real. Mismo patrón que usaba `throwProviderError` en el servidor.
+ */
+async function throwProviderError(
+    response: Response,
+    provider: string,
+    modelLowerCase: string
+): Promise<never> {
+    const rawBody = await response.text();
+
+    let apiErrorMessage = rawBody;
+    try {
+        const parsed = JSON.parse(rawBody);
+        apiErrorMessage = parsed.error?.message || parsed.message || rawBody;
+    } catch {
+        // El cuerpo no era JSON (HTML de un proxy, respuesta vacía): nos quedamos con el texto crudo
+    }
+
+    if (apiErrorMessage.length > MAX_RAW_ERROR_LENGTH) {
+        apiErrorMessage = `${apiErrorMessage.slice(0, MAX_RAW_ERROR_LENGTH)}…`;
+    }
+
+    // Textos heredados del errorMap del servidor: son los que ya veían los usuarios online
+    const friendlyMessages: Record<number, string> = {
+        401: `🔑 Invalid or expired API Key for ${provider}. Check your configuration.`,
+        403: `🚫 Access denied by ${provider}. Your API Key does not have permissions to use the model "${modelLowerCase}".`,
+        404: `❓ The model "${modelLowerCase}" does not exist or is unavailable in ${provider}.`,
+        429: `⏳ Too many requests to ${provider}. You have reached the rate limit. Please wait a moment and try again.`,
+        503: `🔥 The model "${modelLowerCase}" is experiencing high demand right now. Try again in a few seconds or try another model.`,
+    };
+
+    const message = friendlyMessages[response.status]
+        || `Error ${response.status} from ${provider}: ${apiErrorMessage}`;
+
+    throw new ProviderError(message, response.status, provider, modelLowerCase);
+}
+
 // Interfaces internas para Google Gemini
 interface GeminiPart {
     text?: string;
@@ -109,8 +173,7 @@ async function sendToGoogle(
     });
 
     if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error?.message || 'Error en la API de Google');
+        await throwProviderError(response, 'google', modelLowerCase);
     }
 
     const data = await response.json();
@@ -192,8 +255,7 @@ async function sendToAnthropic(
     });
 
     if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error?.message || 'Error en la API de Anthropic');
+        await throwProviderError(response, 'anthropic', modelLowerCase);
     }
 
     const data = await response.json();
@@ -245,7 +307,8 @@ async function sendToOpenAICompatible(
     modelLowerCase: string,
     messagesHistory: Message[],
     reasoningLevel?: string,
-    signal?: AbortSignal
+    signal?: AbortSignal,
+    providerName: string = 'openai'
 ): Promise<ProviderResponse> {
     const formattedMessages: ChatCompletionMessage[] = messagesHistory.map((msg) => {
         let role = 'user';
@@ -276,8 +339,7 @@ async function sendToOpenAICompatible(
     });
 
     if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error?.message || 'Error en la API del proveedor');
+        await throwProviderError(response, providerName, modelLowerCase);
     }
 
     const data = await response.json();
@@ -311,7 +373,8 @@ export async function fetchFromProvider(
                 modelLowerCase,
                 messagesHistory,
                 undefined,
-                signal
+                signal,
+                'lm studio'
             );
         case 'ollama':
             return await sendToOpenAICompatible(
@@ -320,7 +383,8 @@ export async function fetchFromProvider(
                 modelLowerCase,
                 messagesHistory,
                 undefined,
-                signal
+                signal,
+                'ollama'
             );
         default:
             throw new Error(`⚠️ El proveedor de IA "${provider}" no está soportado.`);
