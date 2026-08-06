@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import type { Chat, Message } from './types';
 import { loadLocalChats, saveToLocalDisk, getTutorialChat } from './utils/storage';
-import { loadChatsFromServer, fetchChatResponse, generateChatTitle, saveChatToServer, syncChatDraftToServer, deleteChatFromServer, deleteMessageFromServer, fetchChatMessagesFromServer, checkSession, logoutFromServer } from './services/api';
+import { loadChatsFromServer, fetchChatResponse, saveMessageToServer, generateChatTitle, saveChatToServer, syncChatDraftToServer, deleteChatFromServer, deleteMessageFromServer, fetchChatMessagesFromServer, checkSession, logoutFromServer } from './services/api';
 import Sidebar from './components/Sidebar';
 import { SvgIcons } from './components/SvgIcons';
 import { initResizer } from './utils/resizer';
@@ -548,26 +548,50 @@ export default function App() {
     // descarta los isTemporary). El estado que queda es el mismo que ya deja abortar.
     persistIfOffline(withMessages(historyToSend));
 
+    // Se asigna dentro del try, no aquí: el servidor comprueba que el chat exista y sea
+    // tuyo, y es beforeRequest quien lo materializa en Mongo. Vive fuera para que el catch
+    // pueda sellar el _id aunque la generación acabe fallando o abortada.
+    let pendingUserMessageId: Promise<string | undefined> = Promise.resolve(undefined);
+
     try {
       await options.beforeRequest?.();
 
+      if (isAuthenticatedRef.current) {
+        // Se lanza sin await, en paralelo a la generación: la respuesta del modelo tarda
+        // segundos, así que el viaje extra al servidor queda solapado y no se nota.
+        pendingUserMessageId = saveMessageToServer(chatId, {
+          sender: 'user',
+          content: userMessage.parts?.[0]?.text || '',
+        });
+        // Solo evita el unhandled rejection mientras esperamos al modelo; el fallo se trata abajo
+        pendingUserMessageId.catch(() => undefined);
+      }
+
       const response = await fetchChatResponse(
-        chatId,
         historyToSend,
         activeModel,
         activeReasoning,
-        isAuthenticated,
         // El system prompt solo viaja si el interruptor del chat está encendido
         targetChat?.systemPromptEnabled === false ? undefined : targetChat?.systemPrompt,
         controller.signal
       );
 
+      // Si el prompt no llegó a guardarse, este await relanza y no persistimos la respuesta.
+      // Es deliberado: una conversación sin su última respuesta se reintenta, pero una
+      // respuesta sin su pregunta rompe handleRetryMessage, que da por hecho que todo
+      // mensaje del modelo va precedido del usuario que lo provocó.
+      const userMessageId = await pendingUserMessageId;
+
+      const aiMessageId = isAuthenticatedRef.current
+        ? await saveMessageToServer(chatId, { sender: 'ai', content: response.text, model: activeModel })
+        : undefined;
+
       // Reemplazamos el "pensando" por la respuesta real y sellamos los _id de MongoDB.
       // El || rescata el _id que el mensaje ya tuviera: al reintentar existe, al enviar no.
       const finalChats = withMessages([
         ...historyToSend.slice(0, -1),
-        { ...userMessage, _id: response.userMessageId || userMessage._id },
-        { role: "model", parts: [{ text: response.text }], _id: response.aiMessageId, createdAt: new Date().toISOString(), model: activeModel }
+        { ...userMessage, _id: userMessageId || userMessage._id },
+        { role: "model", parts: [{ text: response.text }], _id: aiMessageId, createdAt: new Date().toISOString(), model: activeModel }
       ]);
 
       setChatList(finalChats);
@@ -576,9 +600,19 @@ export default function App() {
       options.onSuccess?.(response.text);
     } catch (error) {
       const err = error as Error;
+
+      // El prompt puede haberse guardado aunque la generación fallara o se abortara. Sin
+      // sellar su _id el mensaje queda huérfano en Mongo: el cliente lo borraría solo de
+      // la pantalla y reaparecería en la siguiente recarga.
+      const savedUserMessageId = await pendingUserMessageId.catch(() => undefined);
+      const sealedHistory = [
+        ...historyToSend.slice(0, -1),
+        { ...userMessage, _id: savedUserMessageId || userMessage._id },
+      ];
+
       if (err.name === 'AbortError') {
         // Abortar deja la conversación tal y como se envió, sin respuesta
-        const abortedChats = withMessages(historyToSend);
+        const abortedChats = withMessages(sealedHistory);
         setChatList(abortedChats);
         persistIfOffline(abortedChats);
       } else if (err.message === 'SESSION_EXPIRED') {
@@ -586,7 +620,7 @@ export default function App() {
         alert("Session expired. Please log in again.");
       } else {
         // El error ocupa el sitio del "pensando", y también debe quedar en disco
-        const failedChats = withMessages([...historyToSend, { role: "model" as const, parts: [{ text: `Error: ${err.message}` }], createdAt: new Date().toISOString() }]);
+        const failedChats = withMessages([...sealedHistory, { role: "model" as const, parts: [{ text: `Error: ${err.message}` }], createdAt: new Date().toISOString() }]);
         setChatList(failedChats);
         persistIfOffline(failedChats);
       }

@@ -270,67 +270,53 @@ export async function generateChatTitle(
   }
 }
 
-export async function fetchChatResponse(
+/**
+ * Guarda un mensaje ya resuelto y devuelve el _id que le asignó MongoDB.
+ *
+ * El servidor no llama a proveedores: solo persiste. Por eso un intercambio son dos
+ * llamadas —el prompt antes de generar y la respuesta después— en vez de una.
+ * El _id que devuelve es lo que después permite borrar el mensaje del servidor.
+ */
+export async function saveMessageToServer(
   chatId: string,
+  message: { sender: 'user' | 'ai'; content: string; model?: string }
+): Promise<string | undefined> {
+  const response = await apiFetch(`/chats/${chatId}/messages`, {
+    method: 'POST',
+    body: JSON.stringify(message),
+  });
+
+  if (response.status === 401) {
+    throw new Error('SESSION_EXPIRED');
+  }
+
+  if (!response.ok) {
+    const data = await response.json().catch(() => ({}));
+    throw new Error(data.message || 'No se pudo guardar el mensaje en el servidor');
+  }
+
+  const data = await response.json();
+  return data._id;
+}
+
+/**
+ * Pide la respuesta al proveedor. Siempre desde el navegador: el servidor nunca llama
+ * a un proveedor, así que aquí ya no hay dos caminos que mantener en sync.
+ *
+ * Lo único que añade sobre fetchFromProvider es anteponer el system prompt del chat,
+ * que es lo que hace que quien llama no tenga que saber cómo se representa.
+ */
+export async function fetchChatResponse(
   messagesHistory: Message[],
   model: string,
   reasoningLevel: string,
-  useServer: boolean,
   systemPrompt?: string,
   signal?: AbortSignal
-): Promise<{ text: string; userMessageId?: string; aiMessageId?: string }> {
-  const modelLowerCase = model.toLowerCase();
-  const config = getModelConfig(model);
-  const provider = (config?.provider || 'google').toLowerCase();
-
-  const thinkingBudget = config?.thinkingBudgets?.[reasoningLevel] || 4096;
-
+): Promise<{ text: string }> {
   const trimmedSystemPrompt = (systemPrompt || '').trim();
   const historyWithSystemPrompt: Message[] = trimmedSystemPrompt
     ? [{ role: 'system', parts: [{ text: trimmedSystemPrompt }] }, ...messagesHistory]
     : messagesHistory;
 
-  if (useServer) {
-    const userApiKey = getApiKeyForProvider(provider);
-    const lastMessageText = messagesHistory.at(-1)?.parts?.[0]?.text ?? '';
-
-    const headers: Record<string, string> = {};
-    if (userApiKey) {
-      headers['x-user-api-key'] = userApiKey;
-    }
-
-    const response = await apiFetch(`/chats/${chatId}/messages`, {
-      method: 'POST',
-      headers,
-      body: JSON.stringify({
-        content: lastMessageText,
-        messages: historyWithSystemPrompt,
-        model: modelLowerCase,
-        provider,
-        reasoningLevel,
-        thinkingBudget,
-      }),
-      signal,
-    });
-
-    if (response.status === 401) {
-      throw new Error('SESSION_EXPIRED');
-    }
-
-    if (!response.ok) {
-      let errorMessage = 'Error en la respuesta del servidor proxy';
-      try {
-        const errorData = await response.json();
-        errorMessage = errorData.message || errorData.error || errorMessage;
-      } catch {
-        // Fallback a mensaje por defecto si la respuesta no es JSON válido
-      }
-      throw new Error(errorMessage);
-    }
-
-    const data = await response.json();
-    return { text: data.text, userMessageId: data.userMessageId, aiMessageId: data.aiMessageId };
-  } else {
-    return await fetchFromProvider(model, historyWithSystemPrompt, reasoningLevel, signal);
-  }
+  return await fetchFromProvider(model, historyWithSystemPrompt, reasoningLevel, signal);
 }

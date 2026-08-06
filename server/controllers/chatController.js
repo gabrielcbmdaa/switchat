@@ -2,146 +2,53 @@ const Message = require('../models/Message');
 const Chat = require('../models/Chat');
 const { fetchFromProvider } = require('../services/providerService');
 
+// 💾 GUARDAR UN MENSAJE SUELTO
+// Escritura pura: el cliente llama al proveedor y nos manda el resultado. El cliente
+// hace dos peticiones por intercambio (el prompt antes de generar, la respuesta después),
+// así que este handler no sabe nada de conversaciones ni de modelos.
 exports.createMessage = async (req, res) => {
-    const abortController = new AbortController();
-
-    // Usar res.close (no req.close): con body JSON, req 'close' dispara al terminar
-    // de parsear el body y abortaría en falso antes de llamar al proveedor.
-    const abortOnClientDisconnect = () => {
-        if (!res.writableEnded && !abortController.signal.aborted) {
-            abortController.abort();
-        }
-    };
-    res.on('close', abortOnClientDisconnect);
-
     try {
-        // 1. Extraemos los datos que vienen del frontend (incluyendo la clave de API efímera si fue enviada)
         const { chatId } = req.params;
-        const { content, messages, model, provider, reasoningLevel, thinkingBudget } = req.body;
-        const userApiKey = req.headers['x-user-api-key'] || req.body.userApiKey;
+        const { sender, content, model } = req.body;
 
-        // Validación rápida
+        // Guardia de forma. Una pestaña abierta antes del despliegue sigue mandando el body
+        // viejo (sin `sender`) y esperando un `text` de vuelta: sin este 400 recibiría un 201,
+        // leería `undefined` y guardaría una respuesta vacía. Mejor un error que se arregla
+        // recargando que una conversación corrompida en silencio.
+        if (sender !== 'user' && sender !== 'ai') {
+            return res.status(400).json({ message: 'El campo sender debe ser "user" o "ai"' });
+        }
+
         if (!content || content.trim() === '') {
             return res.status(400).json({ message: 'El contenido del mensaje es obligatorio' });
         }
 
-        // 2. GUARDAR EL MENSAJE DEL USUARIO en MongoDB Atlas
-        const userMessage = new Message({
+        // Message no guarda userId, así que la propiedad se comprueba contra el chat padre.
+        // Sin esto el endpoint permitiría escribir en la conversación de cualquiera con solo
+        // acertar un chatId, y de paso nos da el 404 natural para chats que ya no existen.
+        const chatExists = await Chat.exists({ id: chatId, userId: req.user.id });
+        if (!chatExists) {
+            return res.status(404).json({ message: 'Chat no encontrado' });
+        }
+
+        // createdAt lo pone el servidor (default del schema) y se devuelve: getMessages ordena
+        // por él, y aceptar el reloj del cliente desordenaría la conversación al recargar.
+        const message = new Message({
             chatId,
-            sender: 'user',
-            content: content
+            sender,
+            content,
+            ...(model ? { model } : {})
         });
-        await userMessage.save();
+        await message.save();
 
-        if (abortController.signal.aborted) {
-            console.warn('⏹️ [chatController] Cliente desconectado antes de llamar al proveedor.');
-            return;
-        }
-
-        // 3. OBTENER RESPUESTA DEL PROVEEDOR (Google, Anthropic, OpenAI, LM Studio, Ollama)
-        const { text: responseText } = await fetchFromProvider({
-            model,
-            provider,
-            messagesHistory: messages,
-            reasoningLevel,
-            thinkingBudget,
-            userApiKey,
-            signal: abortController.signal
-        });
-
-        // Cliente abortó: no persistir ni responder la generación cancelada
-        if (abortController.signal.aborted || res.writableEnded) {
-            console.warn('⏹️ [chatController] Generación abortada; no se guarda la respuesta AI.');
-            return;
-        }
-
-        // 4. GUARDAR LA RESPUESTA DE LA AI en MongoDB Atlas
-        const aiMessage = new Message({
-            chatId,
-            sender: 'ai',
-            content: responseText,
-            model
-        });
-        await aiMessage.save();
-
-        if (res.writableEnded) {
-            return;
-        }
-
-        // 5. RESPONDER AL FRONTEND
         return res.status(201).json({
-            text: responseText,
-            userMessageId: userMessage._id,
-            aiMessageId: aiMessage._id
+            _id: message._id,
+            createdAt: message.createdAt
         });
 
     } catch (error) {
-        const isAbort =
-            error.name === 'AbortError' ||
-            error.code === 'ABORT_ERR' ||
-            abortController.signal.aborted;
-
-        if (isAbort) {
-            console.warn('⏹️ [chatController] Generación cancelada por desconexión del cliente.');
-            return;
-        }
-
-        if (res.writableEnded || res.headersSent) {
-            console.warn('⚠️ [chatController] Error tras cierre de conexión:', error.message);
-            return;
-        }
-
-        // Diferenciamos errores conocidos de validación / negocio de errores inesperados de servidor
-        const isKnownError = error.message && error.message.startsWith('⚠️');
-
-        if (isKnownError) {
-            console.warn(`⚠️ [chatController] ${error.message}`);
-            return res.status(400).json({
-                message: error.message,
-                error: error.message
-            });
-        }
-
-        // Si el error provino de providerService (error formateado de la API externa)
-        if (error.apiErrorMessage) {
-            console.warn(`⚠️ [chatController] Error ${error.status} de ${error.provider}: ${error.apiErrorMessage}`);
-            const errorMap = {
-                401: `🔑 Invalid or expired API Key for ${error.provider}. Check your configuration.`,
-                403: `🚫 Access denied by ${error.provider}. Your API Key does not have permissions to use the model "${error.model}".`,
-                404: `❓ The model "${error.model}" does not exist or is unavailable in ${error.provider}.`,
-                429: `⏳ Too many requests to ${error.provider}. You have reached the rate limit. Please wait a moment and try again.`,
-                503: `🔥 The model "${error.model}" is experiencing high demand right now. Try again in a few seconds or try another model.`,
-            };
-
-            const userMessage = errorMap[error.status] || `Error ${error.status} de ${error.provider}: ${error.apiErrorMessage}`;
-
-            return res.status(error.status).json({
-                message: userMessage,
-                error: error.apiErrorMessage,
-                code: error.status,
-                provider: error.provider,
-                model: error.model
-            });
-        }
-
-        const isNetworkError = error.code === 'ECONNREFUSED' || error.code === 'ENOTFOUND' || error.cause?.code === 'ECONNREFUSED';
-
-        if (isNetworkError) {
-            console.warn(`🔌 [chatController] No se pudo conectar con el servidor local de IA (${error.message}).`);
-            return res.status(503).json({
-                message: '🔌 No se pudo conectar con el servidor local de IA. Asegúrate de que LM Studio u Ollama estén ejecutándose.',
-                error: error.message
-            });
-        }
-
-        // Únicamente si es un error 500 no controlado imprimimos la traza completa
-        console.error("❌ Error inesperado en chatController:", error);
-        res.status(500).json({
-            message: 'Error interno del servidor. Intenta de nuevo.',
-            error: error.message
-        });
-    } finally {
-        res.off('close', abortOnClientDisconnect);
+        console.error("❌ Error en createMessage:", error);
+        res.status(500).json({ message: 'Error al guardar el mensaje', error: error.message });
     }
 };
 
