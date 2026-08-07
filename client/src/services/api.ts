@@ -104,6 +104,51 @@ export async function deleteAccountFromServer(currentPassword: string): Promise<
 }
 
 // ============================================================================
+// Custodia de API Keys en Servidor
+// ============================================================================
+
+export interface RemoteApiKey {
+  provider: string;
+  key: string;
+  isActive: boolean;
+}
+
+/**
+ * Baja las API keys de la cuenta, ya descifradas.
+ * Devuelve null si no se pudieron leer: quien llama debe dejar localStorage intacto,
+ * porque sobrescribirlo con una lista vacía borraría las keys locales del usuario.
+ */
+export async function fetchApiKeysFromServer(): Promise<RemoteApiKey[] | null> {
+  try {
+    const response = await apiFetch('/keys');
+    if (!response.ok) return null;
+    const data = await response.json();
+    return Array.isArray(data.keys) ? data.keys : null;
+  } catch (error) {
+    console.error('⚠️ Error [fetchApiKeysFromServer]:', (error as Error).message);
+    return null;
+  }
+}
+
+/**
+ * Sustituye el conjunto completo de API keys de la cuenta.
+ * Es un reemplazo, no un alta: lo que no viaje aquí se borra del servidor, que es
+ * justamente lo que impide que una key borrada resucite en el siguiente inicio de sesión.
+ */
+export async function replaceApiKeysOnServer(keys: RemoteApiKey[]): Promise<boolean> {
+  try {
+    const response = await apiFetch('/keys', {
+      method: 'PUT',
+      body: JSON.stringify({ keys }),
+    });
+    return response.ok;
+  } catch (error) {
+    console.error('⚠️ Error [replaceApiKeysOnServer]:', (error as Error).message);
+    return false;
+  }
+}
+
+// ============================================================================
 // Persistencia de Chats y Mensajes en Servidor
 // ============================================================================
 

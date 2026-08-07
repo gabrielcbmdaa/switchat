@@ -14,6 +14,7 @@ import DocsView from './views/DocsView';
 import { loadDefaultModel, saveDefaultModel, resolveReasoningLevel } from './utils/modelPreferences';
 import SelectionToolbar from './components/SelectionToolbar';
 import { isMobileViewport, loadPanelView, savePanelView, loadPanelOpen, savePanelOpen, loadActiveChatId, saveActiveChatId } from './utils/uiPreferences';
+import { syncApiKeysWithServer } from './utils/apiKeys';
 import type { LeftPanelView, RightPanelView } from './utils/uiPreferences';
 
 // El chat nuevo lleva su id real desde el principio: cuando se materialice al enviar
@@ -230,6 +231,10 @@ export default function App() {
         if (session.authenticated) {
           localStorage.setItem('isLoggedIn', 'true');
           if (!cancelled) setIsAuthenticated(true);
+
+          // También aquí, no solo en handleAuthSuccess: quien ya tiene la cookie viva y
+          // solo recarga la página nunca pasa por el login, y se quedaría sin sincronizar.
+          syncApiKeysWithServer();
 
           let serverChats = await loadChatsFromServer();
           if (cancelled) return;
@@ -451,6 +456,9 @@ export default function App() {
     setChatList([]);
     setActiveChatId('');
     setDraftChat(null);
+
+    // Sin await: las claves se reconcilian en segundo plano y no deben retrasar la entrada
+    syncApiKeysWithServer();
 
     try {
       const serverChats = await loadChatsFromServer();
