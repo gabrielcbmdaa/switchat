@@ -64,17 +64,6 @@ async function startServer() {
         app.listen(PORT, () => {
             console.log(`🚀 Servidor corriendo en: http://localhost:${PORT}`);
 
-            const configuredProviders = [];
-            if (process.env.GOOGLE_API_KEY) configuredProviders.push('Google');
-            if (process.env.ANTHROPIC_API_KEY) configuredProviders.push('Anthropic');
-            if (process.env.OPENAI_API_KEY) configuredProviders.push('OpenAI');
-
-            if (configuredProviders.length > 0) {
-                console.log(`🔑 [Config] API Keys globales en server/.env: ${configuredProviders.join(', ')}`);
-            } else {
-                console.log('ℹ️ [Config] Sin API Keys globales en server/.env. Las peticiones utilizarán las claves efímeras enviadas por cada cliente.');
-            }
-
             if (process.env.REGISTRATION_ENABLED === 'false') {
                 console.log('🔒 [Config] Registro de nuevas cuentas DESHABILITADO (REGISTRATION_ENABLED=false).');
             }
