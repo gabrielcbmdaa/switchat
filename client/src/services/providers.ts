@@ -6,21 +6,6 @@ export interface ProviderResponse {
 }
 
 /**
- * Obtiene la API key correspondiente al proveedor desde localStorage.
- */
-export function getApiKeyForProvider(providerName: string): string {
-    const p = (providerName || '').toLowerCase();
-    if (p === 'google') {
-        return localStorage.getItem('geminiApiKey') || '';
-    } else if (p === 'anthropic') {
-        return localStorage.getItem('anthropicApiKey') || '';
-    } else if (p === 'openai') {
-        return localStorage.getItem('openaiApiKey') || '';
-    }
-    return '';
-}
-
-/**
  * Error de un proveedor con el contexto necesario para explicárselo al usuario.
  * El `name` no puede ser 'AbortError': `sendChatHistory` lo usa para distinguir
  * una cancelación voluntaria de un fallo real.
