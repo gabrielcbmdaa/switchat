@@ -1,6 +1,7 @@
 // src/views/ConfigView.tsx
 import { useState, useEffect } from 'react';
 import { loginOrRegister, checkSession, updateEmail, updatePassword, deleteAccountFromServer } from '../services/api'; // Asegúrate de que la ruta sea correcta
+import { pushLocalApiKeysToServer, API_KEYS_SYNCED_EVENT } from '../utils/apiKeys';
 import styles from './AccountView.module.css'
 import DefaultInput from '../components/DefaultInput';
 import DefaultButton from '../components/DefaultButton';
@@ -52,6 +53,34 @@ export default function ConfigView({ isAuthenticated, onAuthSuccess, onLogoutAct
         anthropic: localStorage.getItem('anthropicApiKey') || '',
         openai: localStorage.getItem('openaiApiKey') || ''
     }));
+
+    // Una sincronización de fondo puede reescribir localStorage después de que este
+    // componente ya haya leído su estado inicial. Sin esto, las claves bajadas de la
+    // cuenta no aparecerían hasta cambiar de vista y volver.
+    useEffect(() => {
+        const reloadFromStorage = () => {
+            try {
+                const stored = JSON.parse(localStorage.getItem('savedApiKeys') || '[]');
+                if (Array.isArray(stored)) setSavedApiKeys(stored);
+            } catch {
+                // localStorage corrupto: nos quedamos con lo que ya teníamos en pantalla
+            }
+            setActiveKeys({
+                google: localStorage.getItem('geminiApiKey') || '',
+                anthropic: localStorage.getItem('anthropicApiKey') || '',
+                openai: localStorage.getItem('openaiApiKey') || ''
+            });
+        };
+
+        window.addEventListener(API_KEYS_SYNCED_EVENT, reloadFromStorage);
+        return () => window.removeEventListener(API_KEYS_SYNCED_EVENT, reloadFromStorage);
+    }, []);
+
+    // Cualquier cambio local viaja al servidor como reemplazo completo. Es lo que hace que
+    // borrar una clave aquí no la resucite en el siguiente inicio de sesión.
+    const propagateApiKeys = () => {
+        if (isAuthenticated) pushLocalApiKeysToServer();
+    };
 
     const getActiveKey = (providerName: string) => {
         return activeKeys[providerName.toLowerCase()] || '';
@@ -181,6 +210,7 @@ export default function ConfigView({ isAuthenticated, onAuthSuccess, onLogoutAct
         }
 
         setActiveKeyForProvider(providerName, trimmedKey);
+        propagateApiKeys();
 
         setApiKey('');
         setShowProviderSelectorForApiKey(false);
@@ -194,6 +224,8 @@ export default function ConfigView({ isAuthenticated, onAuthSuccess, onLogoutAct
         if (getActiveKey(provider) === keyToDelete) {
             setActiveKeyForProvider(provider, '');
         }
+
+        propagateApiKeys();
     };
 
     return (
@@ -252,7 +284,10 @@ export default function ConfigView({ isAuthenticated, onAuthSuccess, onLogoutAct
                                 <div
                                     key={index}
                                     className={styles.apiKeyDropdownItem}
-                                    onClick={() => setActiveKeyForProvider(item.provider, item.key)}
+                                    onClick={() => {
+                                        setActiveKeyForProvider(item.provider, item.key);
+                                        propagateApiKeys();
+                                    }}
                                 >
                                     <div className={styles.apiKeyItemContent}>
                                         <span className={`${styles.activeDot} ${isActive ? styles.activeDotVisible : ''}`} />
