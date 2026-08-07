@@ -10,6 +10,7 @@ const path = require('node:path'); // 👈 Importamos 'path' para manejar rutas 
 const { MongoClient } = require('mongodb');
 const authRoutes = require('./routes/authRoutes');
 const chatRoutes = require('./routes/chatRoutes');
+const { assertEncryptionKey } = require('./services/encryptionService');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -51,6 +52,10 @@ let db;
 
 async function startServer() {
     try {
+        // Antes que nada: sin una ENCRYPTION_KEY válida no podemos custodiar API keys, y
+        // más vale saberlo al arrancar que cuando un usuario intente guardar la suya.
+        assertEncryptionKey();
+
         // Conexión 1: Mongoose
         await mongoose.connect(process.env.MONGO_URI);
         console.log('🟢 Conectado con éxito a MongoDB Atlas (Mongoose)');
