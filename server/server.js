@@ -10,6 +10,7 @@ const path = require('node:path'); // 👈 Importamos 'path' para manejar rutas 
 const { MongoClient } = require('mongodb');
 const authRoutes = require('./routes/authRoutes');
 const chatRoutes = require('./routes/chatRoutes');
+const apiKeyRoutes = require('./routes/apiKeyRoutes');
 const { assertEncryptionKey } = require('./services/encryptionService');
 
 const app = express();
@@ -30,6 +31,7 @@ app.use(express.json());
 // ==========================================
 app.use('/api/auth', authRoutes);
 app.use('/api/chats', chatRoutes);
+app.use('/api/keys', apiKeyRoutes);
 
 // ==========================================
 // 3. SERVIR ARCHIVOS ESTÁTICOS DE REACT
