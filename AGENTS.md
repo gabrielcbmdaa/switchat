@@ -1,105 +1,113 @@
-# 🤖 Switchat — Contexto e Instrucciones para Agentes de IA
+# 🤖 Switchat — Context and Instructions for AI Agents
 
-Este documento define el entorno de desarrollo, arquitectura Dual-Mode, esquemas y reglas de diseño para asistentes y agentes de Inteligencia Artificial que trabajen en este repositorio.
-
----
-
-## 📌 1. Descripción del Proyecto
-
-**Switchat** es una plataforma híbrida diseñada para conectar y gestionar conversaciones con múltiples Modelos de Lenguaje (LLMs), incluyendo **Google Gemini**, **OpenAI (ChatGPT)** y servidores de inferencia local a través de **LM Studio**.
-
-### Arquitectura Dual-Mode:
-- **Modo Online (Con Sesión):** Sincroniza chats, mensajes en tiempo real y borradores en **MongoDB Atlas** mediante el servidor Express con autenticación de contraseñas con `bcrypt` y cookies de sesión firmadas con `JWT`. Incluye una optimización de paginación incremental por cursor (`before` / `limit` de 6 mensajes) para un renderizado ultra-rápido de conversaciones largas.
-- **Modo Offline (Sin Sesión):** Almacena todo localmente en `localStorage` del navegador y realiza peticiones de API directas hacia los proveedores utilizando las API Keys configuradas por el usuario.
+This document defines the development environment, the Dual-Mode architecture, the schemas and the design rules for AI assistants and agents working in this repository.
 
 ---
 
-## 🚀 2. Entorno de Desarrollo y Comandos (`pnpm`)
+## 📌 1. Project Description
 
-Este proyecto es un monorepo administrado con **`pnpm` workspaces**.
+**Switchat** is a hybrid platform built to connect and manage conversations with multiple Large Language Models (LLMs): **Google Gemini**, **Anthropic Claude**, **OpenAI (ChatGPT)**, and local inference servers through **LM Studio** and **Ollama**. Those are the five providers implemented in `client/src/services/providers.ts`; if this list and that file ever disagree, the file wins.
 
-- **Instalar dependencias:** `pnpm install`
-- **Modo Desarrollo Completo (Frontend + Backend):** `pnpm dev`
-- **Modo Desarrollo (Solo Frontend - `http://localhost:5173`):** `pnpm dev:client`
-- **Modo Desarrollo (Solo Backend - `http://localhost:3000`):** `pnpm dev:server`
-- **Compilar cliente:** `pnpm build`
-- **Ejecutar Linter:** `pnpm lint`
+### Dual-Mode Architecture:
 
-> ⚠️ **Regla de Oro:** Utiliza **siempre** `pnpm` y sus filtros (`pnpm --filter client ...`). **NO** uses `npm` ni `yarn`.
+> Calls to AI providers **always leave from the browser**, in both modes, using the user's own API Keys. The server never calls a provider: it only stores data. The only thing that changes between modes is **where that data is stored**.
+
+- **Online Mode (Signed In):** Syncs chats, messages and drafts to **MongoDB Atlas** through the Express server, with password authentication via `bcrypt` and session cookies signed with `JWT`. It includes an incremental cursor pagination optimization (`before` / `limit` of 6 messages) so long conversations render fast. The server also acts as **custodian** for API Keys encrypted with AES-256-GCM — but it never uses them, and it only stores the ones the user has marked one by one from the `AccountView` list: signing in downloads keys, it never uploads any.
+- **Offline Mode (Signed Out):** Stores everything locally in the browser's `localStorage`, and nothing travels to the database.
 
 ---
 
-## 📂 3. Estructura de Directorios
+## 🚀 2. Development Environment and Commands (`pnpm`)
+
+This project is a monorepo managed with **`pnpm` workspaces**.
+
+- **Install dependencies:** `pnpm install`
+- **Full Development Mode (Frontend + Backend):** `pnpm dev`
+- **Development Mode (Frontend only - `http://localhost:5173`):** `pnpm dev:client`
+- **Development Mode (Backend only - `http://localhost:3000`):** `pnpm dev:server`
+- **Build the client:** `pnpm build`
+- **Run the linter:** `pnpm lint`
+
+> ⚠️ **Golden Rule:** **Always** use `pnpm` and its filters (`pnpm --filter client ...`). Do **NOT** use `npm` or `yarn`.
+
+---
+
+## 📂 3. Directory Structure
 
 ```text
 switchat/
 ├── client/                     # React 19 + TypeScript + Vite
 │   ├── src/
-│   │   ├── components/         # Componentes reutilizables (Sidebar, SvgIcons, Toolbar...)
-│   │   ├── config/             # Configuraciones globales y constantes
-│   │   ├── services/           # Servicios de integración API (api.ts para sync online)
-│   │   ├── utils/              # Funciones auxiliares (resizer, storage helpers, etc.)
-│   │   ├── views/              # Vistas principales (ChatView, MessageView, SettingsView, AccountView)
-│   │   ├── App.tsx             # Punto de entrada UI y gestión de estado global
-│   │   └── index.css           # Tokens de diseño y estilos globales
+│   │   ├── components/         # Reusable components (Sidebar, SvgIcons, Toolbar...)
+│   │   ├── config/             # Global configuration and constants
+│   │   ├── services/           # API integration services (api.ts for online sync)
+│   │   ├── utils/              # Helper functions (resizer, storage helpers, etc.)
+│   │   ├── views/              # Main views (ChatView, MessageView, SettingsView, AccountView)
+│   │   ├── App.tsx             # UI entry point and global state management
+│   │   └── index.css           # Design tokens and global styles
 ├── server/                     # Node.js + Express 5 + Mongoose
-│   ├── controllers/            # Controladores de lógica (authController, chatController)
-│   ├── middleware/             # Middleware de autorización (authMiddleware)
-│   ├── models/                 # Modelos de base de datos Mongoose (User, Chat, Message)
-│   ├── routes/                 # Rutas de API Express (authRoutes, chatRoutes)
-│   └── server.js               # Inicio de servidor y conexión a MongoDB
+│   ├── controllers/            # Logic controllers (authController, chatController, apiKeyController)
+│   ├── middleware/             # Authorization middleware (authMiddleware)
+│   ├── models/                 # Mongoose database models (User, Chat, Message, ApiKey)
+│   ├── routes/                 # Express API routes (authRoutes, chatRoutes, apiKeyRoutes)
+│   ├── services/               # Internal services (encryptionService: AES-256-GCM)
+│   └── server.js               # Server startup and MongoDB connection
 ```
 
 ---
 
-## ⚙️ 4. Configuración del Entorno (`server/.env`)
+## ⚙️ 4. Environment Configuration (`server/.env`)
 
-Para ejecutar el servidor localmente, asegúrate de contar con el archivo `server/.env` configurado según `server/.env.example`:
-- `PORT`: Puerto de ejecución del servidor (por defecto `3000`).
-- `MONGO_URI`: Cadena de conexión a la base de datos MongoDB Atlas o local.
-- `JWT_SECRET`: Secreto de cifrado para tokens JWT de autenticación.
-- `NODE_ENV`: Entorno de ejecución (`development` / `production`).
-
----
-
-## 🎨 5. Sistema de Diseño Visual (Switchat Design System)
-
-Al crear o modificar componentes de UI en `client/`, **es obligatorio respetar el lenguaje visual estricto**:
-
-1. **Estética:** Monocromática táctil ultra-minimalista dark mode (sin gradientes ni colores estridentes).
-2. **Paleta de Colores Básica:**
-   - Fondo principal (`--bg-primary`): `#191919` (carbono).
-   - Color neutral / Bordes / Textos (`--color-neutral`): `#858585` (gris neutro).
-   - Divisores sutiles (`--border-subtle`): `#333333`.
-3. **Tipografía:**
-   - Principal (UI & Mensajes): `'Space Grotesk', sans-serif`.
-   - Datos / Código / Keys: `ui-monospace, monospace`.
-4. **Geometría Cápsula (Pill-Shape):**
-   - Todos los inputs, botones y tarjetas interactivos usan `border-radius: 20px` o `30px`.
-5. **Inversión de Contraste al Interactuar (Hover / Active):**
-   - Los elementos interactivos pasan de fondo `#191919` / transparente con texto `#858585` a fondo `#858585` con texto `#191919` en hover.
-
-> 📘 Tokens CSS y estilos globales: `client/src/index.css`.
+To run the server locally, make sure you have a `server/.env` file configured after `server/.env.example`:
+- `PORT`: Port the server listens on (defaults to `3000`).
+- `MONGO_URI`: Connection string for the MongoDB Atlas or local database.
+- `JWT_SECRET`: Signing secret for authentication JWTs.
+- `ENCRYPTION_KEY`: AES-256-GCM key for the API Keys users sync. It must decode to **exactly 32 bytes** (`openssl rand -base64 32`) and it must **not** be the same value as `JWT_SECRET`. The server **refuses to start** without it.
+- `NODE_ENV`: Runtime environment (`development` / `production`).
+- `REGISTRATION_ENABLED`: Switch for new account registration (open by default). With the exact value `"false"`, `POST /api/auth/register` answers `403` before touching the database, and the server logs a notice about it on startup. Existing users can still sign in normally.
 
 ---
 
-## 📝 6. Convenciones de Código, Commits y Seguridad
+## 🎨 5. Visual Design System (Switchat Design System)
 
-- **TypeScript Estricto:** Mantén un tipado explícito en `client/src/types.ts`. Evita el uso de `any`.
-- **Sincronización Dual:** Si modificas el almacenamiento de chats o mensajes, asegura la compatibilidad tanto para `localStorage` (Offline) como para `api.ts` (Online).
-- **Commits:** Utiliza **Conventional Commits** (`feat: ...`, `fix: ...`, `refactor: ...`, `docs: ...`).
-- **Seguridad:** NUNCA modifiques ni expongas claves o secretos almacenados en `.secrets/` o `.env`.
-- **Verificación Obligatoria:** Ejecuta siempre `pnpm build` y `pnpm lint` para verificar tus cambios antes de declarar una tarea como finalizada. No existe suite de tests (`pnpm test` no está configurado); la verificación es `pnpm build` (cliente: `tsc -b` + `vite build`) y `pnpm lint` (solo cliente — el servidor no tiene script de lint).
+When creating or modifying UI components in `client/`, **respecting the strict visual language is mandatory**:
+
+1. **Aesthetic:** Ultra-minimalist tactile monochrome dark mode (no gradients, no loud colors).
+2. **Base Color Palette:**
+   - Primary background (`--bg-primary`): `#191919` (carbon).
+   - Neutral color / Borders / Text (`--color-neutral`): `#858585` (neutral gray).
+   - Subtle dividers (`--border-subtle`): `#333333`.
+3. **Typography:**
+   - Primary (UI & Messages): `'Space Grotesk', sans-serif`.
+   - Data / Code / Keys: `ui-monospace, monospace`.
+4. **Pill-Shape Geometry:**
+   - Every interactive input, button and card uses `border-radius: 20px` or `30px`.
+5. **Contrast Inversion on Interaction (Hover / Active):**
+   - Interactive elements go from a `#191919` / transparent background with `#858585` text to a `#858585` background with `#191919` text on hover.
+
+> 📘 CSS tokens and global styles: `client/src/index.css`.
 
 ---
 
-## 🧠 7. Arquitectura: detalles que no deben divergir
+## 📝 6. Code, Commit and Security Conventions
 
-- **Lógica de providers duplicada a propósito — mantener ambas en sync.** El mismo conjunto de proveedores (Google Gemini, Anthropic, OpenAI, LM Studio, Ollama) está implementado dos veces con lógica paralela de construcción de requests:
-  - `client/src/services/providers.ts` — **Modo Offline**, llama a las APIs del proveedor desde el navegador con keys de `localStorage`.
-  - `server/services/providerService.js` — **Modo Online**, llamado desde `server/controllers/chatController.js`, usa keys de `server/.env` o el header por-request `x-user-api-key`.
-  Al añadir/cambiar un provider o la forma del request (system prompt, thinking/reasoning, etc.), actualiza ambos archivos de forma idéntica.
-- **`client/src/config/models.config.ts` (`MODEL_REGISTRY`)** es la única fuente de verdad para IDs de modelos conocidos, su provider y budgets de thinking/reasoning. Tanto el path offline del cliente como el payload a `/api/chats/:chatId/messages` derivan `provider`/`thinkingBudget` de este archivo — añade modelos nuevos aquí primero.
-- **Orden de persistencia:** `localStorage` (`client/src/utils/storage.ts`) es siempre la primera escritura y el fallback; el sync al servidor (`client/src/services/api.ts`) es best-effort encima (ver llamadas a `saveToLocalDisk` antes de `saveChatToServer`/`syncChatDraftToServer` en `App.tsx`). Mantén este orden al tocar handlers de chat/mensaje/borrador para que la app siga funcionando fully offline.
-- **Paginación de mensajes:** los chats cargan con `messages: []` desde `GET /api/chats`; los 6 mensajes más recientes se fetchean lazy al seleccionar el chat; los más antiguos vía cursor (`before`, ISO date) — ver el `useEffect` y `handleLoadMoreMessages` en `client/src/App.tsx` y `getMessages` en `server/controllers/chatController.js`.
-- **Serving en producción:** `server/server.js` sirve `client/dist` como estáticos y tiene catch-all a `index.html` para SPA — hay que correr `pnpm build` (cliente) antes de que `pnpm start` refleje cambios de frontend en Modo Online.
+- **English only — everything, everywhere.** Every single thing that lands in this repository is written in English: UI copy, error messages (client *and* server responses), code comments, JSDoc, identifiers, commit messages, console logs, and documentation. There is no "internal" text exempt from this: a comment is read by whoever comes next, and a server error message ends up in front of a user. The reason is not style, it is cost — a mixed-language codebase forces every reader to switch languages mid-file, and it makes it impossible to tell at a glance whether a Spanish string is a leftover note or a bug about to be shown in the UI. Talking to the user in Spanish in chat is fine; anything **written into the repo** is English.
+  - **Legacy exception:** parts of the code still carry Spanish comments and error messages from before this rule. Do not launch a mass rewrite from an unrelated task, but whenever you touch a file, translate what you touch. New code has no excuse.
+- **Strict TypeScript:** Keep explicit typing in `client/src/types.ts`. Avoid `any`.
+- **Dual Sync:** If you change how chats or messages are stored, make sure it stays compatible with both `localStorage` (Offline) and `api.ts` (Online).
+- **Commits:** Use **Conventional Commits** (`feat: ...`, `fix: ...`, `refactor: ...`, `docs: ...`).
+- **Security:** NEVER modify or expose keys or secrets stored in `.secrets/` or `.env`.
+- **Mandatory Verification:** Always run `pnpm build` and `pnpm lint` to verify your changes before declaring a task finished. There is no test suite (`pnpm test` is not configured); verification is `pnpm build` (client: `tsc -b` + `vite build`) and `pnpm lint` (client only — the server has no lint script).
+
+---
+
+## 🧠 7. Architecture: details that must not drift
+
+- **`client/src/services/providers.ts` is the ONLY place that talks to AI providers.** Google Gemini, Anthropic, OpenAI, LM Studio and Ollama are implemented there and nowhere else. The server does not call any provider and must not start doing so again: a duplicated `server/services/providerService.js` used to exist and was deleted on purpose. Routing the request through the server bought the user nothing, and it actively broke the local providers — LM Studio and Ollama pointed at `127.0.0.1`, which in production is the VPS and not the user's machine. A local provider only works if the call leaves from the local machine. If you find yourself adding provider logic under `server/`, that is the signal that the solution belongs somewhere else.
+- **The server is a custodian for API Keys, but never uses them.** `server/services/encryptionService.js` encrypts them with AES-256-GCM so they can sync across devices. Encrypting a credential and *exercising* one are different things: only the second would rebuild the path that was removed.
+- **Syncing an API Key is opt-in, key by key.** `syncApiKeysWithServer` (`client/src/utils/apiKeys.ts`) **downloads but does not upload**; the only keys that go up are the ones present in `apiKeysLastSynced`, the snapshot of the account that the user edits with the per-row button. If you touch that path, the rule that cannot break is that no local change (saving, deleting, switching the active one) may add keys to the account on its own.
+- **`client/src/config/models.config.ts` (`MODEL_REGISTRY`)** is the single source of truth for known model IDs, their provider, and their thinking levels/budgets. `providers.ts` derives the provider and the effective reasoning level from here — add new models here first.
+- **Model, reasoning and system prompt are CHAT state, not global preferences.** They live on the `Chat` object (`client/src/types.ts`) and the server persists them in `server/models/Chat.js`. The intuitive move is to store them as a global setting in `localStorage`, and that is exactly what they must not be: `loadDefaultModel`/`saveDefaultModel` (`utils/modelPreferences.ts`) are only **the seed for new chats**, never the active model. Two consequences to respect when touching this: changing the model re-validates the level through `resolveReasoningLevel` (scales are not universal — `'none'` exists on some models and not on others), and chats created before this architecture do not carry the fields, so every reader must tolerate `undefined` and fall back instead of assuming a value.
+- **Persistence order:** `localStorage` (`client/src/utils/storage.ts`) is always the first write and the fallback; syncing to the server (`client/src/services/api.ts`) is best-effort on top (see the `saveToLocalDisk` calls before `saveChatToServer`/`syncChatDraftToServer` in `App.tsx`). Keep this order when touching chat/message/draft handlers so the app keeps working fully offline.
+- **Message pagination:** chats load with `messages: []` from `GET /api/chats`; the 6 most recent messages are fetched lazily when the chat is selected; older ones come through the cursor (`before`, ISO date) — see the `useEffect` and `handleLoadMoreMessages` in `client/src/App.tsx`, and `getMessages` in `server/controllers/chatController.js`.
+- **Production serving:** `server/server.js` serves `client/dist` as static files with a catch-all to `index.html` for the SPA — you must run `pnpm build` (client) before `pnpm start` reflects frontend changes in Online Mode.
