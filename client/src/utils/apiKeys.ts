@@ -7,10 +7,14 @@ import type { RemoteApiKey } from '../services/api';
 // saveKeyWithProvider, que compara con === y espera 'Google', no 'google'.
 const SAVED_KEYS_STORAGE = 'savedApiKeys';
 
-// Identidades ("proveedor::clave") que este navegador tenía sincronizadas la última vez.
-// Es la tercera lista que hace falta para poder distinguir una clave nueva de aquí de una
-// que borraron en otro dispositivo: con solo local y servidor, ambas se ven igual.
-const LAST_SYNCED_STORAGE = 'apiKeysLastSynced';
+// Foto de lo que tenía la cuenta la última vez que este navegador miró. Es la tercera
+// lista que hace falta para poder distinguir una clave nueva de aquí de una que borraron
+// en otro dispositivo: con solo local y servidor, ambas se ven igual.
+//
+// Se guarda la entrada completa y no solo la identidad porque también hay que recordar
+// CUÁL tenía el punto de activa en la cuenta, para no pisarlo desde un dispositivo donde
+// el punto lo tiene una clave que solo vive aquí.
+const ACCOUNT_SNAPSHOT_STORAGE = 'apiKeysLastSynced';
 
 const PROVIDER_DISPLAY_NAMES: Record<string, string> = {
     google: 'Google',
@@ -54,20 +58,30 @@ export function loadLocalApiKeys(): ApiKeyEntry[] {
 }
 
 /**
- * Lee las identidades que este navegador tenía sincronizadas la última vez.
+ * Lee la foto de la cuenta que este navegador guardó la última vez que sincronizó.
  * Vacío significa "nunca sincronizado", y entonces nada se considera borrado.
  */
-export function loadLastSyncedIdentities(): Set<string> {
+export function loadAccountSnapshot(): ApiKeyEntry[] {
     try {
-        const raw = JSON.parse(localStorage.getItem(LAST_SYNCED_STORAGE) || '[]');
-        return new Set(Array.isArray(raw) ? raw.filter((item): item is string => typeof item === 'string') : []);
+        const raw = JSON.parse(localStorage.getItem(ACCOUNT_SNAPSHOT_STORAGE) || '[]');
+        if (!Array.isArray(raw)) return [];
+
+        return raw
+            .filter((item): item is ApiKeyEntry =>
+                Boolean(item) && typeof item.provider === 'string' && typeof item.key === 'string'
+            )
+            .map((item) => ({ provider: item.provider, key: item.key, isActive: item.isActive === true }));
     } catch {
-        return new Set();
+        return [];
     }
 }
 
-function saveLastSyncedIdentities(entries: ApiKeyEntry[]): void {
-    localStorage.setItem(LAST_SYNCED_STORAGE, JSON.stringify(entries.map(identityOf)));
+export function accountIdentities(snapshot: ApiKeyEntry[]): Set<string> {
+    return new Set(snapshot.map(identityOf));
+}
+
+function saveAccountSnapshot(entries: ApiKeyEntry[]): void {
+    localStorage.setItem(ACCOUNT_SNAPSHOT_STORAGE, JSON.stringify(entries));
 }
 
 /**
@@ -93,9 +107,9 @@ export function saveLocalApiKeys(entries: ApiKeyEntry[]): void {
  * Funde lo local con lo de la cuenta, a tres bandas.
  *
  * Una clave que está en local pero no en la cuenta es ambigua: puede ser nueva de este
- * navegador, o puede que la borraran en otro dispositivo. `lastSynced` deshace el empate.
- * Si estaba sincronizada y ya no está en la cuenta, es un borrado y se acata; si nunca lo
- * estuvo, es nueva y se sube. Sin esta tercera lista, un borrado nunca se propaga: el
+ * navegador, o puede que la borraran en otro dispositivo. La foto de la cuenta deshace el
+ * empate. Si estaba sincronizada y ya no está, es un borrado y se acata; si nunca lo
+ * estuvo, es nueva y se queda. Sin esta tercera lista, un borrado nunca se propaga: el
  * navegador que aún la tiene la vuelve a subir en cuanto sincroniza.
  *
  * Nada más se pierde. Donde el servidor manda es en CUÁL queda activa por proveedor, y
@@ -107,7 +121,7 @@ export function saveLocalApiKeys(entries: ApiKeyEntry[]): void {
 export function reconcileApiKeys(
     local: ApiKeyEntry[],
     remote: ApiKeyEntry[],
-    lastSynced: Set<string>
+    lastSeenInAccount: Set<string>
 ): ApiKeyEntry[] {
     const merged: ApiKeyEntry[] = [];
     const seen = new Set<string>();
@@ -123,7 +137,7 @@ export function reconcileApiKeys(
         if (seen.has(identity)) continue;
 
         // Estaba sincronizada y ha desaparecido de la cuenta: la borraron en otro sitio.
-        if (lastSynced.has(identity)) continue;
+        if (lastSeenInAccount.has(identity)) continue;
 
         seen.add(identity);
         // Solo puede haber una activa por proveedor (el servidor lo impone con un índice
@@ -153,9 +167,9 @@ export async function syncApiKeysWithServer(): Promise<void> {
         // Confundirlos borraría las keys locales la primera vez que el servidor fallara.
         if (remote === null) return;
 
-        const merged = reconcileApiKeys(loadLocalApiKeys(), remote, loadLastSyncedIdentities());
+        const merged = reconcileApiKeys(loadLocalApiKeys(), remote, accountIdentities(loadAccountSnapshot()));
         saveLocalApiKeys(merged);
-        saveLastSyncedIdentities(merged);
+        saveAccountSnapshot(merged);
         window.dispatchEvent(new CustomEvent(API_KEYS_SYNCED_EVENT));
 
         await replaceApiKeysOnServer(merged);
@@ -180,9 +194,9 @@ export async function pushLocalApiKeysToServer(): Promise<void> {
         const entries = loadLocalApiKeys();
         const stored = await replaceApiKeysOnServer(entries);
 
-        // Solo si la subida cuajó: marcar como sincronizado algo que no llegó haría que la
+        // Solo si la subida cuajó: anotar como sincronizado algo que no llegó haría que la
         // próxima reconciliación lo interpretase como un borrado ajeno y lo eliminara.
-        if (stored) saveLastSyncedIdentities(entries);
+        if (stored) saveAccountSnapshot(entries);
 
     } catch (error) {
         console.warn('⚠️ Error [pushLocalApiKeysToServer]:', (error as Error).message);
