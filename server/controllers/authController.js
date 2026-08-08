@@ -25,7 +25,7 @@ exports.register = async (req, res) => {
   try {
     // 0. Si el registro está deshabilitado por configuración, frenar antes de tocar la DB
     if (process.env.REGISTRATION_ENABLED === 'false') {
-      return res.status(403).json({ message: 'El registro de nuevas cuentas está deshabilitado' });
+      return res.status(403).json({ message: 'New account registration is disabled' });
     }
 
     // 1. Extraer el email y la password que el usuario mandó en la petición
@@ -33,14 +33,14 @@ exports.register = async (req, res) => {
 
     // 1b. El registro exige haber aceptado los términos y la política de privacidad
     if (acceptedTerms !== true) {
-      return res.status(400).json({ message: 'Debes aceptar los términos y la política de privacidad' });
+      return res.status(400).json({ message: 'You must accept the terms and the privacy policy' });
     }
 
     // 2. Verificar si el correo ya existe en la base de datos
     const existingUser = await User.findOne({ email });
     if (existingUser) {
       // Si ya existe, frenamos todo y respondemos con un error 400 (Bad Request)
-      return res.status(400).json({ message: 'El correo electrónico ya está registrado' });
+      return res.status(400).json({ message: 'That email address is already registered' });
     }
 
     // 3. Seguridad: Encriptar la contraseña antes de guardarla
@@ -60,11 +60,11 @@ exports.register = async (req, res) => {
     // 6. Iniciar sesión automáticamente: mismo mecanismo de cookie que el login.
     issueSessionCookie(res, newUser);
 
-    res.status(201).json({ message: 'Usuario registrado con éxito de forma segura' });
+    res.status(201).json({ message: 'Account created successfully' });
 
   } catch (error) {
     // Si algo falla en el proceso (ej. se cae la base de datos), atrapamos el error
-    res.status(500).json({ message: 'Hubo un error en el servidor', error: error.message });
+    res.status(500).json({ message: 'Server error', error: error.message });
   }
 };
 
@@ -76,24 +76,24 @@ exports.login = async (req, res) => {
     const user = await User.findOne({ email });
     if (!user) {
       // Por seguridad, usamos un mensaje genérico para no darle pistas a los hackers
-      return res.status(400).json({ message: 'Credenciales incorrectas' });
+      return res.status(400).json({ message: 'Invalid credentials' });
     }
 
     // Paso B: Comparar la contraseña ingresada con la encriptada en la BD
     const isMatch = await bcrypt.compare(password, user.password);
     if (!isMatch) {
-      return res.status(400).json({ message: 'Credenciales incorrectas' });
+      return res.status(400).json({ message: 'Invalid credentials' });
     }
 
     // Paso C: Si todo está bien, guardar el token en una cookie HttpOnly y responder éxito
     issueSessionCookie(res, user);
 
     res.status(200).json({
-      message: '¡Inicio de sesión exitoso! Bienvenido.'
+      message: 'Signed in successfully'
     });
 
   } catch (error) {
-    res.status(500).json({ message: 'Hubo un error en el servidor', error: error.message });
+    res.status(500).json({ message: 'Server error', error: error.message });
   }
 };
 
@@ -104,17 +104,17 @@ exports.updateEmail = async (req, res) => {
 
     const user = await User.findById(req.user.id);
     if (!user) {
-      return res.status(401).json({ message: 'Usuario no encontrado' });
+      return res.status(401).json({ message: 'User not found' });
     }
 
     const isMatch = await bcrypt.compare(currentPassword, user.password);
     if (!isMatch) {
-      return res.status(400).json({ message: 'Contraseña incorrecta' });
+      return res.status(400).json({ message: 'Incorrect password' });
     }
 
     const normalizedEmail = String(newEmail || '').trim().toLowerCase();
     if (!normalizedEmail) {
-      return res.status(400).json({ message: 'El correo electrónico es obligatorio' });
+      return res.status(400).json({ message: 'The email address is required' });
     }
 
     const existingUser = await User.findOne({
@@ -122,15 +122,15 @@ exports.updateEmail = async (req, res) => {
       _id: { $ne: req.user.id }
     });
     if (existingUser) {
-      return res.status(400).json({ message: 'El correo electrónico ya está registrado' });
+      return res.status(400).json({ message: 'That email address is already registered' });
     }
 
     user.email = normalizedEmail;
     await user.save();
 
-    res.status(200).json({ message: 'Correo actualizado con éxito', email: user.email });
+    res.status(200).json({ message: 'Email updated successfully', email: user.email });
   } catch (error) {
-    res.status(500).json({ message: 'Hubo un error en el servidor', error: error.message });
+    res.status(500).json({ message: 'Server error', error: error.message });
   }
 };
 
@@ -141,25 +141,25 @@ exports.updatePassword = async (req, res) => {
 
     const user = await User.findById(req.user.id);
     if (!user) {
-      return res.status(401).json({ message: 'Usuario no encontrado' });
+      return res.status(401).json({ message: 'User not found' });
     }
 
     const isMatch = await bcrypt.compare(currentPassword, user.password);
     if (!isMatch) {
-      return res.status(400).json({ message: 'Contraseña incorrecta' });
+      return res.status(400).json({ message: 'Incorrect password' });
     }
 
     if (!newPassword || newPassword.length < 6) {
-      return res.status(400).json({ message: 'La contraseña debe tener al menos 6 caracteres' });
+      return res.status(400).json({ message: 'The password must be at least 6 characters long' });
     }
 
     const salt = await bcrypt.genSalt(10);
     user.password = await bcrypt.hash(newPassword, salt);
     await user.save();
 
-    res.status(200).json({ message: 'Contraseña actualizada con éxito' });
+    res.status(200).json({ message: 'Password updated successfully' });
   } catch (error) {
-    res.status(500).json({ message: 'Hubo un error en el servidor', error: error.message });
+    res.status(500).json({ message: 'Server error', error: error.message });
   }
 };
 
@@ -170,12 +170,12 @@ exports.deleteAccount = async (req, res) => {
 
     const user = await User.findById(req.user.id);
     if (!user) {
-      return res.status(401).json({ message: 'Usuario no encontrado' });
+      return res.status(401).json({ message: 'User not found' });
     }
 
     const isMatch = await bcrypt.compare(currentPassword, user.password);
     if (!isMatch) {
-      return res.status(400).json({ message: 'Contraseña incorrecta' });
+      return res.status(400).json({ message: 'Incorrect password' });
     }
 
     const userChats = await Chat.find({ userId: req.user.id }).select('id');
@@ -191,9 +191,9 @@ exports.deleteAccount = async (req, res) => {
       sameSite: 'strict'
     });
 
-    res.status(200).json({ message: 'Cuenta eliminada con éxito' });
+    res.status(200).json({ message: 'Account deleted successfully' });
   } catch (error) {
-    res.status(500).json({ message: 'Hubo un error en el servidor', error: error.message });
+    res.status(500).json({ message: 'Server error', error: error.message });
   }
 };
 
@@ -204,7 +204,7 @@ exports.logout = (req, res) => {
     secure: process.env.NODE_ENV === 'production',
     sameSite: 'strict'
   });
-  res.status(200).json({ message: 'Sesión cerrada con éxito.' });
+  res.status(200).json({ message: 'Signed out successfully' });
 };
 
 // Valida si la sesión sigue activa (el middleware ya comprobó el JWT)
@@ -217,6 +217,6 @@ exports.me = async (req, res) => {
     }
     res.status(200).json({ authenticated: true, userId: req.user.id, email: user.email });
   } catch (error) {
-    res.status(500).json({ message: 'Hubo un error en el servidor', error: error.message });
+    res.status(500).json({ message: 'Server error', error: error.message });
   }
 };

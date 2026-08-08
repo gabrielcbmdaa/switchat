@@ -15,11 +15,11 @@ exports.createMessage = async (req, res) => {
         // leería `undefined` y guardaría una respuesta vacía. Mejor un error que se arregla
         // recargando que una conversación corrompida en silencio.
         if (sender !== 'user' && sender !== 'ai') {
-            return res.status(400).json({ message: 'El campo sender debe ser "user" o "ai"' });
+            return res.status(400).json({ message: 'The sender field must be "user" or "ai"' });
         }
 
         if (!content || content.trim() === '') {
-            return res.status(400).json({ message: 'El contenido del mensaje es obligatorio' });
+            return res.status(400).json({ message: 'The message content is required' });
         }
 
         // Message no guarda userId, así que la propiedad se comprueba contra el chat padre.
@@ -27,7 +27,7 @@ exports.createMessage = async (req, res) => {
         // acertar un chatId, y de paso nos da el 404 natural para chats que ya no existen.
         const chatExists = await Chat.exists({ id: chatId, userId: req.user.id });
         if (!chatExists) {
-            return res.status(404).json({ message: 'Chat no encontrado' });
+            return res.status(404).json({ message: 'Chat not found' });
         }
 
         // createdAt lo pone el servidor (default del schema) y se devuelve: getMessages ordena
@@ -47,7 +47,7 @@ exports.createMessage = async (req, res) => {
 
     } catch (error) {
         console.error("❌ Error en createMessage:", error);
-        res.status(500).json({ message: 'Error al guardar el mensaje', error: error.message });
+        res.status(500).json({ message: 'Failed to save the message', error: error.message });
     }
 };
 
@@ -67,7 +67,7 @@ exports.getChats = async (req, res) => {
 
     } catch (error) {
         console.error("❌ Error en getChats:", error);
-        res.status(500).json({ message: 'Error al leer la base de datos', error: error.message });
+        res.status(500).json({ message: 'Failed to read the database', error: error.message });
     }
 };
 
@@ -102,7 +102,7 @@ exports.getMessages = async (req, res) => {
 
     } catch (error) {
         console.error("❌ Error en getMessages:", error);
-        res.status(500).json({ message: 'Error al obtener los mensajes de la base de datos', error: error.message });
+        res.status(500).json({ message: 'Failed to read the messages from the database', error: error.message });
     }
 };
 
@@ -153,7 +153,7 @@ exports.syncChat = async (req, res) => {
         res.json({ message: 'Chat synchronized successfully', chat });
     } catch (error) {
         console.error("❌ Error en syncChat:", error);
-        res.status(500).json({ message: 'Error al guardar el chat en la base de datos', error: error.message });
+        res.status(500).json({ message: 'Failed to save the chat to the database', error: error.message });
     }
 };
 
@@ -174,7 +174,7 @@ exports.deleteChat = async (req, res) => {
         res.json({ message: 'Chat and its messages deleted successfully' });
     } catch (error) {
         console.error("❌ Error en deleteChat:", error);
-        res.status(500).json({ message: 'Error al eliminar el chat', error: error.message });
+        res.status(500).json({ message: 'Failed to delete the chat', error: error.message });
     }
 };
 
@@ -186,12 +186,12 @@ exports.deleteMessage = async (req, res) => {
         const deletedMessage = await Message.findByIdAndDelete(messageId);
 
         if (!deletedMessage) {
-            return res.status(404).json({ message: 'Mensaje no encontrado' });
+            return res.status(404).json({ message: 'Message not found' });
         }
 
         res.json({ message: 'Message deleted successfully' });
     } catch (error) {
         console.error("❌ Error en deleteMessage:", error);
-        res.status(500).json({ message: 'Error al eliminar el mensaje', error: error.message });
+        res.status(500).json({ message: 'Failed to delete the message', error: error.message });
     }
 };

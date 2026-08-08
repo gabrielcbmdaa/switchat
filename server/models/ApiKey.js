@@ -10,7 +10,7 @@ const ApiKeySchema = new mongoose.Schema({
     },
     provider: {
         type: String,
-        required: [true, 'El proveedor es obligatorio'],
+        required: [true, 'The provider is required'],
         lowercase: true,
         trim: true
     },
@@ -18,7 +18,7 @@ const ApiKeySchema = new mongoose.Schema({
     // Nunca se guarda en claro: el servidor la custodia, no la usa.
     key: {
         type: String,
-        required: [true, 'La API key es obligatoria']
+        required: [true, 'The API key is required']
     },
     isActive: {
         type: Boolean,

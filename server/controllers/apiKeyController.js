@@ -30,7 +30,7 @@ exports.getApiKeys = async (req, res) => {
 
     } catch (error) {
         console.error('❌ Error en getApiKeys:', error.message);
-        return res.status(500).json({ message: 'Error al leer las API keys' });
+        return res.status(500).json({ message: 'Failed to read the API keys' });
     }
 };
 
@@ -44,11 +44,11 @@ exports.replaceApiKeys = async (req, res) => {
         const { keys } = req.body;
 
         if (!Array.isArray(keys)) {
-            return res.status(400).json({ message: 'Se espera un array "keys"' });
+            return res.status(400).json({ message: 'A "keys" array is required' });
         }
 
         if (keys.length > MAX_KEYS_PER_USER) {
-            return res.status(400).json({ message: `No se pueden guardar más de ${MAX_KEYS_PER_USER} API keys` });
+            return res.status(400).json({ message: `You cannot store more than ${MAX_KEYS_PER_USER} API keys` });
         }
 
         const activeProviders = new Set();
@@ -59,7 +59,7 @@ exports.replaceApiKeys = async (req, res) => {
             const plainKey = typeof entry?.key === 'string' ? entry.key.trim() : '';
 
             if (!provider || !plainKey) {
-                return res.status(400).json({ message: 'Cada entrada necesita "provider" y "key" no vacíos' });
+                return res.status(400).json({ message: 'Every entry needs a non-empty "provider" and "key"' });
             }
 
             // El índice parcial ya lo impediría, pero fallar aquí da un error entendible
@@ -67,7 +67,7 @@ exports.replaceApiKeys = async (req, res) => {
             const isActive = entry.isActive === true;
             if (isActive) {
                 if (activeProviders.has(provider)) {
-                    return res.status(400).json({ message: `Hay más de una key activa para ${provider}` });
+                    return res.status(400).json({ message: `More than one active key for ${provider}` });
                 }
                 activeProviders.add(provider);
             }
@@ -84,10 +84,10 @@ exports.replaceApiKeys = async (req, res) => {
             await ApiKey.insertMany(documents);
         }
 
-        return res.json({ message: 'API keys sincronizadas', count: documents.length });
+        return res.json({ message: 'API keys synchronized', count: documents.length });
 
     } catch (error) {
         console.error('❌ Error en replaceApiKeys:', error.message);
-        return res.status(500).json({ message: 'Error al guardar las API keys' });
+        return res.status(500).json({ message: 'Failed to save the API keys' });
     }
 };

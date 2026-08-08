@@ -168,7 +168,7 @@ export default function ConfigView({ isAuthenticated, onAuthSuccess, onLogoutAct
             setCurrentEmail(email);
             setNewEmailValue('');
             setEmailCurrentPassword('');
-            alert('Correo actualizado con éxito');
+            alert('Email updated successfully');
         } catch (err: unknown) {
             const errorMessage = err instanceof Error ? err.message : String(err);
             alert('Error: ' + errorMessage);
@@ -181,7 +181,7 @@ export default function ConfigView({ isAuthenticated, onAuthSuccess, onLogoutAct
             await updatePassword(newPasswordValue, passwordCurrentPassword);
             setNewPasswordValue('');
             setPasswordCurrentPassword('');
-            alert('Contraseña actualizada con éxito');
+            alert('Password updated successfully');
         } catch (err: unknown) {
             const errorMessage = err instanceof Error ? err.message : String(err);
             alert('Error: ' + errorMessage);
@@ -207,7 +207,7 @@ export default function ConfigView({ isAuthenticated, onAuthSuccess, onLogoutAct
         }
 
         if (!deletePassword) {
-            alert('Por favor, ingresa tu contraseña actual');
+            alert('Please enter your current password');
             setConfirmingDelete(false);
             return;
         }

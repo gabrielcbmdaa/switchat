@@ -4,15 +4,15 @@ const mongoose = require('mongoose');
 const UserSchema = new mongoose.Schema({
   email: {
     type: String,
-    required: [true, 'El correo electrónico es obligatorio'],
+    required: [true, 'The email address is required'],
     unique: true,
     lowercase: true,
     trim: true
   },
   password: {
     type: String,
-    required: [true, 'La contraseña es obligatoria'],
-    minlength: [6, 'La contraseña debe tener al menos 6 caracteres']
+    required: [true, 'The password is required'],
+    minlength: [6, 'The password must be at least 6 characters long']
   },
   acceptedTermsAt: {
     type: Date,

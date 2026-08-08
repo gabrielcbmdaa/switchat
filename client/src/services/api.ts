@@ -73,7 +73,7 @@ export async function updateEmail(newEmail: string, currentPassword: string): Pr
 
   const data = await response.json().catch(() => ({}));
   if (!response.ok) {
-    throw new Error(data.message || 'No se pudo actualizar el correo');
+    throw new Error(data.message || 'Could not update the email address');
   }
 
   return { email: data.email };
@@ -87,7 +87,7 @@ export async function updatePassword(newPassword: string, currentPassword: strin
 
   if (!response.ok) {
     const data = await response.json().catch(() => ({}));
-    throw new Error(data.message || 'No se pudo actualizar la contraseña');
+    throw new Error(data.message || 'Could not update the password');
   }
 }
 
@@ -99,7 +99,7 @@ export async function deleteAccountFromServer(currentPassword: string): Promise<
 
   if (!response.ok) {
     const data = await response.json().catch(() => ({}));
-    throw new Error(data.message || 'No se pudo eliminar la cuenta');
+    throw new Error(data.message || 'Could not delete the account');
   }
 }
 
@@ -310,7 +310,7 @@ export async function saveMessageToServer(
 
   if (!response.ok) {
     const data = await response.json().catch(() => ({}));
-    throw new Error(data.message || 'No se pudo guardar el mensaje en el servidor');
+    throw new Error(data.message || 'Could not save the message to the server');
   }
 
   const data = await response.json();
