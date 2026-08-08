@@ -93,7 +93,7 @@ export default function PromptInput({
                 ref={textareaRef}
                 value={draft}
                 onChange={(e) => onDraftChange(e.target.value)}
-                placeholder="Escribe un mensaje..."
+                placeholder="Write a message..."
                 className={styles.promptTextarea}
                 onKeyDown={handleKeyDown}
                 rows={1}
@@ -101,7 +101,7 @@ export default function PromptInput({
             <button
                 className={styles.sendButton}
                 onClick={isGenerating ? onStopGeneration : onSendMessage}
-                title={isGenerating ? 'Detener generación' : 'Enviar mensaje'}
+                title={isGenerating ? 'Stop generating' : 'Send message'}
                 type="button"
             >
                 <svg width="20" height="20">

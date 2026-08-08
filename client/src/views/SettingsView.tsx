@@ -40,7 +40,7 @@ export default function SettingView({ currentModel, onModelChange, reasoningLeve
             {onClose && (
                 <div className={styles.headerSection}>
                     <span className={styles.configLabel}>Settings</span>
-                    <button type="button" className={styles.closeBtn} onClick={onClose} title="Cerrar">
+                    <button type="button" className={styles.closeBtn} onClick={onClose} title="Close">
                         ✕
                     </button>
                 </div>

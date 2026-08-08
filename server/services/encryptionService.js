@@ -14,7 +14,7 @@ const crypto = require('node:crypto');
 const ALGORITHM = 'aes-256-gcm';
 const KEY_LENGTH = 32; // 32 bytes = 256 bits, lo que exige aes-256
 const IV_LENGTH = 12;  // 12 bytes es el tamaño recomendado para GCM
-const KEY_HINT = 'Genérala con: openssl rand -base64 32';
+const KEY_HINT = 'Generate one with: openssl rand -base64 32';
 
 // Versiona el FORMATO, no la clave: permite cambiar de algoritmo más adelante sin
 // invalidar lo ya guardado, porque cada registro dice con qué esquema se escribió.
@@ -28,13 +28,13 @@ function loadEncryptionKey() {
     const rawKey = process.env.ENCRYPTION_KEY;
 
     if (!rawKey) {
-        throw new Error(`Falta ENCRYPTION_KEY en server/.env. ${KEY_HINT}`);
+        throw new Error(`ENCRYPTION_KEY is missing from server/.env. ${KEY_HINT}`);
     }
 
     const key = Buffer.from(rawKey, 'base64');
     if (key.length !== KEY_LENGTH) {
         throw new Error(
-            `ENCRYPTION_KEY debe decodificar a ${KEY_LENGTH} bytes y decodifica a ${key.length}. ${KEY_HINT}`
+            `ENCRYPTION_KEY must decode to ${KEY_LENGTH} bytes but decodes to ${key.length}. ${KEY_HINT}`
         );
     }
 

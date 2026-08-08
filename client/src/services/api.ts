@@ -241,11 +241,11 @@ const TITLE_CONTEXT_LIMIT = 500;
  */
 function buildTitlePrompt(promptText: string, replyText: string): string {
   return [
-    'Genera un título breve (máximo 5 palabras) para esta conversación, en el mismo idioma que escribe el usuario.',
-    'Responde solo con el título: sin comillas, sin markdown y sin punto final.',
+    'Write a short title (5 words maximum) for this conversation, in the same language the user is writing in.',
+    'Reply with the title only: no quotes, no markdown and no trailing period.',
     '',
-    `Usuario: ${promptText.slice(0, TITLE_CONTEXT_LIMIT)}`,
-    `Asistente: ${replyText.slice(0, TITLE_CONTEXT_LIMIT)}`,
+    `User: ${promptText.slice(0, TITLE_CONTEXT_LIMIT)}`,
+    `Assistant: ${replyText.slice(0, TITLE_CONTEXT_LIMIT)}`,
   ].join('\n');
 }
 

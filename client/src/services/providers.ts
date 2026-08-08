@@ -107,7 +107,7 @@ async function sendToGoogle(
         throw new Error("⚠️ Por favor, ve al menú **Config** y guarda tu Gemini API Key para poder chatear.");
     }
 
-    console.log(`🚀 [Providers] Petición nativa a Google Gemini (${modelLowerCase})...`);
+    console.log(`🚀 [Providers] Native request to Google Gemini (${modelLowerCase})...`);
 
     // Separar mensajes de sistema si existen
     const systemMessages = messagesHistory.filter(msg => msg.role === 'system');
@@ -167,7 +167,7 @@ async function sendToGoogle(
     const data = await response.json();
     const candidate = data.candidates?.[0];
     if (!candidate || !candidate.content || !candidate.content.parts) {
-        throw new Error('La API de Google no devolvió ninguna respuesta válida.');
+        throw new Error('The Google API did not return a valid response.');
     }
 
     const parts: GeminiPart[] = candidate.content.parts;
@@ -194,7 +194,7 @@ async function sendToAnthropic(
         throw new Error("⚠️ Por favor, ve al menú **Config** y guarda tu Anthropic API Key para poder chatear.");
     }
 
-    console.log(`🚀 [Providers] Petición nativa a Anthropic Messages API (${modelLowerCase})...`);
+    console.log(`🚀 [Providers] Native request to the Anthropic Messages API (${modelLowerCase})...`);
 
     const config = getModelConfig(modelLowerCase);
 
@@ -248,7 +248,7 @@ async function sendToAnthropic(
 
     const data = await response.json();
     if (!data.content || !Array.isArray(data.content)) {
-        throw new Error('La API de Anthropic no devolvió ningún contenido válido.');
+        throw new Error('The Anthropic API did not return any valid content.');
     }
 
     // Filtrar únicamente los bloques de tipo 'text' (descartando bloques 'thinking')
@@ -274,7 +274,7 @@ async function sendToOpenAI(
         throw new Error("⚠️ Por favor, ve al menú **Config** y guarda tu OpenAI API Key para poder chatear.");
     }
 
-    console.log(`🚀 [Providers] Petición a OpenAI (${modelLowerCase})...`);
+    console.log(`🚀 [Providers] Request to OpenAI (${modelLowerCase})...`);
 
     return sendToOpenAICompatible(
         'https://api.openai.com/v1/chat/completions',
@@ -375,6 +375,6 @@ export async function fetchFromProvider(
                 'ollama'
             );
         default:
-            throw new Error(`⚠️ El proveedor de IA "${provider}" no está soportado.`);
+            throw new Error(`⚠️ The AI provider "${provider}" is not supported.`);
     }
 }

@@ -60,7 +60,7 @@ async function startServer() {
 
         // Conexión 1: Mongoose
         await mongoose.connect(process.env.MONGO_URI);
-        console.log('🟢 Conectado con éxito a MongoDB Atlas (Mongoose)');
+        console.log('🟢 Connected successfully to MongoDB Atlas (Mongoose)');
 
         // Conexión 2: MongoClient Nativo (Solo si lo usas en tus rutas externas)
         await client.connect();
@@ -69,15 +69,15 @@ async function startServer() {
 
         // UN SOLO LISTEN: Levantamos el servidor una vez que las BD estén listas
         app.listen(PORT, () => {
-            console.log(`🚀 Servidor corriendo en: http://localhost:${PORT}`);
+            console.log(`🚀 Server running at: http://localhost:${PORT}`);
 
             if (process.env.REGISTRATION_ENABLED === 'false') {
-                console.log('🔒 [Config] Registro de nuevas cuentas DESHABILITADO (REGISTRATION_ENABLED=false).');
+                console.log('🔒 [Config] New account registration DISABLED (REGISTRATION_ENABLED=false).');
             }
         });
 
     } catch (error) {
-        console.error("❌ Error crítico al iniciar el servidor:", error);
+        console.error("❌ Critical error while starting the server:", error);
         process.exit(1);
     }
 }

@@ -252,7 +252,7 @@ export default function App() {
 
           // Sesión activa pero sin chats: materializar welcome real (id estable por userId).
           if (!session.userId) {
-            console.error('Sesión activa sin userId; no se puede materializar welcome.');
+            console.error('Active session without userId; cannot materialize the welcome chat.');
             return;
           }
           // Re-check por carrera (Strict Mode / doble mount) antes de crear.
@@ -273,7 +273,7 @@ export default function App() {
 
         localStorage.removeItem('isLoggedIn');
       } catch (error) {
-        console.error("Error en la carga inicial de sesión o chats del servidor:", error);
+        console.error("Error during the initial load of the session or the server chats:", error);
       }
 
       if (cancelled) return;
@@ -470,7 +470,7 @@ export default function App() {
         // Cuenta nueva: welcome real en servidor (id estable). No pisar chats locales.
         const session = await checkSession();
         if (!session.userId) {
-          console.error('Sesión activa sin userId; no se puede materializar welcome.');
+          console.error('Active session without userId; cannot materialize the welcome chat.');
           return;
         }
         const welcome = await materializeOnlineWelcomeChat(session.userId);
@@ -478,7 +478,7 @@ export default function App() {
         setActiveChatId(welcome.id);
       }
     } catch (error) {
-      console.error("Error al cargar chats del servidor:", error);
+      console.error("Error loading the chats from the server:", error);
     }
 
     showLeftPanel('chats');
@@ -807,7 +807,7 @@ export default function App() {
 
         {activeLeftPanel !== null && (
           <>
-            <aside className="sidebar-section" id='sidebar-section' aria-label="Navegación principal">
+            <aside className="sidebar-section" id='sidebar-section' aria-label="Main navigation">
               {activeLeftPanel === 'account' && (
                 <AccountView
                   isAuthenticated={isAuthenticated}
