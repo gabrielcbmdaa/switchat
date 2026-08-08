@@ -182,11 +182,13 @@
     color: #191919;
 }
 
-.apiKeyDropdownItem:hover .deleteApiKeyBtn {
+.apiKeyDropdownItem:hover .deleteApiKeyBtn,
+.apiKeyDropdownItem:hover .accountApiKeyBtn {
     color: #191919;
 }
 
-.apiKeyDropdownItem:hover .deleteApiKeyBtn:hover {
+.apiKeyDropdownItem:hover .deleteApiKeyBtn:hover,
+.apiKeyDropdownItem:hover .accountApiKeyBtn:hover:not(:disabled) {
     background-color: #191919;
     color: #858585;
 }
@@ -238,6 +240,26 @@
     justify-content: center;
     border-radius: 50%;
     transition: all 0.2s ease;
+}
+
+/* Guardar la clave en la base de datos o sacarla de ella. Solo aparece con sesión. */
+.accountApiKeyBtn {
+    height: 24px;
+    width: 24px;
+    background-color: transparent;
+    border: none;
+    color: #858585;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+    transition: all 0.2s ease;
+}
+
+.accountApiKeyBtn:disabled {
+    opacity: 0.4;
+    cursor: default;
 }
 
 /* ============================================================

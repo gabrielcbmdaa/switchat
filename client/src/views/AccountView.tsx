@@ -1,7 +1,15 @@
 // src/views/ConfigView.tsx
 import { useState, useEffect } from 'react';
 import { loginOrRegister, checkSession, updateEmail, updatePassword, deleteAccountFromServer } from '../services/api'; // Asegúrate de que la ruta sea correcta
-import { pushLocalApiKeysToServer, API_KEYS_SYNCED_EVENT } from '../utils/apiKeys';
+import {
+    pushLocalApiKeysToServer,
+    addApiKeyToAccount,
+    removeApiKeyFromAccount,
+    loadAccountSnapshot,
+    accountIdentities,
+    apiKeyIdentity,
+    API_KEYS_SYNCED_EVENT,
+} from '../utils/apiKeys';
 import styles from './AccountView.module.css'
 import DefaultInput from '../components/DefaultInput';
 import DefaultButton from '../components/DefaultButton';
@@ -54,6 +62,13 @@ export default function ConfigView({ isAuthenticated, onAuthSuccess, onLogoutAct
         openai: localStorage.getItem('openaiApiKey') || ''
     }));
 
+    // Qué claves están guardadas en la base de datos. Sale de la foto local de la cuenta y
+    // no de una petición: así el icono es correcto en el primer fotograma, mientras el
+    // sync va de camino, y si el servidor no contesta se enseña lo último que se supo en
+    // lugar de pintarlo todo como no sincronizado, que invitaría a subirlo otra vez.
+    const [keysInAccount, setKeysInAccount] = useState<Set<string>>(() => accountIdentities(loadAccountSnapshot()));
+    const [pendingKeyIdentity, setPendingKeyIdentity] = useState<string | null>(null);
+
     // Una sincronización de fondo puede reescribir localStorage después de que este
     // componente ya haya leído su estado inicial. Sin esto, las claves bajadas de la
     // cuenta no aparecerían hasta cambiar de vista y volver.
@@ -70,6 +85,7 @@ export default function ConfigView({ isAuthenticated, onAuthSuccess, onLogoutAct
                 anthropic: localStorage.getItem('anthropicApiKey') || '',
                 openai: localStorage.getItem('openaiApiKey') || ''
             });
+            setKeysInAccount(accountIdentities(loadAccountSnapshot()));
         };
 
         window.addEventListener(API_KEYS_SYNCED_EVENT, reloadFromStorage);
@@ -80,6 +96,24 @@ export default function ConfigView({ isAuthenticated, onAuthSuccess, onLogoutAct
     // borrar una clave aquí no la resucite en el siguiente inicio de sesión.
     const propagateApiKeys = () => {
         if (isAuthenticated) pushLocalApiKeysToServer();
+    };
+
+    // Guardar o sacar una clave de la base de datos. La lista local no se toca: la clave
+    // vive en este navegador en los dos casos, porque es él quien llama al proveedor.
+    const handleToggleKeyInAccount = async (provider: string, key: string) => {
+        const identity = apiKeyIdentity(provider, key);
+        setPendingKeyIdentity(identity);
+
+        if (keysInAccount.has(identity)) {
+            await removeApiKeyFromAccount(provider, key);
+        } else {
+            await addApiKeyToAccount(provider, key);
+        }
+
+        // La foto solo se reescribe si el servidor aceptó, así que releerla es lo que
+        // impide que el icono cambie cuando la petición ha fallado.
+        setKeysInAccount(accountIdentities(loadAccountSnapshot()));
+        setPendingKeyIdentity(null);
     };
 
     const getActiveKey = (providerName: string) => {
@@ -280,6 +314,8 @@ export default function ConfigView({ isAuthenticated, onAuthSuccess, onLogoutAct
                         {savedApiKeys.map((item, index) => {
                             const isActive = getActiveKey(item.provider) === item.key;
                             const iconId = `icon-${item.provider.toLowerCase()}`;
+                            const identity = apiKeyIdentity(item.provider, item.key);
+                            const isInAccount = keysInAccount.has(identity);
                             return (
                                 <div
                                     key={index}
@@ -298,6 +334,22 @@ export default function ConfigView({ isAuthenticated, onAuthSuccess, onLogoutAct
                                             {item.key.length > 10 ? `${item.key.slice(0, 5)}...${item.key.slice(-4)}` : item.key}
                                         </span>
                                     </div>
+                                    {isAuthenticated && (
+                                        <button
+                                            type="button"
+                                            className={styles.accountApiKeyBtn}
+                                            disabled={pendingKeyIdentity === identity}
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                handleToggleKeyInAccount(item.provider, item.key);
+                                            }}
+                                            title={isInAccount ? 'Remove from the database' : 'Store in the database'}
+                                        >
+                                            <svg width="14" height="14">
+                                                <use xlinkHref={isInAccount ? '#icon-database-minus' : '#icon-database-arrow-up'} />
+                                            </svg>
+                                        </button>
+                                    )}
                                     <button
                                         type="button"
                                         className={styles.deleteApiKeyBtn}

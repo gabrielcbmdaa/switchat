@@ -331,6 +331,43 @@ export function SvgIcons() {
                 <path d="M12 16v-4" />
                 <path d="M12 8h.01" />
             </symbol>
+
+            {/* 22. ICON DATABASE ARROW UP */}
+            <symbol
+                id="icon-database-arrow-up"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                className="lucide lucide-database-arrow-up-icon lucide-database-arrow-up"
+            >
+                <path d="M19 22v-6" />
+                <path d="M21 12.536V5" />
+                <path d="m22 19-3-3-3 3" />
+                <path d="M3 12A9 3 0 0 0 14.457 14.886" />
+                <path d="M3 5V19A9 3 0 0 0 13.318 21.968" />
+                <ellipse cx="12" cy="5" rx="9" ry="3" />
+            </symbol>
+
+            {/* 23. ICON DATABASE MINUS */}
+            <symbol
+                id="icon-database-minus"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                className="lucide lucide-database-minus-icon lucide-database-minus"
+            >
+                <path d="M21 15V5" />
+                <path d="M22 19h-6" />
+                <path d="M3 12A9 3 0 0 0 21 12" />
+                <path d="M3 5V19A9 3 0 0 0 13.318 21.968" />
+                <ellipse cx="12" cy="5" rx="9" ry="3" />
+            </symbol>
         </svg>
     );
 }

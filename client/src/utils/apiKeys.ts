@@ -31,7 +31,9 @@ const ACTIVE_KEY_STORAGE: Record<string, string> = {
 // Internamente el proveedor va siempre en minúsculas, como en el servidor y en MODEL_REGISTRY
 export type ApiKeyEntry = RemoteApiKey;
 
-const identityOf = (entry: ApiKeyEntry) => `${entry.provider}::${entry.key}`;
+export const apiKeyIdentity = (provider: string, key: string) => `${provider.toLowerCase()}::${key}`;
+
+const identityOf = (entry: ApiKeyEntry) => apiKeyIdentity(entry.provider, entry.key);
 
 /**
  * Lee las API keys de localStorage y marca cuál está activa por proveedor.
@@ -255,4 +257,30 @@ async function pushAccountKeys(inAccount: Set<string>, snapshot: ApiKeyEntry[]):
 export async function pushLocalApiKeysToServer(): Promise<void> {
     const snapshot = loadAccountSnapshot();
     await pushAccountKeys(accountIdentities(snapshot), snapshot);
+}
+
+/**
+ * Guarda una clave en la base de datos de la cuenta. La clave sigue en este navegador:
+ * sincronizar es añadir una copia, no mover nada.
+ *
+ * Si ahora mismo es la activa de su proveedor, pasa a serlo también en la cuenta. Es una
+ * acción explícita del usuario, y además el índice parcial del servidor no admite dos.
+ */
+export async function addApiKeyToAccount(provider: string, key: string): Promise<boolean> {
+    const snapshot = loadAccountSnapshot();
+    const inAccount = accountIdentities(snapshot);
+    inAccount.add(apiKeyIdentity(provider, key));
+    return pushAccountKeys(inAccount, snapshot);
+}
+
+/**
+ * Saca una clave de la base de datos sin borrarla de este navegador. No es la inversa de
+ * añadirla: en los demás dispositivos la clave desaparece, porque solo la tenían por la
+ * sincronización.
+ */
+export async function removeApiKeyFromAccount(provider: string, key: string): Promise<boolean> {
+    const snapshot = loadAccountSnapshot();
+    const inAccount = accountIdentities(snapshot);
+    inAccount.delete(apiKeyIdentity(provider, key));
+    return pushAccountKeys(inAccount, snapshot);
 }
