@@ -104,7 +104,7 @@ async function sendToGoogle(
 ): Promise<ProviderResponse> {
     const apiKey = localStorage.getItem('geminiApiKey') || '';
     if (!apiKey) {
-        throw new Error("⚠️ Por favor, ve al menú **Config** y guarda tu Gemini API Key para poder chatear.");
+        throw new Error("⚠️ Open the **Account** panel and save your Google Gemini API key to start chatting.");
     }
 
     console.log(`🚀 [Providers] Native request to Google Gemini (${modelLowerCase})...`);
@@ -191,7 +191,7 @@ async function sendToAnthropic(
 ): Promise<ProviderResponse> {
     const apiKey = localStorage.getItem('anthropicApiKey') || '';
     if (!apiKey) {
-        throw new Error("⚠️ Por favor, ve al menú **Config** y guarda tu Anthropic API Key para poder chatear.");
+        throw new Error("⚠️ Open the **Account** panel and save your Anthropic API key to start chatting.");
     }
 
     console.log(`🚀 [Providers] Native request to the Anthropic Messages API (${modelLowerCase})...`);
@@ -271,7 +271,7 @@ async function sendToOpenAI(
 ): Promise<ProviderResponse> {
     const apiKey = localStorage.getItem('openaiApiKey') || '';
     if (!apiKey) {
-        throw new Error("⚠️ Por favor, ve al menú **Config** y guarda tu OpenAI API Key para poder chatear.");
+        throw new Error("⚠️ Open the **Account** panel and save your OpenAI API key to start chatting.");
     }
 
     console.log(`🚀 [Providers] Request to OpenAI (${modelLowerCase})...`);

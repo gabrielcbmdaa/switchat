@@ -8,23 +8,23 @@ export function getTutorialChat(): Chat[] {
         messages: [
             {
                 role: "model",
-                parts: [{ text: "¡Hola! Bienvenido a **Switchat** — tu hub para chatear con varios LLMs desde un solo lugar.\n\nConecta **Google Gemini**, **Anthropic Claude**, **OpenAI ChatGPT**, **LM Studio** u **Ollama**, y cambia de modelo cuando quieras." }]
+                parts: [{ text: "Hi! Welcome to **Switchat** — your hub for chatting with several LLMs from a single place.\n\nConnect **Google Gemini**, **Anthropic Claude**, **OpenAI ChatGPT**, **LM Studio** or **Ollama**, and switch models whenever you want." }]
             },
             {
                 role: "model",
-                parts: [{ text: "## Cómo empezar en 1 minuto\n\n1. Abre **Settings** (barra inferior derecha).\n2. Pega tu API Key y pulsa guardar.\n3. Elige el proveedor: Google, Anthropic u OpenAI.\n4. Selecciona un modelo en la lista (o busca por ID).\n5. Crea un chat nuevo desde la barra izquierda y escribe.\n\nClaves: [Google AI Studio](https://aistudio.google.com/apikey) · [Anthropic Console](https://console.anthropic.com/settings/keys) · [OpenAI Platform](https://platform.openai.com/api-keys)." }]
+                parts: [{ text: "## Get started in 1 minute\n\n1. Open **Account** (bottom of the left panel).\n2. Paste your API key, pick its provider — Google, Anthropic or OpenAI — and press save.\n3. Open **Settings** (bottom of the right panel) and choose a model from the list, or search for one by ID.\n4. Create a new chat from **Chats** and start writing.\n\nGet a key: [Google AI Studio](https://aistudio.google.com/apikey) · [Anthropic Console](https://console.anthropic.com/settings/keys) · [OpenAI Platform](https://platform.openai.com/api-keys)." }]
             },
             {
                 role: "model",
-                parts: [{ text: "## Online vs Offline\n\n- **Sin sesión (Offline):** todo vive en tu navegador (`localStorage`). Las peticiones van directo al proveedor con tus keys.\n- **Con sesión (Online):** inicia sesión en **Account** (barra inferior izquierda). Tus chats se sincronizan con el servidor; las API Keys siguen solo en tu dispositivo y se envían por petición (no se guardan en la nube).\n\nPuedes usar Switchat completamente offline. La cuenta es opcional, para historial entre dispositivos." }]
+                parts: [{ text: "## Online vs Offline\n\n- **Signed out (Offline):** everything lives in your browser (`localStorage`) and nothing reaches our database.\n- **Signed in (Online):** your chats, messages and drafts sync to the server so they follow you between devices.\n\nIn **both** modes it is your browser that calls the AI provider, using your own key — the server never talks to a provider. Signing in only changes *where your conversations are stored*.\n\nYour API keys always stay in this browser, and signing in never uploads them. Each key in **Account** has its own button to store that single key in the database, encrypted, so it follows you across devices — and another to take it back out. Nothing reaches the database until you press it." }]
             },
             {
                 role: "model",
-                parts: [{ text: "## Modelos, System Prompt y Reasoning\n\nEn **Settings** también puedes:\n\n- Cambiar el **modelo** activo (Gemini, Claude, GPT, o IDs locales).\n- Definir un **System Prompt** para tono, rol o reglas fijas.\n- Ajustar **Reasoning** (thinking) si el modelo lo soporta: más esfuerzo = respuestas más reflexivas, a costa de latencia/tokens.\n\nPara modelos locales, ten **LM Studio** u **Ollama** en marcha y elige un modelo compatible." }]
+                parts: [{ text: "## Model, System Prompt and Reasoning belong to each chat\n\nEverything in **Settings** applies to the chat you have open, not to the whole app — a conversation started with Claude stays on Claude while you work on another one with Gemini:\n\n- The active **model** (Gemini, Claude, GPT, or a local ID).\n- A **System Prompt** for tone, role or fixed rules, with a switch that turns it off without throwing the text away.\n- The **Reasoning** effort, when the model supports it: more effort means more thoughtful answers, at the cost of latency and tokens. The slider only shows up for models Switchat knows.\n\nFor local models, keep **LM Studio** or **Ollama** running and pick a compatible model." }]
             },
             {
                 role: "model",
-                parts: [{ text: "## Chats, Notes y atajos útiles\n\n- **Chats:** lista a la izquierda — crea, renombra o elimina conversaciones.\n- **Notes:** panel a la derecha para apuntes. Selecciona texto en un mensaje → botón **Send to Notes**.\n- Los borradores del cuadro de mensaje se guardan por chat.\n\nCuando estés listo: configura tu key, abre un chat nuevo y escribe. Este tutorial puedes dejarlo o borrarlo cuando quieras. ¡A chatear!" }]
+                parts: [{ text: "## Chats, Notes and Docs\n\n- **Chats:** the list on the left — create, rename or delete conversations.\n- **Notes:** a panel on the right for jotting things down. Select text in any message and use **Send to Notes**.\n- **Docs:** the privacy policy and the terms, also on the right.\n- Whatever you leave typed in the message box is saved per chat.\n\nWhen you are ready: save your key, open a new chat and start writing. Feel free to keep this tutorial around or delete it whenever you like." }]
             }
         ]
     }];

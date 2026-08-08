@@ -180,7 +180,7 @@ export default function MessageView({
                 iconId={isLeftSidebarOpen ? "icon-chevron-left" : "icon-chevron-right"}
                 size={30}
                 iconSize={16}
-                title={isLeftSidebarOpen ? "Ocultar barra izquierda" : "Mostrar barra izquierda"}
+                title={isLeftSidebarOpen ? "Hide the left sidebar" : "Show the left sidebar"}
             />
 
             <DefaultButton
@@ -189,13 +189,13 @@ export default function MessageView({
                 iconId={isRightSidebarOpen ? "icon-chevron-right" : "icon-chevron-left"}
                 size={30}
                 iconSize={16}
-                title={isRightSidebarOpen ? "Ocultar barra derecha" : "Mostrar barra derecha"}
+                title={isRightSidebarOpen ? "Hide the right sidebar" : "Show the right sidebar"}
             />
 
             {showEmptyState ? (
                 <div className={styles.emptyStateContainer}>
                     <h1 className={styles.emptyStateTitle}>Switchat</h1>
-                    <p className={styles.emptyStateSubtitle}>¿En qué estás pensando?</p>
+                    <p className={styles.emptyStateSubtitle}>What are you thinking about?</p>
                     {promptInput}
                 </div>
             ) : (
@@ -208,7 +208,7 @@ export default function MessageView({
                     >
                         {hasMoreMessages && (
                             <button className={styles.loadMoreButton} onClick={loadMore}>
-                                Cargar mensajes anteriores
+                                Load earlier messages
                             </button>
                         )}
                         {visibleMessages.map((msg, index) => {
