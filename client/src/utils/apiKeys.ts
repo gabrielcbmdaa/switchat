@@ -117,6 +117,10 @@ export function saveLocalApiKeys(entries: ApiKeyEntry[]): void {
  * siempre, y entrar desde un dispositivo viejo, con una clave rotada hace meses todavía en
  * localStorage, la impondría como activa en todos los demás. Iniciar sesión debe ser
  * "este dispositivo se adhiere a la cuenta", nunca una escritura destructiva.
+ *
+ * Con una excepción: el servidor solo decide entre las claves que él custodia. Si aquí la
+ * activa es una que nunca se sincronizó, se queda con el punto, porque no sube a ningún
+ * sitio y por tanto no puede imponerle nada a los demás dispositivos.
  */
 export function reconcileApiKeys(
     local: ApiKeyEntry[],
@@ -140,10 +144,15 @@ export function reconcileApiKeys(
         if (lastSeenInAccount.has(identity)) continue;
 
         seen.add(identity);
-        // Solo puede haber una activa por proveedor (el servidor lo impone con un índice
-        // parcial): si la cuenta ya trae una, la local sube guardada pero inactiva.
-        const providerAlreadyActive = merged.some((item) => item.provider === entry.provider && item.isActive);
-        merged.push({ ...entry, isActive: entry.isActive && !providerAlreadyActive });
+        // Solo puede haber una activa por proveedor, así que quedarse con el punto implica
+        // quitárselo a la de la cuenta. localStorage tiene un único hueco de activa por
+        // proveedor, de modo que dos claves locales nunca pueden disputárselo entre ellas.
+        if (entry.isActive) {
+            for (const item of merged) {
+                if (item.provider === entry.provider) item.isActive = false;
+            }
+        }
+        merged.push({ ...entry });
     }
 
     return merged;
@@ -154,8 +163,12 @@ export function reconcileApiKeys(
 export const API_KEYS_SYNCED_EVENT = 'switchat:apikeys-synced';
 
 /**
- * Reconcilia las API keys locales con las de la cuenta. Se llama al iniciar sesión y al
- * reatachar una sesión existente al arrancar.
+ * Baja las API keys de la cuenta y las funde con las locales. Se llama al iniciar sesión y
+ * al reatachar una sesión existente al arrancar.
+ *
+ * Baja, pero NO sube: tener sesión no es permiso para guardar credenciales en la base de
+ * datos. Quien se registra para sincronizar sus conversaciones estaría subiendo sus claves
+ * en el mismo gesto y sin verlo. Subir es una decisión explícita por clave.
  *
  * Nunca lanza: fallar sincronizando claves no puede impedirte entrar en la aplicación.
  */
@@ -169,10 +182,11 @@ export async function syncApiKeysWithServer(): Promise<void> {
 
         const merged = reconcileApiKeys(loadLocalApiKeys(), remote, accountIdentities(loadAccountSnapshot()));
         saveLocalApiKeys(merged);
-        saveAccountSnapshot(merged);
-        window.dispatchEvent(new CustomEvent(API_KEYS_SYNCED_EVENT));
 
-        await replaceApiKeysOnServer(merged);
+        // La foto es lo que tiene el SERVIDOR, no lo que acaba de quedar en pantalla: si
+        // aquí el punto se lo ha quedado una clave local, la cuenta conserva el suyo.
+        saveAccountSnapshot(remote);
+        window.dispatchEvent(new CustomEvent(API_KEYS_SYNCED_EVENT));
 
     } catch (error) {
         console.warn('⚠️ Error [syncApiKeysWithServer]:', (error as Error).message);
@@ -180,25 +194,65 @@ export async function syncApiKeysWithServer(): Promise<void> {
 }
 
 /**
- * Sube el estado local actual a la cuenta tras un cambio hecho por el usuario.
+ * Calcula qué debe tener la cuenta a partir del estado local, dado el conjunto de claves
+ * que el usuario ha elegido sincronizar. Todo lo demás se queda solo en este navegador.
  *
  * Lee de localStorage en vez de recibir la lista por parámetro a propósito: AccountView
  * escribe ahí de forma síncrona antes de llamar, y su estado de React todavía no está
  * actualizado en ese momento.
+ */
+function buildAccountKeys(inAccount: Set<string>, snapshot: ApiKeyEntry[]): ApiKeyEntry[] {
+    const local = loadLocalApiKeys();
+    const activeInAccount = new Set(snapshot.filter((entry) => entry.isActive).map(identityOf));
+
+    const localDotByProvider = new Map<string, ApiKeyEntry>();
+    for (const entry of local) {
+        if (entry.isActive) localDotByProvider.set(entry.provider, entry);
+    }
+
+    return local
+        .filter((entry) => inAccount.has(identityOf(entry)))
+        .map((entry) => {
+            const dotHolder = localDotByProvider.get(entry.provider);
+
+            // Si el punto de este proveedor lo tiene una clave que no está en la cuenta,
+            // el servidor conserva el suyo. Mandar todas como inactivas le borraría el
+            // punto a los demás dispositivos por una preferencia que solo vive aquí.
+            const isActive = dotHolder && inAccount.has(identityOf(dotHolder))
+                ? identityOf(dotHolder) === identityOf(entry)
+                : activeInAccount.has(identityOf(entry));
+
+            return { ...entry, isActive };
+        });
+}
+
+/**
+ * Reemplaza el contenido de la cuenta y actualiza la foto si el servidor lo aceptó.
  *
  * Es un reemplazo completo, así que también propaga los BORRADOS. Sin esto, borrar una
  * clave la dejaría viva en el servidor y el siguiente inicio de sesión la volvería a bajar.
  */
-export async function pushLocalApiKeysToServer(): Promise<void> {
+async function pushAccountKeys(inAccount: Set<string>, snapshot: ApiKeyEntry[]): Promise<boolean> {
     try {
-        const entries = loadLocalApiKeys();
+        const entries = buildAccountKeys(inAccount, snapshot);
         const stored = await replaceApiKeysOnServer(entries);
 
         // Solo si la subida cuajó: anotar como sincronizado algo que no llegó haría que la
         // próxima reconciliación lo interpretase como un borrado ajeno y lo eliminara.
         if (stored) saveAccountSnapshot(entries);
+        return stored;
 
     } catch (error) {
-        console.warn('⚠️ Error [pushLocalApiKeysToServer]:', (error as Error).message);
+        console.warn('⚠️ Error [pushAccountKeys]:', (error as Error).message);
+        return false;
     }
+}
+
+/**
+ * Propaga a la cuenta un cambio local (guardar, borrar o cambiar cuál está activa) sin
+ * alterar QUÉ claves se sincronizan: eso solo lo cambia el usuario con el botón de la lista.
+ */
+export async function pushLocalApiKeysToServer(): Promise<void> {
+    const snapshot = loadAccountSnapshot();
+    await pushAccountKeys(accountIdentities(snapshot), snapshot);
 }

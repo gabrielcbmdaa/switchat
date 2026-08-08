@@ -76,8 +76,9 @@ exports.replaceApiKeys = async (req, res) => {
         }
 
         // Sin transacción: si el proceso muere entre el borrado y la inserción el usuario
-        // se queda sin keys en el servidor, pero las conserva en localStorage y el
-        // siguiente inicio de sesión las vuelve a subir. Pérdida recuperable.
+        // se queda sin keys en el servidor, pero las conserva en localStorage. Iniciar
+        // sesión ya no las vuelve a subir —sincronizar es una decisión explícita por
+        // clave—, así que la pérdida sigue siendo recuperable, pero a mano.
         await ApiKey.deleteMany({ userId: req.user.id });
         if (documents.length > 0) {
             await ApiKey.insertMany(documents);
