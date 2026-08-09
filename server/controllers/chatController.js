@@ -78,6 +78,15 @@ exports.getMessages = async (req, res) => {
         const limit = parseInt(req.query.limit) || 6;
         const before = req.query.before; // Fecha ISO
 
+        // Message no guarda userId, así que la propiedad se comprueba contra el chat padre,
+        // igual que en createMessage. Sin esto bastaba acertar un chatId para leer la
+        // conversación de cualquiera, y la respuesta entregaba además los _id de cada
+        // mensaje, que es justo lo que necesita deleteMessage.
+        const chatExists = await Chat.exists({ id: chatId, userId: req.user.id });
+        if (!chatExists) {
+            return res.status(404).json({ message: 'Chat not found' });
+        }
+
         const query = { chatId };
         if (before) {
             query.createdAt = { $lt: new Date(before) };
@@ -162,10 +171,16 @@ exports.deleteChat = async (req, res) => {
     try {
         const chatIdToDelete = req.params.id;
 
-        const chat = await Chat.findOne({ id: chatIdToDelete, userId: req.user.id });
+        // El userId va en el propio deleteOne. Antes se buscaba el chat filtrando por dueño
+        // pero el resultado no se usaba para nada y el borrado iba sin filtro: aparentaba
+        // una comprobación que no existía, y cualquiera con sesión borraba el chat ajeno.
+        const deleted = await Chat.deleteOne({ id: chatIdToDelete, userId: req.user.id });
 
-        // Primero borramos el chat
-        await Chat.deleteOne({ id: chatIdToDelete });
+        // deletedCount es lo que distingue "no era tuyo" de "sí lo era": sin este 404 la
+        // respuesta era un 200 que afirmaba haber borrado algo que no se tocó.
+        if (deleted.deletedCount === 0) {
+            return res.status(404).json({ message: 'Chat not found' });
+        }
 
         // 🔥 PRO-TIP: También borramos todos los mensajes que pertenecían a ese chat
         // así evitamos dejar datos "fantasma" ocupando espacio en MongoDB Atlas
@@ -181,9 +196,18 @@ exports.deleteChat = async (req, res) => {
 // 🗑️ 3. ELIMINAR UN MENSAJE INDIVIDUAL
 exports.deleteMessage = async (req, res) => {
     try {
-        const { messageId } = req.params;
+        const { chatId, messageId } = req.params;
 
-        const deletedMessage = await Message.findByIdAndDelete(messageId);
+        // Mismo permiso que en createMessage: sale del chat padre, no del mensaje.
+        const chatExists = await Chat.exists({ id: chatId, userId: req.user.id });
+        if (!chatExists) {
+            return res.status(404).json({ message: 'Chat not found' });
+        }
+
+        // El borrado se acota también por chatId. Comprobar solo el chat padre dejaría un
+        // chat propio como llave para el messageId de otro: la ruta lleva los dos en la URL
+        // y nada obliga a que se correspondan.
+        const deletedMessage = await Message.findOneAndDelete({ _id: messageId, chatId });
 
         if (!deletedMessage) {
             return res.status(404).json({ message: 'Message not found' });
