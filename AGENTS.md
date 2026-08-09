@@ -12,7 +12,7 @@ This document defines the development environment, the Dual-Mode architecture, t
 
 > Calls to AI providers **always leave from the browser**, in both modes, using the user's own API Keys. The server never calls a provider: it only stores data. The only thing that changes between modes is **where that data is stored**.
 
-- **Online Mode (Signed In):** Syncs chats, messages and drafts to **MongoDB Atlas** through the Express server, with password authentication via `bcrypt` and session cookies signed with `JWT`. It includes an incremental cursor pagination optimization (`before` / `limit` of 6 messages) so long conversations render fast. The server also acts as **custodian** for API Keys encrypted with AES-256-GCM — but it never uses them, and it only stores the ones the user has marked one by one from the `AccountView` list: signing in downloads keys, it never uploads any.
+- **Online Mode (Signed In):** Syncs chats, messages and drafts to **MongoDB** through the Express server, with password authentication via `bcrypt` and session cookies signed with `JWT`. It includes an incremental cursor pagination optimization (`before` / `limit` of 6 messages) so long conversations render fast. The server also acts as **custodian** for API Keys encrypted with AES-256-GCM — but it never uses them, and it only stores the ones the user has marked one by one from the `AccountView` list: signing in downloads keys, it never uploads any.
 - **Offline Mode (Signed Out):** Stores everything locally in the browser's `localStorage`, and nothing travels to the database.
 
 ---
@@ -60,7 +60,7 @@ switchat/
 
 To run the server locally, make sure you have a `server/.env` file configured after `server/.env.example`:
 - `PORT`: Port the server listens on (defaults to `3000`).
-- `MONGO_URI`: Connection string for the MongoDB Atlas or local database.
+- `MONGO_URI`: Connection string for the MongoDB database, self-hosted or on Atlas. Development and production use separate databases; see "Database setup" in the README.
 - `JWT_SECRET`: Signing secret for authentication JWTs.
 - `ENCRYPTION_KEY`: AES-256-GCM key for the API Keys users sync. It must decode to **exactly 32 bytes** (`openssl rand -base64 32`) and it must **not** be the same value as `JWT_SECRET`. The server **refuses to start** without it.
 - `NODE_ENV`: Runtime environment (`development` / `production`).

@@ -15,7 +15,7 @@ const SECTIONS: DocsSection[] = [
     {
         title: 'Privacy Policy',
         body: [
-            'Switchat can run in two modes. Signed in ("online mode"), your account email, a bcrypt hash of your password, and your chats, messages and drafts are stored in a MongoDB Atlas database. Signed out ("offline mode"), everything stays in your browser\'s localStorage and nothing is sent to our database.',
+            'Switchat can run in two modes. Signed in ("online mode"), your account email, a bcrypt hash of your password, and your chats, messages and drafts are stored in a MongoDB database on our own server. Signed out ("offline mode"), everything stays in your browser\'s localStorage and nothing is sent to our database.',
             'Your session is kept in an httpOnly, strict-same-site cookie signed with JWT that expires after 7 days. It cannot be read by page scripts.',
             'API keys you add in Account are always saved in your browser\'s localStorage, and your browser is what calls the AI provider with them — our server never uses your keys to contact a provider, in either mode.',
             'Signing in does not upload your API keys. Each key in Account has its own button that stores that single key in our database so it follows you between devices, and a second button that takes it back out while leaving it in this browser. Nothing is stored in the database until you press it.',
