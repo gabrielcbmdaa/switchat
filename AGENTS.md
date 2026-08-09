@@ -68,7 +68,34 @@ To run the server locally, make sure you have a `server/.env` file configured af
 
 ---
 
-## 🎨 5. Visual Design System (Switchat Design System)
+## 🗄️ 5. Reading the database
+
+Read whatever database `MONGO_URI` in `server/.env` points at, and assume it is a local development one unless the user says otherwise. `mongosh` ships with MongoDB; for a single query prefer the one-shot form, which needs no interactive session:
+
+```bash
+mongosh --quiet "<the MONGO_URI from server/.env>" --eval 'db.users.countDocuments()'
+```
+
+Useful starting points:
+
+```js
+db.getCollectionNames()                                  // users, chats, messages, apikeys
+db.users.findOne()                                       // shape of a document
+db.chats.find({}, { id: 1, title: 1, userId: 1 })        // pick fields instead of dumping all
+db.messages.find().sort({ createdAt: -1 }).limit(10)
+```
+
+The four collections map one-to-one to the Mongoose models in `server/models/`. They exist even in an empty database, because Mongoose creates them when it builds their indexes on startup — an empty collection is not evidence that a feature never ran.
+
+**Rules when reading it:**
+
+- **Never print secret material in full.** `users.password` is a bcrypt hash and `apikeys.key` is an AES-256-GCM ciphertext; both belong to a real person even in development. Show the shape (prefix, length, field names) and truncate the rest — a transcript is not a place for a credential, encrypted or not.
+- **Never decrypt API keys to inspect them.** The `encryptionService` exists to serve the app, not to satisfy curiosity in a debugging session.
+- **Writing to a development database is fine and expected** — wiping it, seeding it, or breaking it on purpose is exactly what it is for, and `db.dropDatabase()` is recoverable because the server recreates the collections on the next start. **Any database holding real accounts is read-only** unless the user explicitly asks for a write. When in doubt about which one you are connected to, ask; the cost of asking is a question, the cost of guessing wrong is someone else's data.
+
+---
+
+## 🎨 6. Visual Design System (Switchat Design System)
 
 When creating or modifying UI components in `client/`, **respecting the strict visual language is mandatory**:
 
@@ -89,7 +116,7 @@ When creating or modifying UI components in `client/`, **respecting the strict v
 
 ---
 
-## 📝 6. Code, Commit and Security Conventions
+## 📝 7. Code, Commit and Security Conventions
 
 - **English only — everything, everywhere.** Every single thing that lands in this repository is written in English: UI copy, error messages (client *and* server responses), code comments, JSDoc, identifiers, commit messages, console logs, and documentation. There is no "internal" text exempt from this: a comment is read by whoever comes next, and a server error message ends up in front of a user. The reason is not style, it is cost — a mixed-language codebase forces every reader to switch languages mid-file, and it makes it impossible to tell at a glance whether a Spanish string is a leftover note or a bug about to be shown in the UI. Talking to the user in Spanish in chat is fine; anything **written into the repo** is English.
   - **Legacy exception:** parts of the code still carry Spanish comments and error messages from before this rule. Do not launch a mass rewrite from an unrelated task, but whenever you touch a file, translate what you touch. New code has no excuse.
@@ -101,7 +128,7 @@ When creating or modifying UI components in `client/`, **respecting the strict v
 
 ---
 
-## 🧠 7. Architecture: details that must not drift
+## 🧠 8. Architecture: details that must not drift
 
 - **`client/src/services/providers.ts` is the ONLY place that talks to AI providers.** Google Gemini, Anthropic, OpenAI, LM Studio and Ollama are implemented there and nowhere else. The server does not call any provider and must not start doing so again: a duplicated `server/services/providerService.js` used to exist and was deleted on purpose. Routing the request through the server bought the user nothing, and it actively broke the local providers — LM Studio and Ollama pointed at `127.0.0.1`, which in production is the VPS and not the user's machine. A local provider only works if the call leaves from the local machine. If you find yourself adding provider logic under `server/`, that is the signal that the solution belongs somewhere else.
 - **The server is a custodian for API Keys, but never uses them.** `server/services/encryptionService.js` encrypts them with AES-256-GCM so they can sync across devices. Encrypting a credential and *exercising* one are different things: only the second would rebuild the path that was removed.

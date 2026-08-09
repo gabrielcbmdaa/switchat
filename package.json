@@ -8,7 +8,6 @@
     "dev:server": "pnpm --filter server start",
     "dev": "pnpm --filter client --filter server --parallel dev",
     "build": "pnpm --filter client build",
-    "lint": "pnpm --filter client lint",
-    "db:tunnel": "ssh -N -L 27018:127.0.0.1:27017 switchat-vps"
+    "lint": "pnpm --filter client lint"
   }
 }
