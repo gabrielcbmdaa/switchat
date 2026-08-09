@@ -1,6 +1,7 @@
 const User = require('../models/User'); // Traemos el "molde" del usuario
 const Chat = require('../models/Chat');
 const Message = require('../models/Message');
+const ApiKey = require('../models/ApiKey');
 const bcrypt = require('bcrypt');   // Traemos la herramienta de seguridad
 const jwt = require('jsonwebtoken')
 
@@ -177,6 +178,13 @@ exports.deleteAccount = async (req, res) => {
     if (!isMatch) {
       return res.status(400).json({ message: 'Incorrect password' });
     }
+
+    // Sin transacción, así que el orden importa: las credenciales primero y el usuario al
+    // final. Si el proceso muere a medio camino queda una cuenta con datos de menos, que se
+    // arregla pulsando otra vez Delete account. Al revés —borrar el User antes— cualquier
+    // fallo posterior dejaría registros huérfanos: nadie podría volver a autenticarse con
+    // ese userId, y sin userId ningún deleteMany vuelve a alcanzarlos.
+    await ApiKey.deleteMany({ userId: req.user.id });
 
     const userChats = await Chat.find({ userId: req.user.id }).select('id');
     const chatIds = userChats.map((chat) => chat.id);
