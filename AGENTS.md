@@ -22,11 +22,12 @@ This document defines the development environment, the Dual-Mode architecture, t
 This project is a monorepo managed with **`pnpm` workspaces**.
 
 - **Install dependencies:** `pnpm install`
-- **Full Development Mode (Frontend + Backend):** `pnpm dev`
+- **Full Development Mode (Frontend + Backend):** `pnpm dev` — the only command that gives you hot reload on both sides: Vite HMR on the client and `node --watch` on the server.
 - **Development Mode (Frontend only - `http://localhost:5173`):** `pnpm dev:client`
-- **Development Mode (Backend only - `http://localhost:3000`):** `pnpm dev:server`
+- **Backend only (`http://localhost:3000`):** `pnpm dev:server` — despite the name, this runs the server's `start` script (plain `node server.js`), **not** its `dev` one, so it does **not** reload when you edit a file. Restart it by hand, or use `pnpm dev` if you want watch mode.
 - **Build the client:** `pnpm build`
 - **Run the linter:** `pnpm lint`
+- **Run the tests:** `pnpm test` — server integration tests. Needs a MongoDB you can reach; they connect to `mongodb://127.0.0.1:27017/switchat_test` unless you set `MONGO_URI_TEST`. They **wipe every collection between cases**, so the helper refuses to run against a database whose name does not end in `_test`.
 
 > ⚠️ **Golden Rule:** **Always** use `pnpm` and its filters (`pnpm --filter client ...`). Do **NOT** use `npm` or `yarn`.
 
@@ -124,7 +125,8 @@ When creating or modifying UI components in `client/`, **respecting the strict v
 - **Dual Sync:** If you change how chats or messages are stored, make sure it stays compatible with both `localStorage` (Offline) and `api.ts` (Online).
 - **Commits:** Use **Conventional Commits** (`feat: ...`, `fix: ...`, `refactor: ...`, `docs: ...`).
 - **Security:** NEVER modify or expose keys or secrets stored in `.secrets/` or `.env`.
-- **Mandatory Verification:** Always run `pnpm build` and `pnpm lint` to verify your changes before declaring a task finished. There is no test suite (`pnpm test` is not configured); verification is `pnpm build` (client: `tsc -b` + `vite build`) and `pnpm lint` (client only — the server has no lint script).
+- **Mandatory Verification:** Always run `pnpm build`, `pnpm lint` and `pnpm test` before declaring a task finished. `pnpm build` is the client (`tsc -b` + `vite build`), `pnpm lint` is the client only (the server has no lint script), and `pnpm test` is the server only (the client has no tests yet).
+- **Tests (`server/tests/`):** integration tests, run with the built-in `node:test` runner plus `supertest`. They import the real Express app from `server/app.js` and hit a real MongoDB — no mocks. That is deliberate: the bugs they guard against were *missing query filters*, and a mocked model reports the call as made whether or not the filter is there. `server/app.js` must therefore stay free of side effects on import: no connections, no `listen`. Those belong in `server/server.js`.
 
 ---
 
