@@ -4,11 +4,66 @@ name: Auto Deploy
 on:
   push:
     branches:
-      - main 
+      - main
 
 # What actions is going to execute
 jobs:
+  # Runs entirely inside GitHub's throwaway runner: it never touches the VPS.
+  # Its only job is to decide whether the code deserves to be deployed.
+  test:
+    runs-on: ubuntu-latest
+
+    services:
+      # A disposable MongoDB that lives and dies with this run. The integration tests
+      # need a real database (they exist to catch missing query filters, which a mocked
+      # model cannot detect), and this keeps them away from the real ones.
+      mongo:
+        image: mongo:7
+        ports:
+          - 27017:27017
+        options: >-
+          --health-cmd "mongosh --quiet --eval 'db.runCommand({ ping: 1 })'"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@v4
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 11
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+
+      # --frozen-lockfile fails instead of silently updating the lockfile, so CI installs
+      # the exact versions the commit was tested with.
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Lint
+        run: pnpm lint
+
+      # The database name must end in "_test" or the suite refuses to start: the cases
+      # wipe every collection between runs.
+      - name: Test
+        run: pnpm test
+        env:
+          MONGO_URI_TEST: mongodb://127.0.0.1:27017/switchat_test
+
+      # Building here catches a broken client before the VPS overwrites its own copy.
+      - name: Build
+        run: pnpm build
+
   deploy:
+    # The gate: if the job above fails, this one never starts and the VPS is left alone.
+    needs: test
     runs-on: ubuntu-latest
 
     steps:
@@ -21,16 +76,16 @@ jobs:
           script: |
             # 1. Enter in the root project folder
             cd ~/switchat
-            
+
             # 2. Code Update
             git fetch origin
             git reset --hard origin/main
-            
+
             #3. Install dependencies
             pnpm install
 
             #4. Build the project
             pnpm build
-            
+
             #5. Restart PM2 to apply changes
             pm2 restart switchat
