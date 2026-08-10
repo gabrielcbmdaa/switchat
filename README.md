@@ -227,6 +227,12 @@ mongod --config /opt/homebrew/etc/mongod.conf
    *The client will run on `http://localhost:5173` (or the port assigned by Vite).*
    *The server will run on `http://localhost:3000`.*
 
+8. Run the tests:
+   ```bash
+   pnpm test
+   ```
+   *Integration tests for the server. They need a running MongoDB and connect to `mongodb://127.0.0.1:27017/switchat_test`, which you can override with `MONGO_URI_TEST`. They wipe every collection between cases, so they refuse to start against a database whose name does not end in `_test`.*
+
 ---
 
 ## 📂 Project Structure
@@ -250,8 +256,10 @@ switchat/
     ├── middleware/         # Authorization middleware (authMiddleware)
     ├── models/             # Mongoose database schemas (User, Chat, Message, ApiKey)
     ├── routes/             # Express API routing (authRoutes, chatRoutes, apiKeyRoutes)
-    ├── services/           # Internal services (encryptionService: AES-256-GCM)
-    ├── server.js           # Server startup and database connections
+    ├── services/           # Internal services (encryptionService: AES-256-GCM, userDataService)
+    ├── tests/              # Integration tests (node:test + supertest, real MongoDB)
+    ├── app.js              # Builds and exports the Express app
+    ├── server.js           # Startup only: database connections and the listen call
     └── package.json
 ```
 

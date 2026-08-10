@@ -34,7 +34,6 @@ This project is a monorepo managed with **`pnpm` workspaces**.
 ---
 
 ## 📂 3. Directory Structure
-
 ```text
 switchat/
 ├── client/                     # React 19 + TypeScript + Vite
@@ -51,8 +50,10 @@ switchat/
 │   ├── middleware/             # Authorization middleware (authMiddleware)
 │   ├── models/                 # Mongoose database models (User, Chat, Message, ApiKey)
 │   ├── routes/                 # Express API routes (authRoutes, chatRoutes, apiKeyRoutes)
-│   ├── services/               # Internal services (encryptionService: AES-256-GCM)
-│   └── server.js               # Server startup and MongoDB connection
+│   ├── services/               # Internal services (encryptionService: AES-256-GCM, userDataService)
+│   ├── tests/                  # Integration tests (node:test + supertest, real MongoDB)
+│   ├── app.js                  # Builds and exports the Express app — no side effects on import
+│   └── server.js               # Startup only: MongoDB connections and the listen call
 ```
 
 ---
@@ -139,4 +140,4 @@ When creating or modifying UI components in `client/`, **respecting the strict v
 - **Model, reasoning and system prompt are CHAT state, not global preferences.** They live on the `Chat` object (`client/src/types.ts`) and the server persists them in `server/models/Chat.js`. The intuitive move is to store them as a global setting in `localStorage`, and that is exactly what they must not be: `loadDefaultModel`/`saveDefaultModel` (`utils/modelPreferences.ts`) are only **the seed for new chats**, never the active model. Two consequences to respect when touching this: changing the model re-validates the level through `resolveReasoningLevel` (scales are not universal — `'none'` exists on some models and not on others), and chats created before this architecture do not carry the fields, so every reader must tolerate `undefined` and fall back instead of assuming a value.
 - **Persistence order:** `localStorage` (`client/src/utils/storage.ts`) is always the first write and the fallback; syncing to the server (`client/src/services/api.ts`) is best-effort on top (see the `saveToLocalDisk` calls before `saveChatToServer`/`syncChatDraftToServer` in `App.tsx`). Keep this order when touching chat/message/draft handlers so the app keeps working fully offline.
 - **Message pagination:** chats load with `messages: []` from `GET /api/chats`; the 6 most recent messages are fetched lazily when the chat is selected; older ones come through the cursor (`before`, ISO date) — see the `useEffect` and `handleLoadMoreMessages` in `client/src/App.tsx`, and `getMessages` in `server/controllers/chatController.js`.
-- **Production serving:** `server/server.js` serves `client/dist` as static files with a catch-all to `index.html` for the SPA — you must run `pnpm build` (client) before `pnpm start` reflects frontend changes in Online Mode.
+- **Production serving:** `server/app.js` serves `client/dist` as static files with a catch-all to `index.html` for the SPA — you must run `pnpm build` (client) before `pnpm start` reflects frontend changes in Online Mode.
