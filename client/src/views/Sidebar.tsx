@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import styles from './Sidebar.module.css';
 import type { Chat } from '../types';
-import DefaultButton from './DefaultButton';
+import DefaultButton from '../components/DefaultButton';
 
 // 1. TypeScript nos pide que le digamos qué "poderes" (datos) recibe esta barra lateral
 interface SidebarProps {
