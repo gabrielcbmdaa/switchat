@@ -1,4 +1,4 @@
-import { defineConfig } from 'vite'
+import { defineConfig } from 'vitest/config'
 import react, { reactCompilerPreset } from '@vitejs/plugin-react'
 import babel from '@rolldown/plugin-babel'
 
@@ -16,5 +16,12 @@ export default defineConfig({
         changeOrigin: true,
       }
     }
+  },
+  test: {
+    // The components under test read the DOM (heights, focus, selection), so a real
+    // document is not optional here.
+    environment: 'jsdom',
+    globals: true,
+    setupFiles: './src/test/setup.ts',
   }
 })

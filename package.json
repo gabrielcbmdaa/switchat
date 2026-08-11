@@ -9,6 +9,6 @@
     "dev": "pnpm --filter client --filter server --parallel dev",
     "build": "pnpm --filter client build",
     "lint": "pnpm --filter client lint",
-    "test": "pnpm --filter server test"
+    "test": "pnpm --filter server test && pnpm --filter client test"
   }
 }
