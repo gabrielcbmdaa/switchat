@@ -704,26 +704,51 @@ export default function App() {
     }
   }
 
-  function handleDeleteMessage(messageIndex: number) {
-    if (!currentChat) return;
+  // A chat that runs out of messages deletes itself: an empty row in the list is noise.
+  // The rule lives here, on the user's own delete action, and NOT in the server's
+  // deleteMessage: handleRetryMessage also empties a chat as an intermediate step, and a
+  // server-side rule would delete the chat right before the retry saves its new messages.
+  async function handleDeleteMessage(messageIndex: number) {
+    if (!currentChat || isDraftChat) return; // The draft is not in chatList yet
 
     const messageToDelete = currentChat.messages[messageIndex];
     if (!messageToDelete) return;
 
-    // 1. Borrar localmente de inmediato
+    // Pin the target chat: the active one may change while we await the server
+    const chatId = currentChat.id;
+
+    // 1. Delete it locally right away
     const updatedMessages = currentChat.messages.filter((_, i) => i !== messageIndex);
     const updatedChats = chatList.map(chat =>
-      chat.id === activeChatId
+      chat.id === chatId
         ? { ...chat, messages: updatedMessages }
         : chat
     );
     setChatList(updatedChats);
     persistIfOffline(updatedChats);
 
-    // 2. Si hay sesión y el mensaje tiene _id, borrarlo del servidor en segundo plano
-    if (isAuthenticated && messageToDelete._id) {
-      deleteMessageFromServer(activeChatId, messageToDelete._id);
+    // 2. Offline, localStorage holds the whole conversation, so the list we just filtered
+    //    is the entire truth: empty means empty.
+    if (!isAuthenticated) {
+      if (updatedMessages.length === 0) handleDeleteChat(chatId);
+      return;
     }
+
+    // 3. Awaited on purpose (it used to be fire-and-forget): asking the server what is left
+    //    before the deletion lands would count the message we are deleting.
+    if (messageToDelete._id) {
+      await deleteMessageFromServer(chatId, messageToDelete._id);
+    }
+
+    if (updatedMessages.length > 0) return;
+
+    // 4. An empty screen is not an empty chat: the list only holds the loaded page of 6 and
+    //    older messages may still be waiting behind the cursor. Ask before deleting anything
+    //    irreversible — on a network error we get null and keep the chat.
+    const remaining = await fetchChatMessagesFromServer(chatId, 1);
+    if (!Array.isArray(remaining) || remaining.length > 0) return;
+
+    handleDeleteChat(chatId);
   }
 
   async function handleRetryMessage(messageIndex: number) {
