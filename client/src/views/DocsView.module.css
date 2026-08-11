@@ -52,6 +52,24 @@
     gap: 20px;
 }
 
+.legalLink {
+    width: 100%;
+    background-color: transparent;
+    border: 1px solid #858585;
+    border-radius: 20px;
+    color: #858585;
+    cursor: pointer;
+    font-size: 13px;
+    text-align: left;
+    padding: 10px 14px;
+    transition: background-color 0.3s ease, color 0.3s ease;
+}
+
+.legalLink:hover {
+    background-color: #858585;
+    color: #191919;
+}
+
 .docSection {
     display: flex;
     flex-direction: column;

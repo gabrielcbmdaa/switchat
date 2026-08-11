@@ -11,6 +11,7 @@ import SettingView from './views/SettingsView';
 import MessageView from './views/MessageView';
 import NotesView from './views/NotesView';
 import DocsView from './views/DocsView';
+import LegalView from './views/LegalView';
 import { loadDefaultModel, saveDefaultModel, resolveReasoningLevel } from './utils/modelPreferences';
 import SelectionToolbar from './components/SelectionToolbar';
 import { isMobileViewport, loadPanelView, savePanelView, loadPanelOpen, savePanelOpen, loadActiveChatId, saveActiveChatId } from './utils/uiPreferences';
@@ -35,6 +36,10 @@ export default function App() {
   const [isRightPanelOpen, setIsRightPanelOpen] = useState<boolean>(() => !isMobileViewport() && loadPanelOpen('right', true));
   const activeLeftPanel = isLeftPanelOpen ? leftPanelView : null;
   const activeRightPanel = isRightPanelOpen ? rightPanelView : null;
+  // What the center column shows. Legal prose needs the width the panels do not have,
+  // so it takes over the center instead of living in the right panel. It is not
+  // persisted: reopening the app always lands on the conversation.
+  const [isLegalOpen, setIsLegalOpen] = useState(false);
   const [hasMoreMap, setHasMoreMap] = useState<Record<string, boolean>>({});
   // Chat en borrador: vive solo en memoria hasta que se envía el primer mensaje.
   // No está en chatList, no se persiste y no aparece en la barra lateral.
@@ -120,6 +125,16 @@ export default function App() {
     clearDraftSyncTimer();
     if (chat && isAuthenticatedRef.current) {
       syncChatDraftToServer(chat);
+    }
+  }
+
+  // Takes over the center column. On mobile the panels are drawers covering it, so they
+  // step aside: opening a document nobody can see would be a dead click.
+  function openLegal() {
+    setIsLegalOpen(true);
+    if (isMobileViewport()) {
+      setIsLeftPanelOpen(false);
+      setIsRightPanelOpen(false);
     }
   }
 
@@ -373,6 +388,7 @@ export default function App() {
   function handleCreateNewChat() {
     flushDraftSyncToServer(syncableChat);
 
+    setIsLegalOpen(false); // Same as picking one: the center goes back to the conversation
     startDraftChat();
     showLeftPanel('chats');
   }
@@ -386,6 +402,7 @@ export default function App() {
     // Salir de la vista de chat nuevo descarta el borrador sin dejar rastro
     setDraftChat(null);
     setActiveChatId(clickedChatId);
+    setIsLegalOpen(false); // Picking a chat means going back to the conversation
     showLeftPanel('chats');
     persistIfOffline(chatList);
   }
@@ -838,7 +855,7 @@ export default function App() {
                   isAuthenticated={isAuthenticated}
                   onAuthSuccess={handleAuthSuccess}
                   onLogoutAction={resetSessionToDefault}
-                  onOpenTerms={() => { setRightPanelView('docs'); setIsRightPanelOpen(true); }}
+                  onOpenTerms={openLegal}
                 />
               )}
               {activeLeftPanel === 'chats' && (
@@ -862,26 +879,30 @@ export default function App() {
         )}
 
         <main className="message-section">
-          <MessageView
-            key={activeChatId}
-            messages={currentChat?.messages || []}
-            chatId={activeChatId}
-            isNewChat={isDraftChat}
-            hasMoreMap={hasMoreMap}
-            onLoadMore={() => handleLoadMoreMessages(activeChatId)}
-            onDeleteMessage={handleDeleteMessage}
-            onRetryMessage={handleRetryMessage}
-            token={isAuthenticated ? 'active' : null}
-            draft={currentChat?.draft || ''}
-            onDraftChange={handleDraftChange}
-            onSendMessage={handleSendMessage}
-            isGenerating={isGenerating}
-            onStopGeneration={handleStopGeneration}
-            isLeftSidebarOpen={activeLeftPanel !== null}
-            isRightSidebarOpen={activeRightPanel !== null}
-            onToggleLeftSidebar={() => setIsLeftPanelOpen((prev) => !prev)}
-            onToggleRightSidebar={() => setIsRightPanelOpen((prev) => !prev)}
-          />
+          {isLegalOpen ? (
+            <LegalView onClose={() => setIsLegalOpen(false)} />
+          ) : (
+            <MessageView
+              key={activeChatId}
+              messages={currentChat?.messages || []}
+              chatId={activeChatId}
+              isNewChat={isDraftChat}
+              hasMoreMap={hasMoreMap}
+              onLoadMore={() => handleLoadMoreMessages(activeChatId)}
+              onDeleteMessage={handleDeleteMessage}
+              onRetryMessage={handleRetryMessage}
+              token={isAuthenticated ? 'active' : null}
+              draft={currentChat?.draft || ''}
+              onDraftChange={handleDraftChange}
+              onSendMessage={handleSendMessage}
+              isGenerating={isGenerating}
+              onStopGeneration={handleStopGeneration}
+              isLeftSidebarOpen={activeLeftPanel !== null}
+              isRightSidebarOpen={activeRightPanel !== null}
+              onToggleLeftSidebar={() => setIsLeftPanelOpen((prev) => !prev)}
+              onToggleRightSidebar={() => setIsRightPanelOpen((prev) => !prev)}
+            />
+          )}
         </main>
 
         {activeRightPanel !== null && (
@@ -904,7 +925,7 @@ export default function App() {
                 <NotesView />
               )}
               {activeRightPanel === 'docs' && (
-                <DocsView />
+                <DocsView onOpenLegal={openLegal} />
               )}
               <Toolbar
                 onNavNotes={() => setRightPanelView('notes')}
