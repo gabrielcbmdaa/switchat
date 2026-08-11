@@ -1,10 +1,10 @@
 import { useState, useEffect } from 'react';
-import styles from './Sidebar.module.css';
+import styles from './ChatView.module.css';
 import type { Chat } from '../types';
 import DefaultButton from '../components/DefaultButton';
 
-// 1. TypeScript nos pide que le digamos qué "poderes" (datos) recibe esta barra lateral
-interface SidebarProps {
+// 1. TypeScript wants us to declare which "powers" (data) this view receives
+interface ChatViewProps {
     chatList: Chat[];
     activeChatId: string;
     onChatClick: (chatId: string) => void; // Función para cambiar de chat
@@ -13,7 +13,7 @@ interface SidebarProps {
     onReTitleChat: (chatId: string, newTitle: string) => void; // Función para renombrar un chat
 }
 
-export default function Sidebar({ chatList, activeChatId, onChatClick, onCreateNewChat, onDeleteChat, onReTitleChat }: SidebarProps) {
+export default function ChatView({ chatList, activeChatId, onChatClick, onCreateNewChat, onDeleteChat, onReTitleChat }: ChatViewProps) {
     // Estado para rastrear qué chat está esperando confirmación de borrado
     const [confirmingDeleteId, setConfirmingDeleteId] = useState<string | null>(null);
 
@@ -64,7 +64,7 @@ export default function Sidebar({ chatList, activeChatId, onChatClick, onCreateN
     const isNewChatActive = !chatList.some((chat) => chat.id === activeChatId);
 
     return (
-        <div className={styles.sidebarContainer}>
+        <div className={styles.chatViewContainer}>
             <button
                 className={styles.newChatButton}
                 style={{ paddingLeft: isNewChatActive ? '6px' : '26px' }}

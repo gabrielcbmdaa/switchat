@@ -8,7 +8,7 @@
 /* ============================
    Main container
    ============================ */
-.sidebarContainer {
+.chatViewContainer {
   display: flex;
   flex-direction: column;
   width: 100%;

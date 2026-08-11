@@ -5,7 +5,7 @@ import { loadChatsFromServer, fetchChatResponse, saveMessageToServer, generateCh
 import { SvgIcons } from './components/SvgIcons';
 import { initResizer } from './utils/resizer';
 import Toolbar from './components/Toolbar';
-import Sidebar from './views/Sidebar';
+import ChatView from './views/ChatView';
 import AccountView from './views/AccountView';
 import SettingView from './views/SettingsView';
 import MessageView from './views/MessageView';
@@ -842,7 +842,7 @@ export default function App() {
                 />
               )}
               {activeLeftPanel === 'chats' && (
-                <Sidebar
+                <ChatView
                   chatList={chatList}
                   activeChatId={activeChatId}
                   onChatClick={handleSelectChat}
@@ -887,7 +887,7 @@ export default function App() {
         {activeRightPanel !== null && (
           <>
             <div className="resizer resizer-right" id="right-resizer"></div>
-            <aside className="settings-section" id='settings-section' aria-label="Panel secundario">
+            <aside className="settings-section" id='settings-section' aria-label="Secondary panel">
               {activeRightPanel === 'settings' && (
                 <SettingView
                   currentModel={activeModel}
