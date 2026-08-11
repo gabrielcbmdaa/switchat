@@ -6,10 +6,9 @@ interface ToolbarProps {
     onNavAccount?: () => void;
     onNavChats?: () => void;
     onNavNotes?: () => void;
-    onNavDocs?: () => void;
 }
 
-export default function Toolbar({ onNavConfig, onNavAccount, onNavChats, onNavNotes, onNavDocs }: ToolbarProps) {
+export default function Toolbar({ onNavConfig, onNavAccount, onNavChats, onNavNotes }: ToolbarProps) {
     return (
         <div className={styles.toolbarContainer}>
             {onNavAccount && (
@@ -37,13 +36,6 @@ export default function Toolbar({ onNavConfig, onNavAccount, onNavChats, onNavNo
                 <button className={styles.btnToolbar} onClick={onNavConfig} title="Settings">
                     <svg width="24" height="24">
                         <use xlinkHref="#icon-setting" />
-                    </svg>
-                </button>
-            )}
-            {onNavDocs && (
-                <button className={styles.btnToolbar} onClick={onNavDocs} title="Docs">
-                    <svg width="24" height="24">
-                        <use xlinkHref="#icon-info" />
                     </svg>
                 </button>
             )}

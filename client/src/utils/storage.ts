@@ -24,7 +24,7 @@ export function getTutorialChat(): Chat[] {
             },
             {
                 role: "model",
-                parts: [{ text: "## Chats, Notes and Docs\n\n- **Chats:** the list on the left — create, rename or delete conversations.\n- **Notes:** a panel on the right for jotting things down. Select text in any message and use **Send to Notes**.\n- **Docs:** the privacy policy and the terms, also on the right.\n- Whatever you leave typed in the message box is saved per chat.\n\nWhen you are ready: save your key, open a new chat and start writing. Feel free to keep this tutorial around or delete it whenever you like." }]
+                parts: [{ text: "## Chats and Notes\n\n- **Chats:** the list on the left — create, rename or delete conversations.\n- **Notes:** a panel on the right for jotting things down. Select text in any message and use **Send to Notes**.\n- Whatever you leave typed in the message box is saved per chat.\n- The privacy policy and the terms open from the sign-up form, in **Account**.\n\nWhen you are ready: save your key, open a new chat and start writing. Feel free to keep this tutorial around or delete it whenever you like." }]
             }
         ]
     }];

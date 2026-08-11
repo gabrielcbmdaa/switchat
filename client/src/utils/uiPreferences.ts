@@ -1,7 +1,7 @@
 // Preferencias de layout de los paneles laterales.
 // Los arrays son la fuente de verdad: de ahí salen los tipos y la validación.
 export const LEFT_PANEL_VIEWS = ['chats', 'account'] as const;
-export const RIGHT_PANEL_VIEWS = ['settings', 'notes', 'docs'] as const;
+export const RIGHT_PANEL_VIEWS = ['settings', 'notes'] as const;
 
 export type LeftPanelView = typeof LEFT_PANEL_VIEWS[number];
 export type RightPanelView = typeof RIGHT_PANEL_VIEWS[number];
