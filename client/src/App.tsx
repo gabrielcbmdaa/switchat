@@ -62,6 +62,8 @@ export default function App() {
   // suyo (ver commitChatMessages).
   const [generatingChatIds, setGeneratingChatIds] = useState<string[]>([]);
   const abortControllersRef = useRef<Map<string, AbortController>>(new Map());
+  // Chats cuya primera página está pedida y todavía no ha vuelto (ver el efecto de carga)
+  const pendingFirstPageRef = useRef<Set<string>>(new Set());
   const draftSyncTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const currentChatRef = useRef(currentChat);
   const isAuthenticatedRef = useRef(isAuthenticated);
@@ -373,24 +375,35 @@ export default function App() {
     if (isDraftChat) return; // El borrador aún no existe en el servidor
 
     if (loadedChatIds[activeChatId]) return; // Su primera página ya se pidió
+    // Y esta guarda es la que impide pedirla N veces: el efecto depende de chatList, que
+    // cambia con cada tecla del borrador y con cada respuesta de cualquier otro chat, y
+    // loadedChatIds no se marca hasta que el servidor contesta. Sin esto, escribir mientras
+    // carga dispara una petición por pulsación. Es un ref y no estado a propósito: hay que
+    // verlo en el mismo tick en que se pide, antes de cualquier re-render.
+    if (pendingFirstPageRef.current.has(activeChatId)) return;
 
     const activeChat = chatList.find(c => c.id === activeChatId);
     if (activeChat && (!activeChat.messages || activeChat.messages.length === 0)) {
-      fetchChatMessagesFromServer(activeChatId, 6).then(msgs => {
+      const requestedChatId = activeChatId;
+      pendingFirstPageRef.current.add(requestedChatId);
+
+      fetchChatMessagesFromServer(requestedChatId, 6).then(msgs => {
         // Sin respuesta (red caída) no marcamos nada: al volver a entrar se reintenta.
         if (msgs) {
           setChatList(prevChats => prevChats.map(c => {
-            if (c.id === activeChatId) {
+            if (c.id === requestedChatId) {
               return { ...c, messages: msgs };
             }
             return c;
           }));
-          setLoadedChatIds(prev => ({ ...prev, [activeChatId]: true }));
+          setLoadedChatIds(prev => ({ ...prev, [requestedChatId]: true }));
           // Página incompleta: el servidor no tiene nada más antiguo que enseñar.
           if (msgs.length < 6) {
-            setHasMoreMap(prev => ({ ...prev, [activeChatId]: false }));
+            setHasMoreMap(prev => ({ ...prev, [requestedChatId]: false }));
           }
         }
+      }).finally(() => {
+        pendingFirstPageRef.current.delete(requestedChatId);
       });
     }
   }, [activeChatId, chatList, loadedChatIds, isAuthenticated, isDraftChat]);
@@ -441,7 +454,6 @@ export default function App() {
     setActiveChatId(clickedChatId);
     setIsLegalOpen(false); // Picking a chat means going back to the conversation
     showLeftPanel('chats');
-    persistIfOffline(chatList);
   }
 
   function handleDraftChange(newDraft: string) {
@@ -708,8 +720,11 @@ export default function App() {
     // Fijamos el chat destino: durante los await el chat activo puede cambiar
     const chatId = currentChat.id;
     const isFirstMessage = currentChat.messages.length === 0;
-    // Enviar el primer mensaje es el acto de nacimiento del borrador: aquí entra en la lista
-    const baseChats = isDraftChat ? [...chatList, currentChat] : chatList;
+    // Enviar el primer mensaje es el acto de nacimiento del borrador: aquí entra en la lista.
+    // Se parte del ref y no de chatList: si otro chat acaba de recibir su respuesta, su
+    // commit ya adelantó el ref pero este render todavía no se ha repintado, y arrancar de
+    // la copia vieja volvería a tirar por la borda lo que acaba de llegar.
+    const baseChats = isDraftChat ? [...chatListRef.current, currentChat] : chatListRef.current;
 
     // 2. El historial que viaja es el de siempre más lo que acabas de escribir
     const userMessage: Message = { role: "user", parts: [{ text: promptText }], createdAt: new Date().toISOString() };
@@ -749,6 +764,9 @@ export default function App() {
   // de dos await, y para entonces su copia de chatList puede haber envejecido.
   function handleDeleteChat(chatId: string) {
     if (!chatId) return;
+    // Si estaba generando, su respuesta ya no tiene dónde aterrizar (commitChatMessages la
+    // descarta). Abortarla evita seguir pagando tokens por algo que nadie va a leer.
+    abortControllersRef.current.get(chatId)?.abort();
     const activeId = activeChatIdRef.current;
     const updatedChats = chatListRef.current.filter(chat => chat.id !== chatId);
     chatListRef.current = updatedChats;
@@ -840,7 +858,7 @@ export default function App() {
     // 3. Bifurcación: lo que venía después queda descartado y hay que borrarlo del backend
     const messagesToDeleteFromBackend = currentChat.messages.slice(userMessageIndex);
 
-    await sendChatHistory(historyToSend, chatList, chatId, {
+    await sendChatHistory(historyToSend, chatListRef.current, chatId, {
       beforeRequest: async () => {
         if (!isAuthenticated) return;
         await saveChatToServer({ ...chatToSync, messages: [] });

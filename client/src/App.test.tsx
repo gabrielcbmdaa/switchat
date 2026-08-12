@@ -109,6 +109,24 @@ describe('switching chats while the model is answering', () => {
         expect(screen.getByText('B question 2')).toBeInTheDocument();
     });
 
+    it('asks for the first page once, however much the list changes while it travels', async () => {
+        const page = deferred<Message[]>();
+        api.fetchChatMessagesFromServer.mockReturnValue(page.promise);
+
+        render(<App />);
+        await screen.findByPlaceholderText('Write a message...');
+
+        // The lazy-load effect depends on chatList, and every keystroke rewrites the draft
+        // inside it. Nothing marks the chat as loaded until the server answers, so without
+        // an in-flight guard this fires one request per character.
+        await userEvent.type(screen.getByPlaceholderText('Write a message...'), 'abcde');
+
+        expect(api.fetchChatMessagesFromServer).toHaveBeenCalledTimes(1);
+
+        await act(async () => { page.resolve(messagesA); });
+        await screen.findByText('A question 1');
+    });
+
     it('offers to send in the other chat instead of stopping the one left behind', async () => {
         const answerA = deferred<{ text: string }>();
         const answerB = deferred<{ text: string }>();
