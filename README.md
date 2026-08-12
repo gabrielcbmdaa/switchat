@@ -42,7 +42,7 @@
 - 📝 **Per-chat System Prompt**: Give each chat its own persistent system prompt to steer the AI's tone, role, or constraints, with a toggle that disables it without throwing the text away.
 - 🔑 **Robust Authentication**: Secure registration and login protected with password hashing via `bcrypt` and route authorization using signed, `HttpOnly` JSON Web Tokens (`JWT`) cookies.
 - ⚡ **Incremental Message Pagination**: Performance optimization that loads messages in batches of 6 using a time-based cursor (`before` / `limit`), speeding up rendering for long chat histories.
-- 📐 **Responsive, Adjustable Layout**: Resizable sidebar using a drag-and-drop divider on desktop, plus a mobile-friendly drawer layout on smaller screens.
+- 📐 **Responsive, Adjustable Layout**: Resizable side panels using drag-and-drop dividers on desktop, plus a mobile-friendly drawer layout on smaller screens.
 - 🗒️ **Notes Panel**: Jot down notes alongside your chats, or right-click any selected message text to send it straight to Notes.
 
 ---
@@ -213,12 +213,15 @@ mongod --config /opt/homebrew/etc/mongod.conf
    openssl rand -base64 32   # ENCRYPTION_KEY (run it again: it must be a different value)
    ```
    *`ENCRYPTION_KEY` encrypts the API keys users sync to their account and must decode to exactly 32 bytes. The server refuses to start without it. Keep it separate from `JWT_SECRET` so leaking one does not compromise the other — and note that changing it makes every stored API key unreadable, at which point users simply re-enter them.*
-6. Start and use:
+6. Build the client and start the server:
    ```bash
+   pnpm build
    pnpm start
    ```
    The server will run on `http://localhost:3000`.
    Go to `http://localhost:3000/` in your browser to use the application.
+
+   *`pnpm build` is not optional here: `pnpm start` only serves the compiled client from `client/dist`, so without it the page comes up empty. Run it again after every frontend change you want to see this way — or use `pnpm dev` below, which needs no build at all.*
 
 7. Start to develop:
    ```bash
@@ -231,7 +234,7 @@ mongod --config /opt/homebrew/etc/mongod.conf
    ```bash
    pnpm test
    ```
-   *Integration tests for the server. They need a running MongoDB and connect to `mongodb://127.0.0.1:27017/switchat_test`, which you can override with `MONGO_URI_TEST`. They wipe every collection between cases, so they refuse to start against a database whose name does not end in `_test`.*
+   *Runs both suites. The server one is integration tests against a real MongoDB: it connects to `mongodb://127.0.0.1:27017/switchat_test`, which you can override with `MONGO_URI_TEST`, and wipes every collection between cases, so it refuses to start against a database whose name does not end in `_test`. The client one is Vitest on jsdom and needs nothing running. To run just one: `pnpm --filter server test` or `pnpm --filter client test`.*
 
 ---
 
@@ -243,10 +246,11 @@ The repository is divided into a frontend (`client`) and a backend (`server`):
 switchat/
 ├── client/                 # React + Vite Frontend
 │   ├── src/
-│   │   ├── components/     # Shared components (Sidebar, SvgIcons, Toolbar...)
+│   │   ├── components/     # Shared components (SvgIcons, Toolbar, PromptInput...)
 │   │   ├── services/       # API integration services (api.ts)
+│   │   ├── test/           # Vitest setup (jsdom stubs the app needs on mount)
 │   │   ├── utils/          # Utility scripts (resizer, storage, etc.)
-│   │   ├── views/          # Main views (ChatView, MessageView, SettingsView, AccountView)
+│   │   ├── views/          # Main views (ChatView, MessageView, SettingsView, AccountView...)
 │   │   ├── App.tsx         # UI Entry point and global state
 │   │   └── index.css       # Global styles and typographic variables
 │   └── package.json
@@ -285,7 +289,11 @@ switchat/
 
 ## 🚀 Deployment
 
-Pushing to `main` automatically deploys to the production VPS via GitHub Actions (`.github/workflows/deploy.yml`), which connects over SSH and runs:
+Pushing to `main` runs `.github/workflows/deploy.yml`, which has two jobs.
+
+**1. `test` — the gate.** Runs entirely inside GitHub's throwaway runner, with its own disposable `mongo:7` service, and never touches the VPS: `pnpm install --frozen-lockfile`, then `pnpm lint`, `pnpm test` (against `switchat_test` on that container) and `pnpm build`. The lockfile is frozen on purpose, so CI installs the exact versions the commit was tested with instead of quietly resolving newer ones.
+
+**2. `deploy`** — declares `needs: test`, so if anything above fails it never starts and production is left exactly as it was. It connects over SSH and runs:
 
 1. `git fetch origin` + `git reset --hard origin/main`
 2. `pnpm install`
@@ -293,6 +301,8 @@ Pushing to `main` automatically deploys to the production VPS via GitHub Actions
 4. `pm2 restart switchat`
 
 Requires these GitHub Secrets: `SSH_HOST`, `SSH_USER`, `SSH_PRIVATE_KEY`.
+
+> A failed deploy that shows a red `test` job is not a broken pipeline — it is the pipeline doing its job. Read the test output before touching anything on the server.
 
 > ⚠️ `server/.env` lives only on the server and is never updated by the workflow. New environment variables must be added manually via SSH, followed by `pm2 restart switchat --update-env`.
 
