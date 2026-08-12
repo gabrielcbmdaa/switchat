@@ -39,7 +39,13 @@ export default function App() {
   // so it takes over the center instead of living in the right panel. It is not
   // persisted: reopening the app always lands on the conversation.
   const [isLegalOpen, setIsLegalOpen] = useState(false);
+  // Dos hechos distintos sobre el mismo chat, que antes compartían mapa: hasMoreMap dice
+  // si quedan mensajes MÁS ANTIGUOS detrás del cursor, y loadedChatIds si ya le hemos
+  // pedido su primera página al servidor. Juntarlos los hacía indistinguibles justo en el
+  // caso peor — un chat de menos de una página, que responde "no hay más" a la primera —,
+  // y entonces "no hay nada anterior" se leía como "ya está cargado, no preguntes".
   const [hasMoreMap, setHasMoreMap] = useState<Record<string, boolean>>({});
+  const [loadedChatIds, setLoadedChatIds] = useState<Record<string, boolean>>({});
   // Chat en borrador: vive solo en memoria hasta que se envía el primer mensaje.
   // No está en chatList, no se persiste y no aparece en la barra lateral.
   const [draftChat, setDraftChat] = useState<Chat | null>(null);
@@ -359,9 +365,12 @@ export default function App() {
     if (!isAuthenticated) return; // En modo offline no hacemos peticiones
     if (isDraftChat) return; // El borrador aún no existe en el servidor
 
+    if (loadedChatIds[activeChatId]) return; // Su primera página ya se pidió
+
     const activeChat = chatList.find(c => c.id === activeChatId);
-    if (activeChat && (!activeChat.messages || activeChat.messages.length === 0) && hasMoreMap[activeChatId] !== false) {
+    if (activeChat && (!activeChat.messages || activeChat.messages.length === 0)) {
       fetchChatMessagesFromServer(activeChatId, 6).then(msgs => {
+        // Sin respuesta (red caída) no marcamos nada: al volver a entrar se reintenta.
         if (msgs) {
           setChatList(prevChats => prevChats.map(c => {
             if (c.id === activeChatId) {
@@ -369,13 +378,15 @@ export default function App() {
             }
             return c;
           }));
+          setLoadedChatIds(prev => ({ ...prev, [activeChatId]: true }));
+          // Página incompleta: el servidor no tiene nada más antiguo que enseñar.
           if (msgs.length < 6) {
             setHasMoreMap(prev => ({ ...prev, [activeChatId]: false }));
           }
         }
       });
     }
-  }, [activeChatId, chatList, hasMoreMap, isAuthenticated, isDraftChat]);
+  }, [activeChatId, chatList, loadedChatIds, isAuthenticated, isDraftChat]);
 
   async function handleLoadMoreMessages(chatId: string) {
     if (!isAuthenticated) return;
@@ -492,6 +503,10 @@ export default function App() {
     setChatList([]);
     setActiveChatId('');
     setDraftChat(null);
+    // Los mapas de paginación hablan de los chats de la sesión anterior: entrar con otra
+    // cuenta y arrastrarlos daría por cargado un chat que este usuario no ha abierto.
+    setHasMoreMap({});
+    setLoadedChatIds({});
 
     // Sin await: las claves se reconcilian en segundo plano y no deben retrasar la entrada
     syncApiKeysWithServer();
@@ -539,6 +554,8 @@ export default function App() {
     setChatList(localChats);
     setActiveChatId(localActiveId);
     setDraftChat(null);
+    setHasMoreMap({});
+    setLoadedChatIds({});
     showLeftPanel('chats');
   }
 
@@ -903,6 +920,7 @@ export default function App() {
               chatId={activeChatId}
               isNewChat={isDraftChat}
               hasMoreMap={hasMoreMap}
+              loadedChatIds={loadedChatIds}
               onLoadMore={() => handleLoadMoreMessages(activeChatId)}
               onDeleteMessage={handleDeleteMessage}
               onRetryMessage={handleRetryMessage}

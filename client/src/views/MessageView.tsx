@@ -10,6 +10,7 @@ interface MessageViewProps {
     chatId: string;
     isNewChat?: boolean;
     hasMoreMap: Record<string, boolean>;
+    loadedChatIds: Record<string, boolean>;
     onLoadMore: () => void;
     onDeleteMessage: (messageIndex: number) => void;
     onRetryMessage: (messageIndex: number) => void;
@@ -30,6 +31,7 @@ export default function MessageView({
     chatId,
     isNewChat = false,
     hasMoreMap,
+    loadedChatIds,
     onLoadMore,
     onDeleteMessage,
     onRetryMessage,
@@ -74,7 +76,7 @@ export default function MessageView({
     // Online los mensajes llegan por fetch diferido: mientras no sepamos si el chat
     // tiene historial, no podemos afirmar que esté vacío (si no, parpadea la vista vacía).
     // Un chat nuevo no tiene nada que esperar: nunca ha existido en el servidor.
-    const isAwaitingHistory = Boolean(token) && !hasMessages && !isNewChat && hasMoreMap[chatId] !== false;
+    const isAwaitingHistory = Boolean(token) && !hasMessages && !isNewChat && !loadedChatIds[chatId];
     const showEmptyState = !hasMessages && !isAwaitingHistory;
     // Función para solicitar más mensajes
     const loadMore = () => {
