@@ -55,8 +55,13 @@ export default function App() {
   // El borrador no existe en el servidor: solo los chats materializados se sincronizan.
   const syncableChat = isDraftChat ? undefined : currentChat;
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false);
-  const [isGenerating, setIsGenerating] = useState<boolean>(false);
-  const abortControllerRef = useRef<AbortController | null>(null);
+  // Generar es un estado DEL CHAT, no de la app: con una bandera global, mirar otra
+  // conversación mientras el modelo responde ponía el botón en modo Stop en un chat que no
+  // estaba generando nada, y pulsarlo abortaba el de al lado. Un chat a la vez, pero varios
+  // chats a la vez — lo que solo es seguro desde que cada respuesta escribe únicamente el
+  // suyo (ver commitChatMessages).
+  const [generatingChatIds, setGeneratingChatIds] = useState<string[]>([]);
+  const abortControllersRef = useRef<Map<string, AbortController>>(new Map());
   const draftSyncTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const currentChatRef = useRef(currentChat);
   const isAuthenticatedRef = useRef(isAuthenticated);
@@ -70,6 +75,8 @@ export default function App() {
   // cae en la preferencia global y el nivel en el defaultThinking del modelo.
   const activeModel = currentChat?.model || defaultModel;
   const activeReasoning = resolveReasoningLevel(activeModel, currentChat?.reasoningLevel);
+  // Lo que ve el chat abierto, que es lo único que la barra de abajo puede afirmar.
+  const isActiveChatGenerating = generatingChatIds.includes(activeChatId);
 
   useEffect(() => {
     currentChatRef.current = syncableChat;
@@ -585,7 +592,12 @@ export default function App() {
     if (!userMessage || userMessage.role !== 'user') return;
 
     const targetChat = chats.find((chat) => chat.id === chatId);
-    const thinkingMessage = { role: "model" as const, parts: [{ text: "Thinking..." }], isTemporary: true, createdAt: new Date().toISOString() };
+    // Del chat DESTINO, no del activo. Hoy solo se envía desde el chat abierto, pero con
+    // varias generaciones a la vez el chat abierto ya no identifica a quién le toca este
+    // modelo: enviar en uno y saltar a otro mandaría la respuesta con el modelo del vecino.
+    const targetModel = targetChat?.model || defaultModel;
+    const targetReasoning = resolveReasoningLevel(targetModel, targetChat?.reasoningLevel);
+    const thinkingMessage ={ role: "model" as const, parts: [{ text: "Thinking..." }], isTemporary: true, createdAt: new Date().toISOString() };
 
     // Pintamos el "pensando" antes de nada para que la UI reaccione al instante
     const chatsWithThinking = chats.map(chat =>
@@ -598,8 +610,8 @@ export default function App() {
     // además el chat que acaba de nacer del borrador. A partir de este punto manda el ref.
     chatListRef.current = chatsWithThinking;
     const controller = new AbortController();
-    abortControllerRef.current = controller;
-    setIsGenerating(true);
+    abortControllersRef.current.set(chatId, controller);
+    setGeneratingChatIds(prev => prev.includes(chatId) ? prev : [...prev, chatId]);
 
     // El prompt se guarda ANTES de generar para que cerrar la pestaña a mitad no se lleve
     // lo que el usuario acaba de escribir: se pierde la respuesta, nunca la pregunta.
@@ -629,8 +641,8 @@ export default function App() {
 
       const response = await fetchChatResponse(
         historyToSend,
-        activeModel,
-        activeReasoning,
+        targetModel,
+        targetReasoning,
         // El system prompt solo viaja si el interruptor del chat está encendido
         targetChat?.systemPromptEnabled === false ? undefined : targetChat?.systemPrompt,
         controller.signal
@@ -643,7 +655,7 @@ export default function App() {
       const userMessageId = await pendingUserMessageId;
 
       const aiMessageId = isAuthenticatedRef.current
-        ? await saveMessageToServer(chatId, { sender: 'ai', content: response.text, model: activeModel })
+        ? await saveMessageToServer(chatId, { sender: 'ai', content: response.text, model: targetModel })
         : undefined;
 
       // Reemplazamos el "pensando" por la respuesta real y sellamos los _id de MongoDB.
@@ -651,7 +663,7 @@ export default function App() {
       commitChatMessages(chatId, [
         ...historyToSend.slice(0, -1),
         { ...userMessage, _id: userMessageId || userMessage._id },
-        { role: "model", parts: [{ text: response.text }], _id: aiMessageId, createdAt: new Date().toISOString(), model: activeModel }
+        { role: "model", parts: [{ text: response.text }], _id: aiMessageId, createdAt: new Date().toISOString(), model: targetModel }
       ]);
 
       options.onSuccess?.(response.text);
@@ -678,16 +690,19 @@ export default function App() {
         commitChatMessages(chatId, [...sealedHistory, { role: "model" as const, parts: [{ text: `Error: ${err.message}` }], createdAt: new Date().toISOString() }]);
       }
     } finally {
-      if (abortControllerRef.current === controller) {
-        abortControllerRef.current = null;
+      // Solo si sigue siendo el nuestro: un reintento sobre el mismo chat ya habrá dejado
+      // el suyo en el mapa, y borrarlo dejaría su Stop sin nada que abortar.
+      if (abortControllersRef.current.get(chatId) === controller) {
+        abortControllersRef.current.delete(chatId);
+        setGeneratingChatIds(prev => prev.filter(id => id !== chatId));
       }
-      setIsGenerating(false);
     }
   }
 
   async function handleSendMessage() {
     // 1. Validaciones iniciales (Reemplaza a tu document.getElementById)
-    if (!currentChat || !currentChat.draft.trim() || isGenerating) return;
+    // Bloquea solo si ESTE chat ya está generando: otro chat ocupado no es asunto suyo.
+    if (!currentChat || !currentChat.draft.trim() || generatingChatIds.includes(currentChat.id)) return;
     clearDraftSyncTimer(); // Avoid syncing a stale draft after send clears it
     const promptText = currentChat.draft.trim();
     // Fijamos el chat destino: durante los await el chat activo puede cambiar
@@ -801,7 +816,7 @@ export default function App() {
   }
 
   async function handleRetryMessage(messageIndex: number) {
-    if (!currentChat || isGenerating) return;
+    if (!currentChat || generatingChatIds.includes(currentChat.id)) return;
 
     const messageToRetry = currentChat.messages[messageIndex];
     if (!messageToRetry || messageToRetry.isTemporary) return;
@@ -840,7 +855,8 @@ export default function App() {
   }
 
   function handleStopGeneration() {
-    abortControllerRef.current?.abort();
+    // El Stop de la barra pertenece al chat que estás mirando, y solo aborta ese.
+    abortControllersRef.current.get(activeChatId)?.abort();
   }
 
   function handleReTitleChat(chatId: string, newTitle: string) {
@@ -928,7 +944,7 @@ export default function App() {
               draft={currentChat?.draft || ''}
               onDraftChange={handleDraftChange}
               onSendMessage={handleSendMessage}
-              isGenerating={isGenerating}
+              isGenerating={isActiveChatGenerating}
               onStopGeneration={handleStopGeneration}
               isLeftSidebarOpen={activeLeftPanel !== null}
               isRightSidebarOpen={activeRightPanel !== null}

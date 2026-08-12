@@ -108,4 +108,42 @@ describe('switching chats while the model is answering', () => {
         expect(screen.getByText('B answer 1')).toBeInTheDocument();
         expect(screen.getByText('B question 2')).toBeInTheDocument();
     });
+
+    it('offers to send in the other chat instead of stopping the one left behind', async () => {
+        const answerA = deferred<{ text: string }>();
+        const answerB = deferred<{ text: string }>();
+        api.fetchChatResponse
+            .mockReturnValueOnce(answerA.promise)
+            .mockReturnValueOnce(answerB.promise);
+
+        render(<App />);
+        await screen.findByText('A question 1');
+
+        await userEvent.type(screen.getByPlaceholderText('Write a message...'), 'ask A');
+        await userEvent.click(screen.getByTitle('Send message'));
+        await screen.findByText('Thinking...');
+
+        await userEvent.click(screen.getByText('Chat B'));
+        await screen.findByText('B question 1');
+
+        // B is not the chat that is generating, so its button must not claim otherwise.
+        expect(screen.queryByTitle('Stop generating')).not.toBeInTheDocument();
+
+        // And it takes a prompt of its own while A is still thinking.
+        await userEvent.type(screen.getByPlaceholderText('Write a message...'), 'ask B');
+        await userEvent.click(screen.getByTitle('Send message'));
+
+        await act(async () => {
+            answerB.resolve({ text: 'the B answer' });
+            answerA.resolve({ text: 'the A answer' });
+        });
+
+        // Each answer went home: no crossing over.
+        await screen.findByText('the B answer');
+        expect(screen.queryByText('the A answer')).not.toBeInTheDocument();
+
+        await userEvent.click(screen.getByText('Chat A'));
+        await screen.findByText('the A answer');
+        expect(screen.queryByText('the B answer')).not.toBeInTheDocument();
+    });
 });
