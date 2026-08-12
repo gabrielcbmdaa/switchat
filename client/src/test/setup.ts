@@ -12,6 +12,10 @@ class ResizeObserverStub implements ResizeObserver {
 
 globalThis.ResizeObserver = ResizeObserverStub;
 
+// Same story with scrollTo: MessageView keeps the conversation pinned to the bottom, and
+// jsdom implements no scrolling at all.
+Element.prototype.scrollTo = () => { };
+
 // Every test mounts into the same document: unmount so the next one starts empty.
 afterEach(() => {
     cleanup();

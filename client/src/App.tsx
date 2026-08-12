@@ -193,12 +193,32 @@ export default function App() {
 
     const updatedChats = chats.map((chat) => (chat.id === chatId ? { ...chat, title } : chat));
 
+    chatListRef.current = updatedChats;
     setChatList(updatedChats);
     persistIfOffline(updatedChats);
 
     if (isAuthenticatedRef.current) {
       saveChatToServer({ ...targetChat, title, messages: [] });
     }
+  }
+
+  // Escribe los mensajes de UN chat sin tocar el resto de la lista. Lee la lista viva por
+  // referencia, igual que applyGeneratedTitle: quien resuelve después de un await no puede
+  // partir de la foto que tenía antes de esperar, porque cualquier cosa ocurrida mientras
+  // tanto (los mensajes que se cargaron al cambiar de chat, un chat borrado, un borrador
+  // recién escrito) se perdería al reescribir la lista entera.
+  function commitChatMessages(chatId: string, messages: Message[]) {
+    const chats = chatListRef.current;
+    // Borrado durante la generación: se descarta la respuesta en vez de resucitar el chat.
+    if (!chats.some((chat) => chat.id === chatId)) return;
+
+    const updatedChats = chats.map((chat) => (chat.id === chatId ? { ...chat, messages } : chat));
+
+    // El efecto que sincroniza el ref no ha corrido todavía entre dos escrituras seguidas,
+    // y el camino de error escribe dos veces: hay que adelantarlo a mano.
+    chatListRef.current = updatedChats;
+    setChatList(updatedChats);
+    persistIfOffline(updatedChats);
   }
 
   async function materializeOnlineWelcomeChat(userId: string): Promise<Chat> {
@@ -557,20 +577,19 @@ export default function App() {
         : chat
     );
     setChatList(chatsWithThinking);
+    // Síncrono, sin awaits de por medio: aquí la foto todavía es la lista viva, y trae
+    // además el chat que acaba de nacer del borrador. A partir de este punto manda el ref.
+    chatListRef.current = chatsWithThinking;
     const controller = new AbortController();
     abortControllerRef.current = controller;
     setIsGenerating(true);
-
-    // Todas las salidas de abajo escriben el mismo chat: lo único que cambia es con qué mensajes
-    const withMessages = (messages: Message[]) =>
-      chatsWithThinking.map(chat => chat.id === chatId ? { ...chat, messages } : chat);
 
     // El prompt se guarda ANTES de generar para que cerrar la pestaña a mitad no se lleve
     // lo que el usuario acaba de escribir: se pierde la respuesta, nunca la pregunta.
     // Persistimos historyToSend y no chatsWithThinking a propósito: el "pensando" es
     // isTemporary y en disco quedaría congelado y sin botón de reintentar (handleRetryMessage
     // descarta los isTemporary). El estado que queda es el mismo que ya deja abortar.
-    persistIfOffline(withMessages(historyToSend));
+    persistIfOffline(chatsWithThinking.map(chat => chat.id === chatId ? { ...chat, messages: historyToSend } : chat));
 
     // Se asigna dentro del try, no aquí: el servidor comprueba que el chat exista y sea
     // tuyo, y es beforeRequest quien lo materializa en Mongo. Vive fuera para que el catch
@@ -612,14 +631,11 @@ export default function App() {
 
       // Reemplazamos el "pensando" por la respuesta real y sellamos los _id de MongoDB.
       // El || rescata el _id que el mensaje ya tuviera: al reintentar existe, al enviar no.
-      const finalChats = withMessages([
+      commitChatMessages(chatId, [
         ...historyToSend.slice(0, -1),
         { ...userMessage, _id: userMessageId || userMessage._id },
         { role: "model", parts: [{ text: response.text }], _id: aiMessageId, createdAt: new Date().toISOString(), model: activeModel }
       ]);
-
-      setChatList(finalChats);
-      persistIfOffline(finalChats);
 
       options.onSuccess?.(response.text);
     } catch (error) {
@@ -636,17 +652,13 @@ export default function App() {
 
       if (err.name === 'AbortError') {
         // Abortar deja la conversación tal y como se envió, sin respuesta
-        const abortedChats = withMessages(sealedHistory);
-        setChatList(abortedChats);
-        persistIfOffline(abortedChats);
+        commitChatMessages(chatId, sealedHistory);
       } else if (err.message === 'SESSION_EXPIRED') {
         resetSessionToDefault();
         alert("Session expired. Please log in again.");
       } else {
         // El error ocupa el sitio del "pensando", y también debe quedar en disco
-        const failedChats = withMessages([...sealedHistory, { role: "model" as const, parts: [{ text: `Error: ${err.message}` }], createdAt: new Date().toISOString() }]);
-        setChatList(failedChats);
-        persistIfOffline(failedChats);
+        commitChatMessages(chatId, [...sealedHistory, { role: "model" as const, parts: [{ text: `Error: ${err.message}` }], createdAt: new Date().toISOString() }]);
       }
     } finally {
       if (abortControllerRef.current === controller) {
@@ -701,21 +713,25 @@ export default function App() {
     });
   }
 
+  // Por referencia y no por el cierre del render: handleDeleteMessage llama aquí después
+  // de dos await, y para entonces su copia de chatList puede haber envejecido.
   function handleDeleteChat(chatId: string) {
     if (!chatId) return;
-    const updatedChats = chatList.filter(chat => chat.id !== chatId);
+    const activeId = activeChatIdRef.current;
+    const updatedChats = chatListRef.current.filter(chat => chat.id !== chatId);
+    chatListRef.current = updatedChats;
     setChatList(updatedChats);
 
-    if (chatId === activeChatId && updatedChats.length === 0) {
+    if (chatId === activeId && updatedChats.length === 0) {
       // Sin chats a los que caer: abrimos la vista de chat nuevo
       startDraftChat(updatedChats);
     } else {
-      const newActiveId = chatId === activeChatId ? updatedChats[0].id : activeChatId;
+      const newActiveId = chatId === activeId ? updatedChats[0].id : activeId;
       setActiveChatId(newActiveId);
       persistIfOffline(updatedChats);
     }
 
-    if (isAuthenticated) {
+    if (isAuthenticatedRef.current) {
       deleteChatFromServer(chatId);
     }
   }
