@@ -1,3 +1,5 @@
+import { isMobileViewport } from './uiPreferences';
+
 export type SidebarSide = 'left' | 'right';
 
 export function initResizer(side: SidebarSide = 'left'): () => void {
@@ -12,7 +14,11 @@ export function initResizer(side: SidebarSide = 'left'): () => void {
 
     if (!resizer || !panelSection) return () => {};
 
-    const MIN_WIDTH = 300;
+    // Suelo al arrastrar. El ancho por defecto (300px) vive solo en el CSS: aqui no se
+    // fija ninguno, se parte del que ya tenga el panel. Este valor tiene que coincidir con
+    // el min-width de .sidebar-section / .settings-section en index.css, que es quien de
+    // verdad impide que el panel se encoja mas de la cuenta.
+    const MIN_WIDTH = 260;
     const MESSAGE_MIN_WIDTH = 400;
 
     // Función dinámica para calcular el ancho total de resizers presentes en el DOM (0px, 3px o 6px)
@@ -33,8 +39,10 @@ export function initResizer(side: SidebarSide = 'left'): () => void {
         return window.innerWidth - oppositeWidth - MESSAGE_MIN_WIDTH - resizersTotalWidth;
     };
 
-    // Restaurar ancho guardado en localStorage si existe, validando los límites
-    const savedWidthStr = localStorage.getItem(storageKey);
+    // Restaurar ancho guardado en localStorage si existe, validando los límites.
+    // En móvil no: ahí los paneles son drawers (85vw) y el resizer está oculto, así que un
+    // ancho en línea solo serviría para pisar el CSS del drawer con una medida de escritorio.
+    const savedWidthStr = isMobileViewport() ? null : localStorage.getItem(storageKey);
     if (savedWidthStr) {
         let savedWidth = parseInt(savedWidthStr, 10);
         if (!isNaN(savedWidth)) {

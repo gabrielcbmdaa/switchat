@@ -36,12 +36,16 @@ body {
 }
 
 /* SIDEBAR-SECTION */
+/* width es el ancho por defecto, el que se ve sin haber arrastrado nunca el resizer.
+   min-width es el suelo al arrastrar, y tiene que coincidir con MIN_WIDTH de
+   utils/resizer.ts: sin este min-width, el ancho en linea que pone el resizer no podria
+   bajar de 300 por mucho que el JS lo permitiera. */
 .sidebar-section {
   flex: none;
   display: flex;
   flex-direction: column;
   width: 300px;
-  min-width: 300px;
+  min-width: 260px;
   height: 100%;
 }
 
@@ -61,12 +65,13 @@ body {
 }
 
 /* SETTINGS-SECTION */
+/* Mismo criterio que .sidebar-section: 300 por defecto, 260 de suelo. */
 .settings-section {
   flex: none;
   display: flex;
   flex-direction: column;
   width: 300px;
-  min-width: 300px;
+  min-width: 260px;
   height: 100%;
   background-color: #191919;
 }
