@@ -22,9 +22,15 @@ function escapeHtml(text: string): string {
 const markdown = new Marked({
     renderer: {
         code({ text, lang, escaped }) {
-            const language = (lang || '').match(/^\S*/)?.[0] ?? '';
+            // La marca de un ``` puede traer mas de una palabra ("js showLineNumbers"); solo
+            // la primera es el lenguaje.
+            const language = (lang ?? '').trim().split(/\s+/)[0];
             const languageClass = language ? ` class="language-${escapeHtml(language)}"` : '';
-            const code = escaped ? text : escapeHtml(text.replace(/\n$/, ''));
+            // El salto final se recorta antes de decidir si escapar: el <code> siempre acaba
+            // en un unico \n, lo escribiera quien lo escribiera. "escaped" viene a true
+            // cuando un plugin ya escapo el texto por su cuenta.
+            const trimmed = text.replace(/\n$/, '');
+            const code = escaped ? trimmed : escapeHtml(trimmed);
             // El boton va fuera del <pre> a proposito: el <pre> hace scroll horizontal, asi
             // que un boton dentro se desplazaria al arrastrar el codigo hacia un lado.
             // Los dos iconos se pintan siempre y el CSS decide cual se ve, porque este HTML
@@ -63,12 +69,13 @@ export default function MessageBubble({ msg, isUser, onDelete, onRetry }: Messag
     // como HTML plano, no como elementos de React, asi que no se les puede poner onClick.
     // El click igualmente sube hasta aqui y closest() nos dice si nacio en un boton.
     const handleCodeCopy = async (event: React.MouseEvent<HTMLDivElement>) => {
-        const button = (event.target as HTMLElement).closest<HTMLButtonElement>('[data-copy-code]');
+        // El click nace casi siempre en el <svg> del icono, que es un Element pero no un
+        // HTMLElement; closest() esta en Element, asi que ese es el tipo correcto.
+        const button = (event.target as Element).closest<HTMLButtonElement>('[data-copy-code]');
         if (!button) return;
 
         // Leemos el texto del DOM, que es el codigo ya desescapado y tal cual se ve.
         const code = button.parentElement?.querySelector('code')?.textContent ?? '';
-        if (!code) return;
 
         try {
             await navigator.clipboard.writeText(code);
