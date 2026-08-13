@@ -38,37 +38,45 @@ export function initResizer(side: SidebarSide): () => void {
         return window.innerWidth - oppositeWidth - MESSAGE_MIN_WIDTH - resizersTotalWidth;
     };
 
-    // Restaurar ancho guardado en localStorage si existe, validando los límites.
-    // En móvil no: ahí los paneles son drawers (85vw) y el resizer está oculto, así que un
-    // ancho en línea solo serviría para pisar el CSS del drawer con una medida de escritorio.
-    const savedWidthStr = isMobileViewport() ? null : localStorage.getItem(storageKey);
-    if (savedWidthStr) {
-        let savedWidth = parseInt(savedWidthStr, 10);
-        if (!isNaN(savedWidth)) {
-            const maxWidth = calculateMaxWidth();
-            savedWidth = Math.max(MIN_WIDTH, Math.min(savedWidth, maxWidth));
-            panelSection.style.width = `${savedWidth}px`;
+    // Ancho que ha pedido el usuario, sin recortar. null significa que nunca se arrastró,
+    // así que manda el width por defecto del CSS y aquí no se toca nada. Se guarda en crudo
+    // a propósito: el recorte depende del tamaño de la ventana, que cambia, así que se
+    // recalcula en cada aplicación en vez de quedarse congelado.
+    const savedWidth = parseInt(localStorage.getItem(storageKey) ?? '', 10);
+    let desiredWidth: number | null = isNaN(savedWidth) ? null : savedWidth;
+
+    // Único sitio que escribe el ancho del panel.
+    // En móvil lo borra en vez de calcularlo: ahí el panel es un drawer y su ancho es cosa
+    // del CSS (85vw), pero un ancho en línea le gana siempre a la hoja de estilos, así que
+    // la única forma de devolverle el mando al CSS es quitar la propiedad.
+    const applyWidth = () => {
+        if (isMobileViewport()) {
+            panelSection.style.removeProperty('width');
+            return;
         }
-    }
+        if (desiredWidth === null) return;
+        panelSection.style.width = `${Math.max(MIN_WIDTH, Math.min(desiredWidth, calculateMaxWidth()))}px`;
+    };
+
+    applyWidth();
 
     let xCoordinate = 0;
     let initialWidth = 0;
 
     const mouseMoveHandler = function (e: MouseEvent) {
         const deltaX = e.clientX - xCoordinate;
-        let newWidth = isLeft ? (initialWidth + deltaX) : (initialWidth - deltaX);
-        const maxWidth = calculateMaxWidth();
-
-        newWidth = Math.max(MIN_WIDTH, Math.min(newWidth, maxWidth));
-        panelSection.style.width = `${newWidth}px`;
+        desiredWidth = isLeft ? (initialWidth + deltaX) : (initialWidth - deltaX);
+        applyWidth();
     };
 
     const mouseUpHandler = function () {
         document.removeEventListener('mousemove', mouseMoveHandler);
         document.removeEventListener('mouseup', mouseUpHandler);
 
-        const finalWidth = panelSection.getBoundingClientRect().width;
-        localStorage.setItem(storageKey, `${finalWidth}`);
+        // Se guarda el ancho que quedó en pantalla, no el que pedía el ratón: si el arrastre
+        // se pasó del máximo, lo que vale es lo que se ve.
+        desiredWidth = panelSection.getBoundingClientRect().width;
+        localStorage.setItem(storageKey, `${desiredWidth}`);
     };
 
     const mouseDownHandler = function (e: MouseEvent) {
@@ -81,11 +89,19 @@ export function initResizer(side: SidebarSide): () => void {
         e.preventDefault();
     };
 
+    // El ancho se validaba solo al arrancar y al arrastrar, nunca al cambiar el tamaño de la
+    // ventana: el ancho en línea se quedaba clavado, aplastando el área de mensajes al
+    // achicar y pisando el drawer al cruzar a móvil. Con esto se vuelve a aplicar, y como
+    // applyWidth recalcula el límite contra la ventana de ahora, los dos casos se arreglan.
+    const resizeHandler = () => applyWidth();
+
     resizer.addEventListener('mousedown', mouseDownHandler);
+    window.addEventListener('resize', resizeHandler);
 
     // Retorna la función de limpieza (cleanup) para desmontar event listeners en React
     return () => {
         resizer.removeEventListener('mousedown', mouseDownHandler);
+        window.removeEventListener('resize', resizeHandler);
         document.removeEventListener('mousemove', mouseMoveHandler);
         document.removeEventListener('mouseup', mouseUpHandler);
     };
