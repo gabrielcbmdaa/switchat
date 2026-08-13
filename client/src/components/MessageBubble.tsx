@@ -1,10 +1,49 @@
 import { useState } from 'react';
-import { marked } from 'marked';
+import { Marked } from 'marked';
 import styles from './MessageBubble.module.css';
 import type { Message } from '../types';
 
+// Al sustituir el renderer de bloques de codigo perdemos el escapado que marked hacia por
+// su cuenta, y este HTML termina en un dangerouslySetInnerHTML. Sin esto, un modelo que
+// devuelva etiquetas dentro de ``` haria que el navegador las interpretara en vez de
+// mostrarlas.
+function escapeHtml(text: string): string {
+    return text
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+}
+
+// Instancia propia de marked con un unico cambio: cada bloque ``` sale envuelto en un div
+// con el boton de copiar. Es "new Marked" y no "marked.use" para no alterar la
+// configuracion global de la libreria.
+const markdown = new Marked({
+    renderer: {
+        code({ text, lang, escaped }) {
+            const language = (lang || '').match(/^\S*/)?.[0] ?? '';
+            const languageClass = language ? ` class="language-${escapeHtml(language)}"` : '';
+            const code = escaped ? text : escapeHtml(text.replace(/\n$/, ''));
+            // El boton va fuera del <pre> a proposito: el <pre> hace scroll horizontal, asi
+            // que un boton dentro se desplazaria al arrastrar el codigo hacia un lado.
+            // Los dos iconos se pintan siempre y el CSS decide cual se ve, porque este HTML
+            // no lo controla React y no puede reaccionar a un useState.
+            return (
+                `<div class="${styles.codeBlock}">` +
+                `<button type="button" class="${styles.copyCodeButton}" data-copy-code title="Copy code" aria-label="Copy code">` +
+                `<svg class="${styles.copyCodeIcon}" width="14" height="14" aria-hidden="true"><use href="#icon-copy"></use></svg>` +
+                `<svg class="${styles.copyCodeIconDone}" width="14" height="14" aria-hidden="true"><use href="#icon-confirm"></use></svg>` +
+                `</button>` +
+                `<pre><code${languageClass}>${code}\n</code></pre>` +
+                `</div>\n`
+            );
+        },
+    },
+});
+
 function renderModelHtml(text: string): string {
-    const html = marked.parse(text) as string;
+    const html = markdown.parse(text) as string;
     return html.replace(/<a /g, '<a target="_blank" rel="noopener noreferrer" ');
 }
 
@@ -19,6 +58,27 @@ export default function MessageBubble({ msg, isUser, onDelete, onRetry }: Messag
     const [copied, setCopied] = useState(false);
     const rawText = msg.parts[0]?.text || '';
     const htmlContent = { __html: isUser ? rawText : renderModelHtml(rawText) };
+
+    // Un solo listener en la burbuja en vez de uno por bloque: los botones los crea marked
+    // como HTML plano, no como elementos de React, asi que no se les puede poner onClick.
+    // El click igualmente sube hasta aqui y closest() nos dice si nacio en un boton.
+    const handleCodeCopy = async (event: React.MouseEvent<HTMLDivElement>) => {
+        const button = (event.target as HTMLElement).closest<HTMLButtonElement>('[data-copy-code]');
+        if (!button) return;
+
+        // Leemos el texto del DOM, que es el codigo ya desescapado y tal cual se ve.
+        const code = button.parentElement?.querySelector('code')?.textContent ?? '';
+        if (!code) return;
+
+        try {
+            await navigator.clipboard.writeText(code);
+            // El estado "copiado" vive en el propio nodo porque React no repinta este HTML.
+            button.classList.add(styles.copied);
+            window.setTimeout(() => button.classList.remove(styles.copied), 2000);
+        } catch (err) {
+            console.error('Failed to copy code to clipboard:', err);
+        }
+    };
 
     const handleCopy = async () => {
         try {
@@ -35,6 +95,7 @@ export default function MessageBubble({ msg, isUser, onDelete, onRetry }: Messag
             <div
                 className={`${styles.messageBubble} ${isUser ? styles.userBubble : styles.geminiBubble}`}
                 data-message-bubble
+                onClick={handleCodeCopy}
                 dangerouslySetInnerHTML={htmlContent}
             />
             <div className={styles.messageActions}>

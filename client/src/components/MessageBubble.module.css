@@ -64,6 +64,61 @@
     display: block;
 }
 
+/* Envoltorio del bloque de codigo: es el ancla del boton de copiar. El margen pasa del
+   <pre> al envoltorio para que el boton se posicione respecto al borde visible del bloque. */
+.messageBubble .codeBlock {
+    position: relative;
+    margin: 10px 0;
+}
+
+.messageBubble .codeBlock pre {
+    margin: 0;
+}
+
+.copyCodeButton {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    width: 26px;
+    height: 26px;
+    padding: 0;
+    background-color: #191919;
+    border: none;
+    border-radius: 20px;
+    color: #858585;
+    cursor: pointer;
+    opacity: 0;
+    transition: opacity 0.2s ease-in-out, background-color 0.3s ease, color 0.3s ease;
+}
+
+.messageBubble .codeBlock:hover .copyCodeButton,
+.copyCodeButton:focus-visible,
+.copyCodeButton.copied {
+    opacity: 1;
+}
+
+.copyCodeButton:hover {
+    background-color: #858585;
+    color: #191919;
+}
+
+/* Los dos iconos estan en el DOM desde el principio; el estado de copiado solo cambia
+   cual de los dos se muestra. */
+.copyCodeIconDone {
+    display: none;
+}
+
+.copyCodeButton.copied .copyCodeIcon {
+    display: none;
+}
+
+.copyCodeButton.copied .copyCodeIconDone {
+    display: block;
+}
+
 .messageBubble ol,
 .messageBubble ul {
     padding-left: 1.5rem;
@@ -131,5 +186,9 @@
     }
     .messageBubble pre {
         padding: 8px 10px;
+    }
+    /* En tactil no hay hover, asi que el boton se queda visible como las otras acciones. */
+    .copyCodeButton {
+        opacity: 0.75;
     }
 }
