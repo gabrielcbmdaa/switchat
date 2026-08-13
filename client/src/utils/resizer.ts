@@ -2,7 +2,7 @@ import { isMobileViewport } from './uiPreferences';
 
 export type SidebarSide = 'left' | 'right';
 
-export function initResizer(side: SidebarSide = 'left'): () => void {
+export function initResizer(side: SidebarSide): () => void {
     const isLeft = side === 'left';
     const resizerId = isLeft ? 'left-resizer' : 'right-resizer';
     const panelId = isLeft ? 'sidebar-section' : 'settings-section';
@@ -21,14 +21,13 @@ export function initResizer(side: SidebarSide = 'left'): () => void {
     const MIN_WIDTH = 260;
     const MESSAGE_MIN_WIDTH = 400;
 
-    // Función dinámica para calcular el ancho total de resizers presentes en el DOM (0px, 3px o 6px)
+    // Ancho total que ocupan los separadores presentes en el DOM (0px, 3px o 6px). Se suma
+    // lo que midan de verdad: un separador oculto mide 0 y no debe descontar nada.
     const getResizersTotalWidth = () => {
-        const leftResizer = document.getElementById('left-resizer');
-        const rightResizer = document.getElementById('right-resizer');
-        let totalWidth = 0;
-        if (leftResizer) totalWidth += (leftResizer.getBoundingClientRect().width || 3);
-        if (rightResizer) totalWidth += (rightResizer.getBoundingClientRect().width || 3);
-        return totalWidth;
+        return ['left-resizer', 'right-resizer'].reduce((total, id) => {
+            const element = document.getElementById(id);
+            return total + (element ? element.getBoundingClientRect().width : 0);
+        }, 0);
     };
 
     // Función helper DRY para calcular el ancho máximo permitido para la barra lateral
