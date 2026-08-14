@@ -280,7 +280,7 @@ switchat/
 
 ### Backend
 - **Node.js** & **Express 5** for the API REST backend.
-- **Mongoose** and the **Native MongoDB Client** working side-by-side.
+- **Mongoose** as the single ODM and connection to **MongoDB**.
 - **JWT (JsonWebToken)** for session management and route protection.
 - **Bcrypt** for hashing user credentials.
 - Environment variables support via **dotenv**.
