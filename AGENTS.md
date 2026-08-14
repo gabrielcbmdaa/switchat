@@ -117,6 +117,8 @@ When creating or modifying UI components in `client/`, **respecting the strict v
 
 > 📘 CSS tokens and global styles: `client/src/index.css`.
 
+> 🎨 **Before creating or modifying any UI, invoke the `switchat-design-system` skill** (`.agents/skills/switchat-design-system/`). The list above is a summary kept short on purpose; the skill is the reference, with the full palette, spacing scale, component specs and interaction states.
+
 ---
 
 ## 📝 7. Code, Commit and Security Conventions
@@ -125,7 +127,7 @@ When creating or modifying UI components in `client/`, **respecting the strict v
   - **Legacy exception:** parts of the code still carry Spanish comments and error messages from before this rule. Do not launch a mass rewrite from an unrelated task, but whenever you touch a file, translate what you touch. New code has no excuse.
 - **Strict TypeScript:** Keep explicit typing in `client/src/types.ts`. Avoid `any`.
 - **Dual Sync:** If you change how chats or messages are stored, make sure it stays compatible with both `localStorage` (Offline) and `api.ts` (Online).
-- **Commits:** Use **Conventional Commits** (`feat: ...`, `fix: ...`, `refactor: ...`, `docs: ...`).
+- **Commits:** Use **Conventional Commits** (`feat: ...`, `fix: ...`, `refactor: ...`, `docs: ...`). **Invoke the `smart-commit` skill** (`.agents/skills/smart-commit/`) to write any commit message here — it holds the exact rules this repository uses: lowercase summary ending in a period, `(client)` / `(server)` as the only scopes (omitted when a change spans both), `* ` bullets in the body, and the blank line after the header that Git needs to tell subject from body. Never add an AI `Co-authored-by` trailer: GitHub counts it as a real contributor. This applies to **every** commit, including ones made from inside an implementation plan or by a dispatched subagent — a plan step that says "Commit" does not waive it.
 - **Security:** NEVER modify or expose keys or secrets stored in `.secrets/` or `.env`.
 - **Mandatory Verification:** Always run `pnpm build`, `pnpm lint` and `pnpm test` before declaring a task finished. `pnpm build` is the client (`tsc -b` + `vite build`), `pnpm lint` is the client only (the server has no lint script), and `pnpm test` covers both workspaces. This is not etiquette: `.github/workflows/deploy.yml` runs those same three on every push to `main`, in a throwaway runner with its own `mongo:7`, and the deploy job declares `needs: test` — so anything red here blocks production, and the VPS is simply left untouched.
 - **Tests (`server/tests/`):** integration tests, run with the built-in `node:test` runner plus `supertest`. They import the real Express app from `server/app.js` and hit a real MongoDB — no mocks. That is deliberate: the bugs they guard against were *missing query filters*, and a mocked model reports the call as made whether or not the filter is there. `server/app.js` must therefore stay free of side effects on import: no connections, no `listen`. Those belong in `server/server.js`.
