@@ -73,6 +73,12 @@ jobs:
           host: ${{ secrets.SSH_HOST }}
           username: ${{ secrets.SSH_USER }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
+          # Without this the commands below run as five independent orders: a failing build
+          # does not stop the restart, so pm2 comes back up with the new server code and the
+          # previous client bundle, and the step still exits green because only the last
+          # command is looked at. Stopping at the first failure means a half-applied deploy
+          # is reported as the failure it is.
+          script_stop: true
           script: |
             # 1. Enter in the root project folder
             cd ~/switchat
@@ -81,8 +87,10 @@ jobs:
             git fetch origin
             git reset --hard origin/main
 
-            #3. Install dependencies
-            pnpm install
+            # 3. Install dependencies
+            # --frozen-lockfile matches the test job, so that job is a real rehearsal of this
+            # install. Without it the VPS was free to resolve versions the tests never saw.
+            pnpm install --frozen-lockfile
 
             #4. Build the project
             pnpm build
