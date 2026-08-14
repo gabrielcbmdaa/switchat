@@ -14,6 +14,21 @@ export function isMobileViewport(): boolean {
     return typeof window !== 'undefined' && window.innerWidth < MOBILE_BREAKPOINT;
 }
 
+// Anchos del layout de escritorio, tal y como están en index.css. Ninguna de las tres
+// columnas cede: los paneles llevan flex: none y el área de mensajes su propio min-width.
+// Si no caben, el layout no se reparte: se sale por la derecha.
+const PANEL_WIDTH = 300;
+const MESSAGE_MIN_WIDTH = 400;
+const RESIZER_WIDTH = 3;
+
+// 1006px: los dos paneles a su ancho por defecto, sus dos separadores y el mínimo del chat.
+// Se mide con el ancho por defecto y no con el mínimo de 260px a propósito: un panel que
+// nunca se ha arrastrado no tiene ancho en línea, así que nadie lo encoge.
+export function fitsBothPanels(): boolean {
+    return typeof window !== 'undefined'
+        && window.innerWidth >= PANEL_WIDTH * 2 + MESSAGE_MIN_WIDTH + RESIZER_WIDTH * 2;
+}
+
 export type PanelSide = 'left' | 'right';
 
 const VIEW_KEYS: Record<PanelSide, string> = { left: 'leftPanelView', right: 'rightPanelView' };
@@ -72,5 +87,10 @@ export function savePanelOpen(side: PanelSide, isOpen: boolean) {
     // En móvil abrir/cerrar el drawer es navegación (seleccionar un chat lo cierra),
     // no una preferencia de layout: no debe pisar lo elegido en escritorio.
     if (isMobileViewport()) return;
+    // Por el mismo motivo, un cierre forzado por una ventana estrecha tampoco es una
+    // preferencia: al volver a una ventana ancha tiene que reaparecer lo que se eligió.
+    // Cuesta que un cierre deliberado en ventana estrecha no se recuerde, pero a ese ancho
+    // se volvería a cerrar solo de todas formas, así que no se nota.
+    if (!isOpen && !fitsBothPanels()) return;
     writeItem(OPEN_KEYS[side], `${isOpen}`);
 }

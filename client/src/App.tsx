@@ -13,7 +13,7 @@ import NotesView from './views/NotesView';
 import LegalView from './views/LegalView';
 import { loadDefaultModel, saveDefaultModel, resolveReasoningLevel } from './utils/modelPreferences';
 import SelectionToolbar from './components/SelectionToolbar';
-import { isMobileViewport, loadPanelView, savePanelView, loadPanelOpen, savePanelOpen, loadActiveChatId, saveActiveChatId } from './utils/uiPreferences';
+import { isMobileViewport, fitsBothPanels, loadPanelView, savePanelView, loadPanelOpen, savePanelOpen, loadActiveChatId, saveActiveChatId } from './utils/uiPreferences';
 import { syncApiKeysWithServer } from './utils/apiKeys';
 import type { LeftPanelView, RightPanelView } from './utils/uiPreferences';
 
@@ -109,6 +109,24 @@ export default function App() {
     savePanelOpen('right', isRightPanelOpen);
   }, [isRightPanelOpen]);
 
+  // Ninguna de las tres columnas de escritorio se encoge: los paneles llevan flex: none y
+  // el área de mensajes tiene min-width. Por debajo de 1006px no caben las tres y el layout
+  // se salía por la derecha. Se cierra el panel derecho, que es el accesorio, para que el
+  // chat nunca baje de sus 400px. Se comprueba también al montar: la ventana pudo cambiar
+  // de tamaño con la pestaña cerrada.
+  useEffect(() => {
+    if (!isLeftPanelOpen || !isRightPanelOpen) return;
+
+    const closeRightPanelIfTight = () => {
+      if (isMobileViewport() || fitsBothPanels()) return;
+      setIsRightPanelOpen(false);
+    };
+
+    closeRightPanelIfTight();
+    window.addEventListener('resize', closeRightPanelIfTight);
+    return () => window.removeEventListener('resize', closeRightPanelIfTight);
+  }, [isLeftPanelOpen, isRightPanelOpen]);
+
   // El chat activo se guarda con sesión y sin ella: es una preferencia de UI, igual
   // que los paneles de arriba. El id del borrador también se guarda; al recargar no
   // estará en la lista y la carga inicial abrirá un chat nuevo, que es lo correcto.
@@ -150,6 +168,20 @@ export default function App() {
       setIsLeftPanelOpen(false);
       setIsRightPanelOpen(false);
     }
+  }
+
+  // Abrir un panel cuando no caben los dos cierra el otro: se queda el último que pides.
+  // En móvil no aplica, ahí los paneles flotan sobre el chat y no le roban sitio.
+  function toggleLeftPanel() {
+    const willOpen = !isLeftPanelOpen;
+    setIsLeftPanelOpen(willOpen);
+    if (willOpen && !isMobileViewport() && !fitsBothPanels()) setIsRightPanelOpen(false);
+  }
+
+  function toggleRightPanel() {
+    const willOpen = !isRightPanelOpen;
+    setIsRightPanelOpen(willOpen);
+    if (willOpen && !isMobileViewport() && !fitsBothPanels()) setIsLeftPanelOpen(false);
   }
 
   // En móvil el panel izquierdo es un drawer que tapa el chat: al navegar lo cerramos.
@@ -966,8 +998,8 @@ export default function App() {
               onStopGeneration={handleStopGeneration}
               isLeftSidebarOpen={activeLeftPanel !== null}
               isRightSidebarOpen={activeRightPanel !== null}
-              onToggleLeftSidebar={() => setIsLeftPanelOpen((prev) => !prev)}
-              onToggleRightSidebar={() => setIsRightPanelOpen((prev) => !prev)}
+              onToggleLeftSidebar={toggleLeftPanel}
+              onToggleRightSidebar={toggleRightPanel}
             />
           )}
         </main>
