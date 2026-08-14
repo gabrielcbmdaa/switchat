@@ -11,11 +11,16 @@ function issueSessionCookie(res, user) {
     { expiresIn: '7d' } // La pulsera expira en 7 días
   );
 
+  // Do not relax sameSite to 'lax' or 'none' without reading this first. It is what stops a
+  // page on another domain from making the browser attach this cookie to a request, and the
+  // routes it guards no longer hold only chats: /api/keys hands out the user's provider API
+  // keys. 'lax' is the usual reflex when a sign-in flow misbehaves — if that ever comes up,
+  // fix the flow, and check the ALLOWED_ORIGINS list in app.js before touching this line.
   res.cookie('token', token, {
-    httpOnly: true,                                // 👈 Protege contra XSS (JS no puede leer esta cookie)
-    secure: process.env.NODE_ENV === 'production', // 👈 Solo HTTPS en producción (en desarrollo permite HTTP)
-    sameSite: 'strict',                            // 👈 Protege contra CSRF (la cookie no se envía desde otros sitios)
-    maxAge: 7 * 24 * 60 * 60 * 1000               // 👈 Expira en 7 días (igual que el token)
+    httpOnly: true,                                // JavaScript cannot read this cookie, so XSS cannot steal it
+    secure: process.env.NODE_ENV === 'production', // HTTPS only in production; plain HTTP is allowed in development
+    sameSite: 'strict',                            // The browser never sends it on requests coming from another site
+    maxAge: 7 * 24 * 60 * 60 * 1000               // Expires in 7 days, same as the token
   });
 }
 
