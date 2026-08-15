@@ -131,7 +131,7 @@ async function sendToGoogle(
         'high': 'HIGH'
     };
 
-    // Gemini 3.x y 2.5 no entienden 'off': lo mínimo que aceptan es el nivel más bajo que
+    // Gemini 3.x no entiende 'off': lo mínimo que acepta es el nivel más bajo que
     // el modelo declare en MODEL_REGISTRY (las listas van de menor a mayor). La forma
     // antigua de apagarlo —thinkingConfig.thinkingBudget: 0— devuelve "Request contains
     // an invalid argument" en estos modelos, y es lo que impedía generar títulos, que es

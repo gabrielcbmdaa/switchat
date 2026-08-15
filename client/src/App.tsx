@@ -11,7 +11,7 @@ import SettingView from './views/SettingsView';
 import MessageView from './views/MessageView';
 import NotesView from './views/NotesView';
 import LegalView from './views/LegalView';
-import { loadDefaultModel, saveDefaultModel, resolveReasoningLevel } from './utils/modelPreferences';
+import { loadDefaultModel, saveDefaultModel, resolveReasoningLevel, migrateRetiredModels } from './utils/modelPreferences';
 import SelectionToolbar from './components/SelectionToolbar';
 import { isMobileViewport, fitsBothPanels, loadPanelView, savePanelView, loadPanelOpen, savePanelOpen, loadActiveChatId, saveActiveChatId } from './utils/uiPreferences';
 import { syncApiKeysWithServer } from './utils/apiKeys';
@@ -322,7 +322,7 @@ export default function App() {
 
           if (serverChats && serverChats.length > 0) {
             // Online: solo state. No escribir chats del servidor en localStorage.
-            setChatList(serverChats);
+            setChatList(migrateRetiredModels(serverChats));
             setActiveChatId(
               localActiveId && serverChats.some((chat: Chat) => chat.id === localActiveId)
                 ? localActiveId
@@ -340,7 +340,7 @@ export default function App() {
           serverChats = await loadChatsFromServer();
           if (cancelled) return;
           if (serverChats && serverChats.length > 0) {
-            setChatList(serverChats);
+            setChatList(migrateRetiredModels(serverChats));
             setActiveChatId(serverChats[0].id);
             return;
           }
@@ -368,7 +368,7 @@ export default function App() {
         saveToLocalDisk(initialChats);
       }
 
-      setChatList(initialChats);
+      setChatList(migrateRetiredModels(initialChats));
       if (initialActiveId && initialChats.some((chat) => chat.id === initialActiveId)) {
         setActiveChatId(initialActiveId);
       } else {
@@ -566,7 +566,7 @@ export default function App() {
       const serverChats = await loadChatsFromServer();
 
       if (serverChats && serverChats.length > 0) {
-        setChatList(serverChats);
+        setChatList(migrateRetiredModels(serverChats));
         setActiveChatId(serverChats[0].id);
       } else {
         // Cuenta nueva: welcome real en servidor (id estable). No pisar chats locales.
@@ -602,7 +602,7 @@ export default function App() {
       localActiveId = localChats[0].id;
     }
 
-    setChatList(localChats);
+    setChatList(migrateRetiredModels(localChats));
     setActiveChatId(localActiveId);
     setDraftChat(null);
     setHasMoreMap({});

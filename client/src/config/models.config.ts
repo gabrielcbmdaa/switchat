@@ -55,20 +55,6 @@ export const MODEL_REGISTRY: Record<string, ModelConfig> = {
         thinkingBudgets: {},
     },
 
-    // ── Google Gemini 2.5 ────────────────────────────────────
-    'gemini-2.5-pro': {
-        thinkingLevels: ['low', 'medium', 'high'],
-        defaultThinking: 'high',
-        provider: 'google',
-        thinkingBudgets: {},
-    },
-    'gemini-2.5-flash': {
-        thinkingLevels: ['low', 'medium', 'high'],
-        defaultThinking: 'high',
-        provider: 'google',
-        thinkingBudgets: {},
-    },
-
     // ── Anthropic Claude ─────────────────────────────────────
     'claude-fable-5': {
         thinkingLevels: ['minimal', 'low', 'medium', 'high'],
@@ -146,6 +132,21 @@ export const MODEL_REGISTRY: Record<string, ModelConfig> = {
         thinkingBudgets: {},
     },
 };
+
+/**
+ * Modelos que estuvieron en el registro y ya no.
+ *
+ * Hace falta la lista aparte porque borrarlos no basta: los chats guardados siguen
+ * apuntando a ellos. Y no vale con migrar "todo lo que el registro no conozca" — los ids
+ * de LM Studio y Ollama se escriben a mano y nunca están aquí, así que esa regla le
+ * cambiaría al usuario sus modelos locales. Esta lista dice "esto lo quitamos nosotros",
+ * que no es lo mismo que "esto no lo conocemos".
+ */
+export const RETIRED_MODELS: readonly string[] = ['gemini-2.5-pro', 'gemini-2.5-flash'];
+
+export function isRetiredModel(modelName: string): boolean {
+    return RETIRED_MODELS.includes(modelName.toLowerCase());
+}
 
 /**
  * Busca la configuración de un modelo por su nombre exacto.

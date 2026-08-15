@@ -1,4 +1,5 @@
-import { getModelConfig } from '../config/models.config';
+import { getModelConfig, isRetiredModel } from '../config/models.config';
+import type { Chat } from '../types';
 
 // Modelo con el que arranca la app cuando no hay ninguna preferencia guardada.
 export const DEFAULT_MODEL = 'gemini-3.5-flash';
@@ -58,4 +59,23 @@ export function resolveReasoningLevel(model: string, stored?: string): string {
     if (levels.length === 0) return REASONING_OFF;
     if (stored && levels.includes(stored)) return stored;
     return getModelConfig(model)?.defaultThinking ?? REASONING_OFF;
+}
+
+/**
+ * Sustituye los modelos retirados por la preferencia global, que es el último modelo que
+ * el usuario eligió (handleModelChange la reescribe en cada cambio). Cualquier otro id se
+ * devuelve intacto.
+ *
+ * Se llama al cargar los chats, vengan del disco o del servidor. No fuerza una escritura:
+ * online serían tantas llamadas de red como chats migrados justo al entrar, y el cambio se
+ * persiste solo la próxima vez que ese chat se guarde por cualquier otro motivo. Mientras
+ * tanto no molesta, porque migrar es idempotente y cuesta una comparación de texto.
+ */
+export function migrateRetiredModels(chats: Chat[]): Chat[] {
+    if (!chats.some((chat) => chat.model && isRetiredModel(chat.model))) return chats;
+
+    const replacement = loadDefaultModel();
+    return chats.map((chat) =>
+        chat.model && isRetiredModel(chat.model) ? { ...chat, model: replacement } : chat
+    );
 }
