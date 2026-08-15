@@ -18,6 +18,8 @@ export interface Chat {
   messages: Message[];
   systemPrompt?: string;
   systemPromptEnabled?: boolean;
+  // Absent on chats created before this field; absent means off.
+  notesEnabled?: boolean;
   // Ausentes en los chats creados antes de que estos ajustes fueran por chat:
   // el modelo se resuelve contra la preferencia global y el nivel contra el modelo.
   model?: string;
