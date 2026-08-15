@@ -15,6 +15,7 @@ import { loadDefaultModel, saveDefaultModel, resolveReasoningLevel, migrateRetir
 import SelectionToolbar from './components/SelectionToolbar';
 import { isMobileViewport, fitsBothPanels, loadPanelView, savePanelView, loadPanelOpen, savePanelOpen, loadActiveChatId, saveActiveChatId } from './utils/uiPreferences';
 import { syncApiKeysWithServer } from './utils/apiKeys';
+import { matchPanelShortcut } from './utils/keyboardShortcuts';
 import type { LeftPanelView, RightPanelView } from './utils/uiPreferences';
 
 // El chat nuevo lleva su id real desde el principio: cuando se materialice al enviar
@@ -189,6 +190,25 @@ export default function App() {
     setIsRightPanelOpen(willOpen);
     if (willOpen && !isMobileViewport() && !fitsBothPanels()) setIsLeftPanelOpen(false);
   }
+
+  // ⌘B abre y cierra el panel derecho, ⌥⌘B el izquierdo (Ctrl y Ctrl+Alt fuera de macOS).
+  //
+  // Sin array de dependencias a propósito: toggleLeftPanel y toggleRightPanel leen
+  // isLeftPanelOpen / isRightPanelOpen directamente, así que con [] el listener se quedaría
+  // mirando el estado del primer render y el panel dejaría de responder tras la primera
+  // pulsación. Volver a suscribirse en cada render cuesta nada y siempre es correcto.
+  useEffect(() => {
+    const handlePanelShortcut = (event: KeyboardEvent) => {
+      const side = matchPanelShortcut(event);
+      if (!side) return;
+      event.preventDefault();
+      if (side === 'left') toggleLeftPanel();
+      else toggleRightPanel();
+    };
+
+    window.addEventListener('keydown', handlePanelShortcut);
+    return () => window.removeEventListener('keydown', handlePanelShortcut);
+  });
 
   // En móvil el panel izquierdo es un drawer que tapa el chat: al navegar lo cerramos.
   function showLeftPanel(view: LeftPanelView) {
