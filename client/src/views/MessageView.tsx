@@ -208,11 +208,6 @@ export default function MessageView({
                         onScroll={handleScroll}
                         style={{ paddingBottom: promptHeight + 16 }}
                     >
-                        {hasMoreMessages && (
-                            <button className={styles.loadMoreButton} onClick={loadMore}>
-                                Load earlier messages
-                            </button>
-                        )}
                         {visibleMessages.map((msg, index) => {
                             // Calcular el índice real en el array completo de messages
                             const realIndex = token ? index : (messages.length - visibleMessages.length + index);
