@@ -1,5 +1,6 @@
 import type { Chat, Message } from "../types";
 import { fetchFromProvider } from "./providers";
+import { composeProviderHistory } from "../utils/notesContext";
 
 export const API_BACKEND_URL = '/api';
 
@@ -318,23 +319,26 @@ export async function saveMessageToServer(
 }
 
 /**
- * Pide la respuesta al proveedor. Siempre desde el navegador: el servidor nunca llama
- * a un proveedor, así que aquí ya no hay dos caminos que mantener en sync.
+ * Asks the provider for a reply. Always from the browser: the server never calls
+ * a provider, so there are no longer two paths to keep in sync.
  *
- * Lo único que añade sobre fetchFromProvider es anteponer el system prompt del chat,
- * que es lo que hace que quien llama no tenga que saber cómo se representa.
+ * The only thing this adds on top of fetchFromProvider is prepending the chat's
+ * system prompt and, when present, the notebook — so the caller does not have
+ * to know how either one is represented.
  */
 export async function fetchChatResponse(
   messagesHistory: Message[],
   model: string,
   reasoningLevel: string,
   systemPrompt?: string,
-  signal?: AbortSignal
+  signal?: AbortSignal,
+  notesText?: string
 ): Promise<{ text: string }> {
-  const trimmedSystemPrompt = (systemPrompt || '').trim();
-  const historyWithSystemPrompt: Message[] = trimmedSystemPrompt
-    ? [{ role: 'system', parts: [{ text: trimmedSystemPrompt }] }, ...messagesHistory]
-    : messagesHistory;
+  const historyWithContext = composeProviderHistory(
+    messagesHistory,
+    systemPrompt,
+    notesText
+  );
 
-  return await fetchFromProvider(model, historyWithSystemPrompt, reasoningLevel, signal);
+  return await fetchFromProvider(model, historyWithContext, reasoningLevel, signal);
 }

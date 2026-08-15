@@ -196,3 +196,53 @@ describe('a failed generation', () => {
         expect(screen.getByText('a doomed prompt')).toBeInTheDocument();
     });
 });
+
+describe('a chat that can read notes', () => {
+    it('sends the notebook to the model without painting it in the transcript', async () => {
+        const answer = deferred<{ text: string }>();
+        api.fetchChatResponse.mockReturnValue(answer.promise);
+        localStorage.setItem('switchat_notes', 'ship the notes reader first');
+
+        render(<App />);
+        await screen.findByText('A question 1');
+
+        await userEvent.click(screen.getByRole('switch', { name: 'Notes' }));
+        await userEvent.type(screen.getByPlaceholderText('Write a message...'), 'what did I write about the project?');
+        await userEvent.click(screen.getByTitle('Send message'));
+        await screen.findByText('Thinking...');
+
+        expect(api.fetchChatResponse).toHaveBeenCalled();
+        const args = api.fetchChatResponse.mock.calls[0];
+        expect(args[5]).toBe('ship the notes reader first');
+        expect(args[0].some((message: Message) =>
+            (message.parts?.[0]?.text || '').includes('ship the notes reader first')
+        )).toBe(false);
+
+        await act(async () => {
+            answer.resolve({ text: 'you wrote: ship the notes reader first' });
+        });
+
+        expect(screen.queryByText('ship the notes reader first')).not.toBeInTheDocument();
+        expect(screen.getByText('what did I write about the project?')).toBeInTheDocument();
+    });
+
+    it('does not send the notebook when the switch is off', async () => {
+        const answer = deferred<{ text: string }>();
+        api.fetchChatResponse.mockReturnValue(answer.promise);
+        localStorage.setItem('switchat_notes', 'ship the notes reader first');
+
+        render(<App />);
+        await screen.findByText('A question 1');
+
+        await userEvent.type(screen.getByPlaceholderText('Write a message...'), 'hello');
+        await userEvent.click(screen.getByTitle('Send message'));
+        await screen.findByText('Thinking...');
+
+        const args = api.fetchChatResponse.mock.calls[0];
+        expect(args[5]).toBeUndefined();
+
+        await act(async () => {
+            answer.resolve({ text: 'hi' });
+        });
+    });
+});

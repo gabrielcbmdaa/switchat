@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import type { Chat, Message } from './types';
-import { loadLocalChats, saveToLocalDisk, getTutorialChat } from './utils/storage';
+import { loadLocalChats, saveToLocalDisk, getTutorialChat, getNotesText } from './utils/storage';
 import { loadChatsFromServer, fetchChatResponse, saveMessageToServer, generateChatTitle, saveChatToServer, syncChatDraftToServer, deleteChatFromServer, deleteMessageFromServer, fetchChatMessagesFromServer, checkSession, logoutFromServer } from './services/api';
 import { SvgIcons } from './components/SvgIcons';
 import { initResizer } from './utils/resizer';
@@ -17,6 +17,7 @@ import { isMobileViewport, fitsBothPanels, loadPanelView, savePanelView, loadPan
 import { syncApiKeysWithServer } from './utils/apiKeys';
 import { matchPanelShortcut } from './utils/keyboardShortcuts';
 import type { LeftPanelView, RightPanelView } from './utils/uiPreferences';
+import { isNotesEnabled } from './utils/notesContext';
 
 // El chat nuevo lleva su id real desde el principio: cuando se materialice al enviar
 // el primer mensaje no hay que reasignar nada.
@@ -603,6 +604,14 @@ export default function App() {
     }
   }
 
+  function handleNotesEnabledChange(isEnabled: boolean) {
+    const updatedChat = updateActiveChat((chat) => ({ ...chat, notesEnabled: isEnabled }));
+
+    if (updatedChat && isAuthenticated && !isDraftChat) {
+      saveChatToServer(updatedChat);
+    }
+  }
+
   async function handleAuthSuccess() {
     localStorage.setItem('isLoggedIn', 'true');
     setLeftPanelView('chats');
@@ -743,9 +752,10 @@ export default function App() {
         historyToSend,
         targetModel,
         targetReasoning,
-        // El system prompt solo viaja si el interruptor del chat está encendido
+        // The system prompt only travels if this chat's switch is on
         targetChat?.systemPromptEnabled === false ? undefined : targetChat?.systemPrompt,
-        controller.signal
+        controller.signal,
+        isNotesEnabled(targetChat?.notesEnabled) ? getNotesText() : undefined
       );
 
       // Si el prompt no llegó a guardarse, este await relanza y no persistimos la respuesta.
@@ -1085,6 +1095,8 @@ export default function App() {
                   onSystemPromptChange={handleSystemPromptChange}
                   systemPromptEnabled={currentChat?.systemPromptEnabled !== false}
                   onSystemPromptEnabledChange={handleSystemPromptEnabledChange}
+                  notesEnabled={currentChat?.notesEnabled === true}
+                  onNotesEnabledChange={handleNotesEnabledChange}
                 />
               )}
               {activeRightPanel === 'notes' && (
