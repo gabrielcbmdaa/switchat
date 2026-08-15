@@ -59,6 +59,10 @@ function deferred<T>() {
 
 beforeEach(() => {
     vi.clearAllMocks();
+    // A test that installs a fake clock and then fails would leave it installed for
+    // everyone after it. Starting each test on the real one costs nothing and makes that
+    // impossible.
+    vi.useRealTimers();
     api.checkSession.mockResolvedValue({ authenticated: true, userId: 'user-1' });
     api.loadChatsFromServer.mockResolvedValue([
         { id: 'chat-a', title: 'Chat A', draft: '', messages: [], model: 'gemini-3.5-flash' },
@@ -163,5 +167,32 @@ describe('switching chats while the model is answering', () => {
         await userEvent.click(screen.getByText('Chat A'));
         await screen.findByText('the A answer');
         expect(screen.queryByText('the B answer')).not.toBeInTheDocument();
+    });
+});
+
+describe('a failed generation', () => {
+    it('shows the error for five seconds and then clears it, keeping the question', async () => {
+        // The fake clock has to be installed BEFORE the app schedules anything. Vitest only
+        // captures timers created after useFakeTimers runs, so setting it up later leaves
+        // the removal timer on the real clock and advancing moves a clock with nothing on
+        // it — the error would just sit there. shouldAdvanceTime keeps time flowing by
+        // itself, which is what lets the awaits below still resolve.
+        vi.useFakeTimers({ shouldAdvanceTime: true });
+        const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+        api.fetchChatResponse.mockRejectedValue(new Error('429 quota exceeded'));
+
+        render(<App />);
+        await screen.findByText('A question 1');
+
+        await user.type(screen.getByPlaceholderText('Write a message...'), 'a doomed prompt');
+        await user.click(screen.getByTitle('Send message'));
+
+        await screen.findByText('Error: 429 quota exceeded');
+
+        await act(async () => { vi.advanceTimersByTime(5000); });
+
+        expect(screen.queryByText('Error: 429 quota exceeded')).not.toBeInTheDocument();
+        // Only the failed answer is temporary. The question stays, ready to be retried.
+        expect(screen.getByText('a doomed prompt')).toBeInTheDocument();
     });
 });

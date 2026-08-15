@@ -23,6 +23,9 @@ function createDraftChat(): Chat {
   return { id: 'chat-' + Date.now(), title: 'New conversation', messages: [], draft: '', model: loadDefaultModel() };
 }
 
+// Lo que dura en pantalla un mensaje temporal antes de retirarse solo.
+const TEMPORARY_MESSAGE_MS = 5000;
+
 export default function App() {
   const [chatList, setChatList] = useState<Chat[]>([]);
   const [activeChatId, setActiveChatId] = useState<string>('');
@@ -65,6 +68,9 @@ export default function App() {
   // Chats cuya primera página está pedida y todavía no ha vuelto (ver el efecto de carga)
   const pendingFirstPageRef = useRef<Set<string>>(new Set());
   const draftSyncTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Los temporizadores de los mensajes temporales, para poder cancelarlos al desmontar:
+  // un setTimeout que sobrevive al componente escribiría estado en un árbol que ya no está.
+  const temporaryMessageTimersRef = useRef<Set<number>>(new Set());
   const currentChatRef = useRef(currentChat);
   const isAuthenticatedRef = useRef(isAuthenticated);
   // Espejo del estado para los callbacks que resuelven después de un await
@@ -254,7 +260,7 @@ export default function App() {
   // partir de la foto que tenía antes de esperar, porque cualquier cosa ocurrida mientras
   // tanto (los mensajes que se cargaron al cambiar de chat, un chat borrado, un borrador
   // recién escrito) se perdería al reescribir la lista entera.
-  function commitChatMessages(chatId: string, messages: Message[]) {
+  function commitChatMessages(chatId: string, messages: Message[], messagesToPersist?: Message[]) {
     const chats = chatListRef.current;
     // Borrado durante la generación: se descarta la respuesta en vez de resucitar el chat.
     if (!chats.some((chat) => chat.id === chatId)) return;
@@ -265,7 +271,28 @@ export default function App() {
     // y el camino de error escribe dos veces: hay que adelantarlo a mano.
     chatListRef.current = updatedChats;
     setChatList(updatedChats);
-    persistIfOffline(updatedChats);
+    // Lo que se ve y lo que se guarda no siempre son lo mismo. Un mensaje temporal —el
+    // "pensando", un error— se pinta pero no baja a disco: allí quedaría congelado y
+    // reaparecería en la siguiente recarga, sin botón de reintentar y sin nada que lo
+    // retire, porque el temporizador que lo iba a borrar murió con la pestaña.
+    persistIfOffline(messagesToPersist
+      ? updatedChats.map((chat) => (chat.id === chatId ? { ...chat, messages: messagesToPersist } : chat))
+      : updatedChats);
+  }
+
+  // Retira un mensaje temporal pasados unos segundos. Guarda el mensaje exacto que puso y
+  // solo lo quita si sigue siendo el último: durante esos segundos el usuario ha podido
+  // reintentar, borrar o recibir otra respuesta, y entonces la conversación ya es otra y
+  // no nos toca tocarla. La comparación es por referencia a propósito: commitChatMessages
+  // rehace el array, pero los mensajes de dentro son los mismos objetos.
+  function scheduleTemporaryMessageRemoval(chatId: string, message: Message) {
+    const timer = window.setTimeout(() => {
+      temporaryMessageTimersRef.current.delete(timer);
+      const chat = chatListRef.current.find((item) => item.id === chatId);
+      if (!chat || chat.messages[chat.messages.length - 1] !== message) return;
+      commitChatMessages(chatId, chat.messages.slice(0, -1));
+    }, TEMPORARY_MESSAGE_MS);
+    temporaryMessageTimersRef.current.add(timer);
   }
 
   async function materializeOnlineWelcomeChat(userId: string): Promise<Chat> {
@@ -398,6 +425,15 @@ export default function App() {
     return () => {
       window.removeEventListener('beforeunload', handleBeforeUnload);
       clearDraftSyncTimer();
+    };
+  }, []);
+
+  // Un setTimeout pendiente al desmontar escribiría en un árbol que ya no existe.
+  useEffect(() => {
+    const timers = temporaryMessageTimersRef.current;
+    return () => {
+      timers.forEach((timer) => window.clearTimeout(timer));
+      timers.clear();
     };
   }, []);
 
@@ -730,8 +766,19 @@ export default function App() {
         resetSessionToDefault();
         alert("Session expired. Please log in again.");
       } else {
-        // El error ocupa el sitio del "pensando", y también debe quedar en disco
-        commitChatMessages(chatId, [...sealedHistory, { role: "model" as const, parts: [{ text: `Error: ${err.message}` }], createdAt: new Date().toISOString() }]);
+        // El error ocupa el sitio del "pensando", pero no es parte de la conversación: se
+        // enseña unos segundos y se retira, dejando la pregunta lista para reintentar. Se
+        // persiste el historial SIN él, igual que con el "pensando": en disco un error se
+        // queda para siempre, y lo que cuenta el error casi nunca sigue siendo verdad en
+        // la siguiente sesión.
+        const errorMessage: Message = {
+          role: "model",
+          parts: [{ text: `Error: ${err.message}` }],
+          isTemporary: true,
+          createdAt: new Date().toISOString(),
+        };
+        commitChatMessages(chatId, [...sealedHistory, errorMessage], sealedHistory);
+        scheduleTemporaryMessageRemoval(chatId, errorMessage);
       }
     } finally {
       // Solo si sigue siendo el nuestro: un reintento sobre el mismo chat ya habrá dejado
