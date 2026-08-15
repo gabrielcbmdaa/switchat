@@ -12,10 +12,12 @@ interface SettingViewProps {
     onSystemPromptChange: (value: string) => void;
     systemPromptEnabled: boolean;
     onSystemPromptEnabledChange: (value: boolean) => void;
+    notesEnabled: boolean;
+    onNotesEnabledChange: (value: boolean) => void;
     onClose?: () => void;
 }
 
-export default function SettingView({ currentModel, onModelChange, reasoningLevel, onReasoningChange, systemPrompt, onSystemPromptChange, systemPromptEnabled, onSystemPromptEnabledChange, onClose }: SettingViewProps) {
+export default function SettingView({ currentModel, onModelChange, reasoningLevel, onReasoningChange, systemPrompt, onSystemPromptChange, systemPromptEnabled, onSystemPromptEnabledChange, notesEnabled, onNotesEnabledChange, onClose }: SettingViewProps) {
     // El panel no guarda nada: los niveles salen del modelo y el valor llega ya
     // resuelto desde arriba, que es quien decide a quién pertenece.
     const thinkingLevels = getThinkingLevels(currentModel);
@@ -123,6 +125,23 @@ export default function SettingView({ currentModel, onModelChange, reasoningLeve
                         value={systemPrompt}
                         onChange={(e) => onSystemPromptChange(e.target.value)}
                     />
+                </div>
+                <div className={styles.notesContainer}>
+                    <div className={styles.notesHeader}>
+                        <label className={styles.configLabel} id="notesEnabledLabel">Notes</label>
+                        <button
+                            type="button"
+                            role="switch"
+                            aria-checked={notesEnabled}
+                            aria-labelledby="notesEnabledLabel"
+                            aria-label="Notes"
+                            title={notesEnabled ? 'This chat can read notes' : 'This chat cannot read notes'}
+                            className={`${styles.toggleSwitch} ${notesEnabled ? styles.toggleSwitchOn : ''}`}
+                            onClick={() => onNotesEnabledChange(!notesEnabled)}
+                        >
+                            <span className={styles.toggleKnob} />
+                        </button>
+                    </div>
                 </div>
                 {/* REASONING — Solo se muestra si el modelo soporta thinking */}
                 {thinkingLevels.length > 0 && (
