@@ -4,6 +4,19 @@
 // ============================================================
 
 /**
+ * How a model expects the thinking knob to be sent. Only the Anthropic client reads it,
+ * because Anthropic changed that shape mid-generation and both forms are still live:
+ *
+ * - 'budget': `thinking: {type:'enabled', budget_tokens: N}`. The old form. Still the ONLY
+ *   one the pre-4.6 models accept, so it cannot simply be deleted.
+ * - 'effort': `thinking: {type:'adaptive'}` plus `output_config.effort`. The models that use
+ *   it answer 400 to `budget_tokens`, which is what this field exists to prevent.
+ * - 'always-on': same as 'effort' but thinking cannot be turned off; ANY explicit `thinking`
+ *   is a 400, including `{type:'disabled'}`, so the field is left out of the request.
+ */
+export type ThinkingApi = 'budget' | 'effort' | 'always-on';
+
+/**
  * Configuración de un modelo de IA.
  * Se puede extender en el futuro con más campos (maxOutputTokens, contextWindow, etc.)
  */
@@ -16,6 +29,8 @@ export interface ModelConfig {
     provider: string;
     /** Mapeo de nivel de thinking a budget_tokens para el proveedor */
     thinkingBudgets: Record<string, number>;
+    /** Anthropic only: request shape for the thinking knob. Defaults to 'budget'. */
+    thinkingApi?: ThinkingApi;
 }
 
 /**
@@ -60,39 +75,31 @@ export const MODEL_REGISTRY: Record<string, ModelConfig> = {
         thinkingLevels: ['minimal', 'low', 'medium', 'high'],
         defaultThinking: 'high',
         provider: 'anthropic',
-        thinkingBudgets: {
-            minimal: 2048,
-            low: 8192,
-            medium: 16384,
-            high: 32768,
-        },
+        // Empty on purpose: this model bills thinking by effort, not by a token budget.
+        thinkingBudgets: {},
+        thinkingApi: 'always-on',
     },
     'claude-opus-4-8': {
         thinkingLevels: ['minimal', 'low', 'medium', 'high'],
         defaultThinking: 'high',
         provider: 'anthropic',
-        thinkingBudgets: {
-            minimal: 2048,
-            low: 8192,
-            medium: 16384,
-            high: 32768,
-        },
+        thinkingBudgets: {},
+        thinkingApi: 'effort',
     },
     'claude-sonnet-5': {
         thinkingLevels: ['minimal', 'low', 'medium', 'high'],
         defaultThinking: 'high',
         provider: 'anthropic',
-        thinkingBudgets: {
-            minimal: 1024,
-            low: 4096,
-            medium: 8192,
-            high: 16384,
-        },
+        thinkingBudgets: {},
+        thinkingApi: 'effort',
     },
+    // The only Anthropic model here still on the old shape: it has no effort parameter,
+    // so budget_tokens is not legacy leftovers, it is the only thing it accepts.
     'claude-haiku-4-5': {
         thinkingLevels: ['minimal', 'low', 'medium', 'high'],
         defaultThinking: 'medium',
         provider: 'anthropic',
+        thinkingApi: 'budget',
         thinkingBudgets: {
             minimal: 1024,
             low: 2048,

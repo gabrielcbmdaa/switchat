@@ -1,5 +1,5 @@
 import type { Message } from "../types";
-import { getModelConfig } from "../config/models.config";
+import { getModelConfig, type ModelConfig, type ThinkingApi } from "../config/models.config";
 
 export interface ProviderResponse {
     text: string;
@@ -180,8 +180,65 @@ async function sendToGoogle(
     return { text: textContent || parts.map((part: GeminiPart) => part.text || '').join('') };
 }
 
+// Anthropic's effort scale is low | medium | high | xhigh | max. Our slider also offers
+// 'minimal', which has no equivalent there, so it lands on the lowest real level: sending
+// 'minimal' as-is is rejected. An unknown level falls back to the API's own default.
+const ANTHROPIC_EFFORT_BY_LEVEL: Record<string, string> = {
+    minimal: 'low',
+    low: 'low',
+    medium: 'medium',
+    high: 'high',
+    xhigh: 'xhigh',
+    max: 'max',
+};
+
+function toAnthropicEffort(reasoningLevel: string): string {
+    return ANTHROPIC_EFFORT_BY_LEVEL[reasoningLevel] || 'high';
+}
+
 /**
- * Cliente nativo para Anthropic Messages API (/v1/messages) con soporte para Extended Thinking.
+ * Writes the reasoning knob into the request body, in the shape that one model accepts.
+ * There is no single shape: Anthropic replaced `thinking.budget_tokens` with
+ * `output_config.effort`, and the newer models answer 400 to the old form while the older
+ * ones do not understand the new one. MODEL_REGISTRY says which form each model uses.
+ */
+function applyAnthropicThinking(
+    requestBody: Record<string, unknown>,
+    thinkingApi: ThinkingApi,
+    reasoningLevel: string,
+    config?: ModelConfig
+): void {
+    if (thinkingApi === 'budget') {
+        // Here turning reasoning off means leaving the field out: there is no 'disabled'.
+        if (reasoningLevel === 'off') return;
+        requestBody.thinking = {
+            type: 'enabled',
+            budget_tokens: config?.thinkingBudgets?.[reasoningLevel] || 4096,
+        };
+        return;
+    }
+
+    if (thinkingApi === 'always-on') {
+        // This model cannot be silenced: any explicit `thinking` is a 400, 'disabled'
+        // included. So 'off' becomes the cheapest effort it accepts, the same fallback
+        // sendToGoogle makes for Gemini 3.x.
+        const effort = reasoningLevel === 'off' ? 'low' : toAnthropicEffort(reasoningLevel);
+        requestBody.output_config = { effort };
+        return;
+    }
+
+    // 'effort': there IS a switch here, and it has to be used. Omitting `thinking` does not
+    // turn it off on models that reason by default.
+    if (reasoningLevel === 'off') {
+        requestBody.thinking = { type: 'disabled' };
+        return;
+    }
+    requestBody.thinking = { type: 'adaptive' };
+    requestBody.output_config = { effort: toAnthropicEffort(reasoningLevel) };
+}
+
+/**
+ * Cliente nativo para Anthropic Messages API (/v1/messages) con soporte para razonamiento.
  */
 async function sendToAnthropic(
     modelLowerCase: string,
@@ -221,14 +278,7 @@ async function sendToAnthropic(
         requestBody.system = systemPrompt;
     }
 
-    // Configurar Extended Thinking si está habilitado
-    if (reasoningLevel !== 'off') {
-        const budget = config?.thinkingBudgets?.[reasoningLevel] || 4096;
-        requestBody.thinking = {
-            type: 'enabled',
-            budget_tokens: budget
-        };
-    }
+    applyAnthropicThinking(requestBody, config?.thinkingApi ?? 'budget', reasoningLevel, config);
 
     const response = await fetch('https://api.anthropic.com/v1/messages', {
         method: 'POST',
