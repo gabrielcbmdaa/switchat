@@ -794,7 +794,7 @@ export default function App() {
       const userMessageId = await pendingUserMessageId;
 
       const aiMessageId = isAuthenticatedRef.current
-        ? await saveMessageToServer(chatId, { sender: 'ai', content: response.text, model: targetModel })
+        ? await saveMessageToServer(chatId, { sender: 'ai', content: response.text, model: targetModel, reasoningLevel: targetReasoning })
         : undefined;
 
       // Reemplazamos el "pensando" por la respuesta real y sellamos los _id de MongoDB.
@@ -802,7 +802,7 @@ export default function App() {
       commitChatMessages(chatId, [
         ...historyToSend.slice(0, -1),
         { ...userMessage, _id: userMessageId || userMessage._id },
-        { role: "model", parts: [{ text: response.text }], _id: aiMessageId, createdAt: new Date().toISOString(), model: targetModel }
+        { role: "model", parts: [{ text: response.text }], _id: aiMessageId, createdAt: new Date().toISOString(), model: targetModel, reasoningLevel: targetReasoning }
       ]);
 
       options.onSuccess?.(response.text);

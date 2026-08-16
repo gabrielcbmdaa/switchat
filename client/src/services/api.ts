@@ -305,7 +305,7 @@ export async function generateChatTitle(
  */
 export async function saveMessageToServer(
   chatId: string,
-  message: { sender: 'user' | 'ai'; content: string; model?: string }
+  message: { sender: 'user' | 'ai'; content: string; model?: string; reasoningLevel?: string }
 ): Promise<string | undefined> {
   const response = await apiFetch(`/chats/${chatId}/messages`, {
     method: 'POST',

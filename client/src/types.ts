@@ -9,6 +9,10 @@ export interface Message {
   createdAt?: string;
   isTemporary?: boolean;
   model?: string;
+  // El nivel con el que se generó esta respuesta, no el que tenga el chat ahora: mover
+  // el slider después no reescribe lo ya respondido. Ausente en los mensajes anteriores
+  // a este campo y en los del usuario, igual que model.
+  reasoningLevel?: string;
 }
 
 export interface Chat {
