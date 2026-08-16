@@ -394,4 +394,64 @@ describe('a chat that can read notes', () => {
         await screen.findByText('B question 1');
         expect(screen.getByPlaceholderText('Write your notes here...')).toHaveValue('from B');
     });
+
+    it('saves what you write in the notes to the server', async () => {
+        vi.useFakeTimers({ shouldAdvanceTime: true });
+        const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+
+        render(<App />);
+        await screen.findByText('A question 1');
+
+        await user.click(screen.getByTitle('Notes'));
+        await user.type(screen.getByPlaceholderText('Write your notes here...'), ' and then the cache');
+
+        // Notes ride the same debounce as the draft, so nothing leaves before it fires.
+        await act(async () => { vi.advanceTimersByTime(2000); });
+
+        const synced = api.syncChatDraftToServer.mock.calls.map((call) => call[0]);
+        const savedChatA = synced.reverse().find((chat) => chat?.id === 'chat-a');
+        expect(savedChatA?.notes).toBe('ship the notes reader first and then the cache');
+    });
+
+    it('carries the notes written in a brand new chat into the chat it becomes', async () => {
+        const answer = deferred<{ text: string }>();
+        api.fetchChatResponse.mockReturnValue(answer.promise);
+
+        render(<App />);
+        await screen.findByText('A question 1');
+
+        // A chat that does not exist on the server yet: nothing may be synced for it.
+        await userEvent.click(screen.getByText('New Chat'));
+        await userEvent.click(screen.getByTitle('Notes'));
+        await userEvent.type(screen.getByPlaceholderText('Write your notes here...'), 'notes typed before the chat existed');
+
+        expect(api.syncChatDraftToServer.mock.calls.every((call) => call[0]?.notes !== 'notes typed before the chat existed')).toBe(true);
+
+        await userEvent.type(screen.getByPlaceholderText('Write a message...'), 'first message');
+        await userEvent.click(screen.getByTitle('Send message'));
+        await screen.findByText('Thinking...');
+
+        // Sending is what creates it, and the notebook has to be born with it.
+        const created = api.saveChatToServer.mock.calls.at(-1);
+        expect(created?.[0]?.notes).toBe('notes typed before the chat existed');
+        expect(created?.[1]).toEqual({ allowCreate: true });
+
+        await act(async () => { answer.resolve({ text: 'hello' }); });
+    });
+
+    it('keeps the notes of the chat you leave instead of the one you open', async () => {
+        render(<App />);
+        await screen.findByText('A question 1');
+
+        await userEvent.click(screen.getByTitle('Notes'));
+        await userEvent.type(screen.getByPlaceholderText('Write your notes here...'), '!');
+
+        // Switching flushes the pending sync. It must carry A's notebook, not B's.
+        await userEvent.click(screen.getByText('Chat B'));
+        await screen.findByText('B question 1');
+
+        const synced = api.syncChatDraftToServer.mock.calls.map((call) => call[0]);
+        const savedChatA = synced.reverse().find((chat) => chat?.id === 'chat-a');
+        expect(savedChatA?.notes).toBe('ship the notes reader first!');
+    });
 });
