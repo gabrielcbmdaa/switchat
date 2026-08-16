@@ -80,7 +80,7 @@ describe('notesEnabled on a chat', () => {
         await request(app)
             .post('/api/chats')
             .set('Cookie', cookie)
-            .send({ id: 'chat-notes-blank', title: 'Old chat' })
+            .send({ id: 'chat-notes-blank', title: 'Old chat', allowCreate: true })
             .expect(200);
 
         const response = await request(app)
