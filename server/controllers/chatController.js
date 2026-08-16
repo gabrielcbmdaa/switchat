@@ -8,7 +8,7 @@ const Chat = require('../models/Chat');
 exports.createMessage = async (req, res) => {
     try {
         const { chatId } = req.params;
-        const { sender, content, model } = req.body;
+        const { sender, content, model, reasoningLevel } = req.body;
 
         // Guardia de forma. Una pestaña abierta antes del despliegue sigue mandando el body
         // viejo (sin `sender`) y esperando un `text` de vuelta: sin este 400 recibiría un 201,
@@ -32,11 +32,14 @@ exports.createMessage = async (req, res) => {
 
         // createdAt lo pone el servidor (default del schema) y se devuelve: getMessages ordena
         // por él, y aceptar el reloj del cliente desordenaría la conversación al recargar.
+        // reasoningLevel viaja sin guardia propia, igual que model: falta en los mensajes de
+        // usuario y en todo lo que guardó una versión anterior, y ausente es un caso válido.
         const message = new Message({
             chatId,
             sender,
             content,
-            ...(model ? { model } : {})
+            ...(model ? { model } : {}),
+            ...(reasoningLevel ? { reasoningLevel } : {})
         });
         await message.save();
 
@@ -104,7 +107,8 @@ exports.getMessages = async (req, res) => {
             role: msg.sender === 'user' ? 'user' : 'model',
             parts: [{ text: msg.content }],
             createdAt: msg.createdAt,
-            model: msg.model
+            model: msg.model,
+            reasoningLevel: msg.reasoningLevel
         })).reverse();
 
         res.json(formattedMessages);
@@ -160,7 +164,8 @@ exports.syncChat = async (req, res) => {
                             sender,
                             content: text,
                             createdAt,
-                            ...(msg.model ? { model: msg.model } : {})
+                            ...(msg.model ? { model: msg.model } : {}),
+                            ...(msg.reasoningLevel ? { reasoningLevel: msg.reasoningLevel } : {})
                         };
                     })
                     .filter(Boolean);

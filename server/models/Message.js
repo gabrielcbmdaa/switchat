@@ -18,6 +18,12 @@ const MessageSchema = new mongoose.Schema({
     model: {
         type: String // Only meaningful for sender: 'ai' messages
     },
+    reasoningLevel: {
+        // Like model, only meaningful for sender: 'ai'. It is the level the answer was
+        // generated with, not the chat's current one: Chat.reasoningLevel keeps moving with
+        // the slider, and without a copy here every past answer would relabel itself.
+        type: String
+    },
     createdAt: {
         type: Date,
         default: Date.now // Set by the server when the caller does not provide one
