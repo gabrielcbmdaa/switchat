@@ -34,7 +34,7 @@ describe('propiedad del chat', () => {
         await request(app)
             .post('/api/chats')
             .set('Cookie', victima)
-            .send({ id: CHAT_ID, title: 'Mis cosas privadas' })
+            .send({ id: CHAT_ID, title: 'Mis cosas privadas', allowCreate: true })
             .expect(200);
 
         const created = await request(app)
@@ -117,7 +117,7 @@ describe('propiedad del chat', () => {
             await request(app)
                 .post('/api/chats')
                 .set('Cookie', atacante)
-                .send({ id: 'chat-senyuelo', title: 'Señuelo' })
+                .send({ id: 'chat-senyuelo', title: 'Señuelo', allowCreate: true })
                 .expect(200);
 
             await request(app)

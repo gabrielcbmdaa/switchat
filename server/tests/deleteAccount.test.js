@@ -36,7 +36,7 @@ describe('DELETE /api/auth/account', () => {
         await request(app)
             .post('/api/chats')
             .set('Cookie', cookie)
-            .send({ id: `chat-${email}`, title: 'Conversación' })
+            .send({ id: `chat-${email}`, title: 'Conversación', allowCreate: true })
             .expect(200);
 
         await request(app)

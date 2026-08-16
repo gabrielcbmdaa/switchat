@@ -115,11 +115,17 @@ exports.getMessages = async (req, res) => {
     }
 };
 
-// 🔄 1. SINCRONIZAR CHAT (Crear o Actualizar)
+// 🔄 1. SINCRONIZAR CHAT (Actualizar, y Crear solo si lo piden)
 // Si el body trae messages[] y el chat aún no tiene mensajes en Message, los siembra una sola vez.
+//
+// Crear es la excepción, no la norma: el cliente solo pide allowCreate en los dos sitios donde
+// un chat nace de verdad (el de bienvenida y el primer envío). El resto de llamadas —borrador,
+// título, modelo, nivel, los dos interruptores— actualizan algo que ya existe, y dejarlas crear
+// era lo que resucitaba chats: una de esas peticiones puede salir antes del DELETE y llegar
+// después, y con upsert siempre puesto volvía a escribir en Mongo el chat recién borrado.
 exports.syncChat = async (req, res) => {
     try {
-        const { messages, ...chatFields } = req.body;
+        const { messages, allowCreate, ...chatFields } = req.body;
         delete chatFields._id; // Evitamos romper MongoDB / schema Chat (messages no pertenece aquí)
 
         chatFields.userId = req.user.id;
@@ -127,8 +133,14 @@ exports.syncChat = async (req, res) => {
         const chat = await Chat.findOneAndUpdate(
             { id: chatFields.id, userId: req.user.id },
             { $set: chatFields },
-            { upsert: true, returnDocument: 'after' }
+            { upsert: Boolean(allowCreate), returnDocument: 'after' }
         );
+
+        // Sin chat no hay dónde colgar nada. Salir aquí es lo que impide que los mensajes que
+        // viajan en el body se reinserten sueltos, sin conversación que los contenga.
+        if (!chat) {
+            return res.status(404).json({ message: 'Chat not found' });
+        }
 
         if (Array.isArray(messages) && messages.length > 0) {
             const existingCount = await Message.countDocuments({ chatId: chatFields.id });
