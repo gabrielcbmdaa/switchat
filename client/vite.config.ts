@@ -10,9 +10,11 @@ export default defineConfig({
   ],
   server: {
     proxy: {
-      // Cualquier petición que empiece con /api se redirigirá automáticamente a tu Node
+      // Cualquier petición que empiece con /api se redirigirá automáticamente a tu Node.
+      // VITE_API_TARGET permite apuntar a otro puerto sin tocar este archivo: hace falta
+      // cuando dos worktrees levantan su propio servidor y no pueden compartir el 3000.
       '/api': {
-        target: 'http://localhost:3000',
+        target: process.env.VITE_API_TARGET || 'http://localhost:3000',
         changeOrigin: true,
       }
     }
