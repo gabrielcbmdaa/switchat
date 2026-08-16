@@ -10,7 +10,6 @@ const {
 } = require('./helpers/testEnv');
 
 const app = require('../app');
-const Chat = require('../models/Chat');
 
 describe('notesEnabled on a chat', () => {
     before(connectTestDb);
@@ -55,21 +54,42 @@ describe('notesEnabled on a chat', () => {
         assert.notEqual(chat.notesEnabled, true);
     });
 
-    test('the notebook text is not stored on the chat document', async () => {
+    test('a chat saved with notes comes back with the same text', async () => {
         await request(app)
             .post('/api/chats')
             .set('Cookie', cookie)
             .send({
-                id: 'chat-notes-stray',
-                title: 'Stray field',
+                id: 'chat-notes-text',
+                title: 'With notebook',
                 notesEnabled: true,
-                notes: 'secret notebook that must not land in mongo',
+                notes: 'ship the notes reader first',
                 allowCreate: true,
             })
             .expect(200);
 
-        const raw = await Chat.collection.findOne({ id: 'chat-notes-stray' });
-        assert.equal(raw.notesEnabled, true);
-        assert.equal(raw.notes, undefined);
+        const response = await request(app)
+            .get('/api/chats')
+            .set('Cookie', cookie)
+            .expect(200);
+
+        const chat = response.body.find((item) => item.id === 'chat-notes-text');
+        assert.equal(chat.notes, 'ship the notes reader first');
+    });
+
+    test('a chat saved without notes is not treated as having any', async () => {
+        await request(app)
+            .post('/api/chats')
+            .set('Cookie', cookie)
+            .send({ id: 'chat-notes-blank', title: 'Old chat' })
+            .expect(200);
+
+        const response = await request(app)
+            .get('/api/chats')
+            .set('Cookie', cookie)
+            .expect(200);
+
+        const chat = response.body.find((item) => item.id === 'chat-notes-blank');
+        assert.notEqual(chat.notes, 'ship the notes reader first');
+        assert.ok(!chat.notes);
     });
 });
