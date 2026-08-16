@@ -272,6 +272,61 @@ describe('clicking Stop', () => {
     });
 });
 
+describe('deleting a chat', () => {
+    // The trash button carries no text, only an icon, so it is found by the icon it draws.
+    // Grabbing the element once matters: the first click swaps its icon for the confirm one.
+    function iconButtons(iconId: string): HTMLButtonElement[] {
+        return Array.from(document.querySelectorAll('button')).filter((button) => {
+            const use = button.querySelector('use');
+            const href = use?.getAttribute('xlink:href') ?? use?.getAttribute('href');
+            return href === `#${iconId}`;
+        });
+    }
+
+    it('does not push the deleted chat back to the server when its draft sync was pending', async () => {
+        // Installed before render so the debounce timer lands on the fake clock.
+        vi.useFakeTimers({ shouldAdvanceTime: true });
+        const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+
+        render(<App />);
+        await screen.findByText('A question 1');
+
+        // Typing arms the two-second debounce that syncs chat A's draft.
+        await user.type(screen.getByPlaceholderText('Write a message...'), 'half a thought');
+
+        const trash = iconButtons('icon-trash')[0];
+        await user.click(trash); // asks for confirmation
+        await user.click(trash); // deletes for real
+
+        // The debounce fires after the chat is gone. Its closure still holds chat A, and the
+        // sync route upserts, so this is the call that recreates in Mongo what was deleted.
+        await act(async () => { vi.advanceTimersByTime(2000); });
+
+        const syncedIds = api.syncChatDraftToServer.mock.calls.map((call) => call[0]?.id);
+        expect(syncedIds).not.toContain('chat-a');
+    });
+
+    it('does not push the deleted chat back to the server when the tab closes right after', async () => {
+        render(<App />);
+        await screen.findByText('A question 1');
+
+        await userEvent.type(screen.getByPlaceholderText('Write a message...'), 'half a thought');
+
+        const trash = iconButtons('icon-trash')[0];
+        await userEvent.click(trash);
+        await userEvent.click(trash);
+
+        // Leaving syncs whatever chat is open. It must be the one that survived, never the
+        // one just deleted: that sync upserts, and would recreate it in Mongo.
+        await act(async () => { window.dispatchEvent(new Event('beforeunload')); });
+
+        // Asserting the survivor too, so the test cannot pass by syncing nothing at all.
+        const syncedIds = api.syncChatDraftToServer.mock.calls.map((call) => call[0]?.id);
+        expect(syncedIds).toContain('chat-b');
+        expect(syncedIds).not.toContain('chat-a');
+    });
+});
+
 describe('a chat that can read notes', () => {
     it('sends the notebook to the model without painting it in the transcript', async () => {
         const answer = deferred<{ text: string }>();

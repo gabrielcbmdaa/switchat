@@ -70,6 +70,10 @@ export default function App() {
   // Chats cuya primera página está pedida y todavía no ha vuelto (ver el efecto de carga)
   const pendingFirstPageRef = useRef<Set<string>>(new Set());
   const draftSyncTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // De quién es el borrador que espera a sincronizarse. Sin esto, borrar un chat cualquiera
+  // tendría que cancelar el temporizador a ciegas y se llevaría por delante el borrador de
+  // otro; con el id se cancela solo cuando el muerto es justo el que iba a escribirse.
+  const draftSyncChatIdRef = useRef<string | null>(null);
   // Los temporizadores de los mensajes temporales, para poder cancelarlos al desmontar:
   // un setTimeout que sobrevive al componente escribiría estado en un árbol que ya no está.
   const temporaryMessageTimersRef = useRef<Set<number>>(new Set());
@@ -150,14 +154,17 @@ export default function App() {
       clearTimeout(draftSyncTimerRef.current);
       draftSyncTimerRef.current = null;
     }
+    draftSyncChatIdRef.current = null;
   }
 
   function scheduleDraftSyncToServer(chat: Chat) {
     if (!isAuthenticatedRef.current) return;
     clearDraftSyncTimer();
+    draftSyncChatIdRef.current = chat.id;
     draftSyncTimerRef.current = setTimeout(() => {
       syncChatDraftToServer(chat);
       draftSyncTimerRef.current = null;
+      draftSyncChatIdRef.current = null;
     }, 2000);
   }
 
@@ -897,6 +904,9 @@ export default function App() {
     // Si estaba generando, su respuesta ya no tiene dónde aterrizar (commitChatMessages la
     // descarta). Abortarla evita seguir pagando tokens por algo que nadie va a leer.
     abortControllersRef.current.get(chatId)?.abort();
+    // Un borrador suyo esperando a salir lo resucitaría: la ruta de sincronización hace
+    // upsert, así que ese envío tardío recrea en Mongo el chat que acabas de borrar.
+    if (draftSyncChatIdRef.current === chatId) clearDraftSyncTimer();
     const activeId = activeChatIdRef.current;
     const updatedChats = chatListRef.current.filter(chat => chat.id !== chatId);
     chatListRef.current = updatedChats;
