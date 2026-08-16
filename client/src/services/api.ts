@@ -181,11 +181,18 @@ export async function fetchChatMessagesFromServer(chatId: string, limit: number 
   }
 }
 
-export async function saveChatToServer(updatedChat: Chat): Promise<boolean> {
+// allowCreate distingue las dos cosas que esta ruta sabe hacer. Crear un chat pasa solo en
+// dos sitios (el de bienvenida y el primer envío); las demás llamadas actualizan uno que ya
+// existe, y pedir que NO puedan crear es lo que impide que una petición lenta que llega
+// después de un borrado devuelva a la vida el chat que acabas de tirar.
+export async function saveChatToServer(
+  updatedChat: Chat,
+  { allowCreate = false }: { allowCreate?: boolean } = {}
+): Promise<boolean> {
   try {
     const response = await apiFetch('/chats', {
       method: 'POST',
-      body: JSON.stringify(updatedChat),
+      body: JSON.stringify({ ...updatedChat, allowCreate }),
     });
     return response.ok;
   } catch (error) {

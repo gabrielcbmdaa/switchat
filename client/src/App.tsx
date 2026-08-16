@@ -335,7 +335,8 @@ export default function App() {
         createdAt: new Date(baseTime + index * 1000).toISOString(),
       })),
     };
-    await saveChatToServer(welcome);
+    // Nace aquí: es uno de los dos únicos sitios que pueden crear un chat en el servidor.
+    await saveChatToServer(welcome, { allowCreate: true });
     return welcome;
   }
 
@@ -884,7 +885,8 @@ export default function App() {
         if (!isAuthenticated) return;
         const chatToSync = sealedChats.find((chat) => chat.id === chatId);
         // Crea el documento Chat si aún no existe; no sembrar Thinking/user aquí (van por createMessage).
-        if (chatToSync) await saveChatToServer({ ...chatToSync, messages: [] });
+        // El otro sitio que puede crear: aquí es donde un borrador se convierte en chat real.
+        if (chatToSync) await saveChatToServer({ ...chatToSync, messages: [] }, { allowCreate: true });
       },
       onSuccess: (responseText) => {
         // El título real se pide en segundo plano: no debe retrasar la respuesta en pantalla
