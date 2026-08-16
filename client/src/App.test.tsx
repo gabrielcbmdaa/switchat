@@ -214,6 +214,7 @@ describe('a chat that can read notes', () => {
         expect(api.fetchChatResponse).toHaveBeenCalled();
         const args = api.fetchChatResponse.mock.calls[0];
         expect(args[5]).toBe('ship the notes reader first');
+        expect(args[6]).toBe(true);
         expect(args[0].some((message: Message) =>
             (message.parts?.[0]?.text || '').includes('ship the notes reader first')
         )).toBe(false);
@@ -240,6 +241,7 @@ describe('a chat that can read notes', () => {
 
         const args = api.fetchChatResponse.mock.calls[0];
         expect(args[5]).toBeUndefined();
+        expect(args[6]).toBe(false);
 
         await act(async () => {
             answer.resolve({ text: 'hi' });

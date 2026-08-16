@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import type { Message } from '../types';
 import {
+    NOTES_DISABLED_INSTRUCTION,
     NOTES_INSTRUCTION,
     buildNotesSystemText,
     composeProviderHistory,
@@ -64,6 +65,28 @@ describe('composeProviderHistory', () => {
         expect(result[0].role).toBe('system');
         expect(result[0].parts[0].text).toContain('only notes');
         expect(result[1]).toEqual(history[0]);
+    });
+
+    it('when the switch is off, tells the model how to turn notes on and never sends the notebook', () => {
+        const result = composeProviderHistory(
+            history,
+            undefined,
+            'ship the notes reader first',
+            false
+        );
+
+        expect(result).toHaveLength(2);
+        expect(result[0].role).toBe('system');
+        expect(result[0].parts[0].text).toContain(NOTES_DISABLED_INSTRUCTION);
+        expect(result[0].parts[0].text).not.toContain('ship the notes reader first');
+        expect(result[1]).toEqual(history[0]);
+    });
+
+    it('when the switch is on, does not tell the model to turn notes on', () => {
+        const result = composeProviderHistory(history, undefined, 'ship the notes reader first', true);
+
+        expect(result[0].parts[0].text).toContain('ship the notes reader first');
+        expect(result[0].parts[0].text).not.toContain(NOTES_DISABLED_INSTRUCTION);
     });
 });
 

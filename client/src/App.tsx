@@ -755,7 +755,8 @@ export default function App() {
         // The system prompt only travels if this chat's switch is on
         targetChat?.systemPromptEnabled === false ? undefined : targetChat?.systemPrompt,
         controller.signal,
-        isNotesEnabled(targetChat?.notesEnabled) ? getNotesText() : undefined
+        isNotesEnabled(targetChat?.notesEnabled) ? getNotesText() : undefined,
+        isNotesEnabled(targetChat?.notesEnabled)
       );
 
       // Si el prompt no llegó a guardarse, este await relanza y no persistimos la respuesta.

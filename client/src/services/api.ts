@@ -324,7 +324,8 @@ export async function saveMessageToServer(
  *
  * The only thing this adds on top of fetchFromProvider is prepending the chat's
  * system prompt and, when present, the notebook — so the caller does not have
- * to know how either one is represented.
+ * to know how either one is represented. When notes are off, a short hint
+ * tells the model how the user can turn the switch on, without sending the notebook.
  */
 export async function fetchChatResponse(
   messagesHistory: Message[],
@@ -332,12 +333,14 @@ export async function fetchChatResponse(
   reasoningLevel: string,
   systemPrompt?: string,
   signal?: AbortSignal,
-  notesText?: string
+  notesText?: string,
+  notesEnabled?: boolean
 ): Promise<{ text: string }> {
   const historyWithContext = composeProviderHistory(
     messagesHistory,
     systemPrompt,
-    notesText
+    notesText,
+    notesEnabled
   );
 
   return await fetchFromProvider(model, historyWithContext, reasoningLevel, signal);
