@@ -781,19 +781,39 @@ export default function App() {
     } catch (error) {
       const err = error as Error;
 
-      // El prompt puede haberse guardado aunque la generación fallara o se abortara. Sin
-      // sellar su _id el mensaje queda huérfano en Mongo: el cliente lo borraría solo de
-      // la pantalla y reaparecería en la siguiente recarga.
+      if (err.name === 'AbortError') {
+        // Abortar deja la conversación tal y como se envió, sin respuesta. El botón se
+        // libera ya mismo: lo único que puede seguir en vuelo es el guardado del mensaje de
+        // usuario, no la generación, que ya está cortada. Su _id se sella en cuanto llegue,
+        // parcheando solo ese mensaje por referencia para no pisar lo que el usuario haga
+        // mientras tanto (p.ej. mandar el siguiente prompt antes de que el guardado vuelva).
+        if (abortControllersRef.current.get(chatId) === controller) {
+          abortControllersRef.current.delete(chatId);
+          setGeneratingChatIds(prev => prev.filter(id => id !== chatId));
+        }
+        commitChatMessages(chatId, historyToSend);
+        pendingUserMessageId.catch(() => undefined).then((savedUserMessageId) => {
+          if (!savedUserMessageId) return;
+          const chat = chatListRef.current.find((item) => item.id === chatId);
+          if (!chat) return;
+          const patched = chat.messages.map((message) =>
+            message === userMessage ? { ...message, _id: savedUserMessageId } : message
+          );
+          commitChatMessages(chatId, patched);
+        });
+        return;
+      }
+
+      // El prompt puede haberse guardado aunque la generación fallara. Sin sellar su _id el
+      // mensaje queda huérfano en Mongo: el cliente lo borraría solo de la pantalla y
+      // reaparecería en la siguiente recarga.
       const savedUserMessageId = await pendingUserMessageId.catch(() => undefined);
       const sealedHistory = [
         ...historyToSend.slice(0, -1),
         { ...userMessage, _id: savedUserMessageId || userMessage._id },
       ];
 
-      if (err.name === 'AbortError') {
-        // Abortar deja la conversación tal y como se envió, sin respuesta
-        commitChatMessages(chatId, sealedHistory);
-      } else if (err.message === 'SESSION_EXPIRED') {
+      if (err.message === 'SESSION_EXPIRED') {
         resetSessionToDefault();
         alert("Session expired. Please log in again.");
       } else {

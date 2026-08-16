@@ -197,6 +197,81 @@ describe('a failed generation', () => {
     });
 });
 
+describe('clicking Stop', () => {
+    // fetchChatResponse only rejects with AbortError once its signal actually fires, the way
+    // the real fetch does. Each call's resolver is kept around so a later request in the same
+    // test can still be answered normally.
+    function mockAbortableFetch() {
+        const resolvers: Array<(value: { text: string }) => void> = [];
+        api.fetchChatResponse.mockImplementation((...args: unknown[]) => {
+            const signal = args[4] as AbortSignal;
+            return new Promise<{ text: string }>((resolve, reject) => {
+                resolvers.push(resolve);
+                signal.addEventListener('abort', () => {
+                    const err = new Error('The user aborted a request.');
+                    err.name = 'AbortError';
+                    reject(err);
+                });
+            });
+        });
+        return resolvers;
+    }
+
+    it('flips the button back to Send right away, without waiting for the prompt to save', async () => {
+        mockAbortableFetch();
+        // Kept pending on purpose: the button must come back before this ever resolves.
+        const savedMessageId = deferred<string>();
+        api.saveMessageToServer.mockReturnValue(savedMessageId.promise);
+
+        render(<App />);
+        await screen.findByText('A question 1');
+
+        await userEvent.type(screen.getByPlaceholderText('Write a message...'), 'a message to stop');
+        await userEvent.click(screen.getByTitle('Send message'));
+        await screen.findByText('Thinking...');
+
+        await userEvent.click(screen.getByTitle('Stop generating'));
+
+        // Before the fix this hung until saveMessageToServer resolved: the catch block
+        // awaited it ahead of the finally that releases the button.
+        await screen.findByTitle('Send message');
+
+        await act(async () => { savedMessageId.resolve('sealed-id'); });
+    });
+
+    it('seals the stopped prompt in the background without wiping a message sent right after', async () => {
+        const resolvers = mockAbortableFetch();
+        const savedMessageId = deferred<string>();
+        api.saveMessageToServer
+            .mockReturnValueOnce(savedMessageId.promise)
+            .mockResolvedValue('id-2');
+
+        render(<App />);
+        await screen.findByText('A question 1');
+
+        await userEvent.type(screen.getByPlaceholderText('Write a message...'), 'first prompt');
+        await userEvent.click(screen.getByTitle('Send message'));
+        await screen.findByText('Thinking...');
+
+        await userEvent.click(screen.getByTitle('Stop generating'));
+        await screen.findByTitle('Send message');
+
+        await userEvent.type(screen.getByPlaceholderText('Write a message...'), 'second prompt');
+        await userEvent.click(screen.getByTitle('Send message'));
+        await screen.findByText('second prompt');
+
+        // The aborted prompt's save lands only now: sealing its _id must not overwrite the
+        // second prompt that was sent while it was still in flight.
+        await act(async () => { savedMessageId.resolve('sealed-id'); });
+
+        expect(screen.getByText('first prompt')).toBeInTheDocument();
+        expect(screen.getByText('second prompt')).toBeInTheDocument();
+
+        await act(async () => { resolvers[1]({ text: 'the second answer' }); });
+        await screen.findByText('the second answer');
+    });
+});
+
 describe('a chat that can read notes', () => {
     it('sends the notebook to the model without painting it in the transcript', async () => {
         const answer = deferred<{ text: string }>();
