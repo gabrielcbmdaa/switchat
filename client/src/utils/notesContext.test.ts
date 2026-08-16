@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect } from 'vitest';
 import type { Message } from '../types';
 import {
     NOTES_DISABLED_INSTRUCTION,
@@ -7,7 +7,6 @@ import {
     composeProviderHistory,
     isNotesEnabled,
 } from './notesContext';
-import { NOTES_STORAGE_KEY, getNotesText } from './storage';
 
 function user(text: string): Message {
     return { role: 'user', parts: [{ text }] };
@@ -87,20 +86,5 @@ describe('composeProviderHistory', () => {
 
         expect(result[0].parts[0].text).toContain('ship the notes reader first');
         expect(result[0].parts[0].text).not.toContain(NOTES_DISABLED_INSTRUCTION);
-    });
-});
-
-describe('getNotesText', () => {
-    beforeEach(() => {
-        localStorage.clear();
-    });
-
-    it('reads the trimmed notebook from the existing storage key', () => {
-        localStorage.setItem(NOTES_STORAGE_KEY, '  hello notes  ');
-        expect(getNotesText()).toBe('hello notes');
-    });
-
-    it('returns an empty string when nothing is stored', () => {
-        expect(getNotesText()).toBe('');
     });
 });

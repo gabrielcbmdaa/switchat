@@ -51,25 +51,3 @@ export function loadLocalChats(): Chat[] {
 export function saveToLocalDisk(chatList: Chat[]) {
     localStorage.setItem('chatList', JSON.stringify(chatList));
 }
-
-export const NOTES_STORAGE_KEY = 'switchat_notes';
-
-export function getNotesText(): string {
-    try {
-        return (localStorage.getItem(NOTES_STORAGE_KEY) || '').trim();
-    } catch {
-        // Private mode can throw. An unreadable notebook is an empty one, not a crashed send.
-        return '';
-    }
-}
-
-// Notes: localStorage is the source of truth, so this works even when
-// NotesView is not mounted (e.g. when sending text from the SelectionToolbar).
-export function appendToNotes(text: string) {
-    const prev = localStorage.getItem(NOTES_STORAGE_KEY) || '';
-    const separator = prev.trim() ? '\n\n' : '';
-    const updated = prev + separator + text;
-    localStorage.setItem(NOTES_STORAGE_KEY, updated);
-    window.dispatchEvent(new CustomEvent('sendToNotes', { detail: updated }));
-    return updated;
-}
