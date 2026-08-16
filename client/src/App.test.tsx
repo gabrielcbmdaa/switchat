@@ -328,10 +328,16 @@ describe('deleting a chat', () => {
 });
 
 describe('a chat that can read notes', () => {
-    it('sends the notebook to the model without painting it in the transcript', async () => {
+    beforeEach(() => {
+        api.loadChatsFromServer.mockResolvedValue([
+            { id: 'chat-a', title: 'Chat A', draft: '', messages: [], model: 'gemini-3.5-flash', notes: 'ship the notes reader first' },
+            { id: 'chat-b', title: 'Chat B', draft: '', messages: [], model: 'gemini-3.5-flash', notes: 'from B' },
+        ]);
+    });
+
+    it('sends the chat notes to the model without painting them in the transcript', async () => {
         const answer = deferred<{ text: string }>();
         api.fetchChatResponse.mockReturnValue(answer.promise);
-        localStorage.setItem('switchat_notes', 'ship the notes reader first');
 
         render(<App />);
         await screen.findByText('A question 1');
@@ -357,10 +363,9 @@ describe('a chat that can read notes', () => {
         expect(screen.getByText('what did I write about the project?')).toBeInTheDocument();
     });
 
-    it('does not send the notebook when the switch is off', async () => {
+    it('does not send the notes when the switch is off', async () => {
         const answer = deferred<{ text: string }>();
         api.fetchChatResponse.mockReturnValue(answer.promise);
-        localStorage.setItem('switchat_notes', 'ship the notes reader first');
 
         render(<App />);
         await screen.findByText('A question 1');
@@ -376,5 +381,17 @@ describe('a chat that can read notes', () => {
         await act(async () => {
             answer.resolve({ text: 'hi' });
         });
+    });
+
+    it('shows the notes of the chat you have open', async () => {
+        render(<App />);
+        await screen.findByText('A question 1');
+
+        await userEvent.click(screen.getByTitle('Notes'));
+        expect(screen.getByPlaceholderText('Write your notes here...')).toHaveValue('ship the notes reader first');
+
+        await userEvent.click(screen.getByText('Chat B'));
+        await screen.findByText('B question 1');
+        expect(screen.getByPlaceholderText('Write your notes here...')).toHaveValue('from B');
     });
 });

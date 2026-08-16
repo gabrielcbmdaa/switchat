@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import type { Chat, Message } from './types';
-import { loadLocalChats, saveToLocalDisk, getTutorialChat, getNotesText } from './utils/storage';
+import { loadLocalChats, saveToLocalDisk, getTutorialChat } from './utils/storage';
 import { loadChatsFromServer, fetchChatResponse, saveMessageToServer, generateChatTitle, saveChatToServer, syncChatDraftToServer, deleteChatFromServer, deleteMessageFromServer, fetchChatMessagesFromServer, checkSession, logoutFromServer } from './services/api';
 import { SvgIcons } from './components/SvgIcons';
 import { initResizer } from './utils/resizer';
@@ -620,6 +620,26 @@ export default function App() {
     }
   }
 
+  function handleNotesChange(newNotes: string) {
+    const updatedChat = updateActiveChat((chat) => ({ ...chat, notes: newNotes }));
+
+    if (updatedChat && !isDraftChat) {
+      scheduleDraftSyncToServer(updatedChat);
+    }
+  }
+
+  function handleSendToNotes(text: string) {
+    const updatedChat = updateActiveChat((chat) => {
+      const prev = chat.notes ?? '';
+      const separator = prev.trim() ? '\n\n' : '';
+      return { ...chat, notes: prev + separator + text };
+    });
+
+    if (updatedChat && !isDraftChat) {
+      scheduleDraftSyncToServer(updatedChat);
+    }
+  }
+
   async function handleAuthSuccess() {
     localStorage.setItem('isLoggedIn', 'true');
     setLeftPanelView('chats');
@@ -763,7 +783,7 @@ export default function App() {
         // The system prompt only travels if this chat's switch is on
         targetChat?.systemPromptEnabled === false ? undefined : targetChat?.systemPrompt,
         controller.signal,
-        isNotesEnabled(targetChat?.notesEnabled) ? getNotesText() : undefined,
+        isNotesEnabled(targetChat?.notesEnabled) ? targetChat?.notes : undefined,
         isNotesEnabled(targetChat?.notesEnabled)
       );
 
@@ -1043,7 +1063,7 @@ export default function App() {
     <>
       {/* 1. Inyectamos los símbolos en el DOM */}
       <SvgIcons />
-      <SelectionToolbar onReply={handleReplyWithSelection} />
+      <SelectionToolbar onReply={handleReplyWithSelection} onSendToNotes={handleSendToNotes} />
       <div className="app-container" id='app-container'>
         {(activeLeftPanel !== null || activeRightPanel !== null) && (
           <div
@@ -1133,7 +1153,7 @@ export default function App() {
                 />
               )}
               {activeRightPanel === 'notes' && (
-                <NotesView />
+                <NotesView notes={currentChat?.notes ?? ''} onChange={handleNotesChange} />
               )}
               <Toolbar
                 onNavNotes={() => setRightPanelView('notes')}

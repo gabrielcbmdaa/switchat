@@ -1,6 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import styles from './SelectionToolbar.module.css';
-import { appendToNotes } from '../utils/storage';
 
 // Medidas aproximadas del toolbar, para centrarlo sobre la selección
 const TOOLBAR_W = 230;
@@ -9,6 +8,7 @@ const GAP = 8;
 
 interface SelectionToolbarProps {
     onReply: (text: string) => void;
+    onSendToNotes: (text: string) => void;
 }
 
 // Coloca el toolbar centrado sobre la selección, sin salirse del viewport.
@@ -27,7 +27,7 @@ function positionFor(rect: DOMRect): { x: number; y: number } | null {
     return { x, y };
 }
 
-export default function SelectionToolbar({ onReply }: SelectionToolbarProps) {
+export default function SelectionToolbar({ onReply, onSendToNotes }: SelectionToolbarProps) {
     const [toolbar, setToolbar] = useState<{ x: number; y: number; text: string } | null>(null);
     // Guardamos el rango para poder recalcular la posición al hacer scroll
     const rangeRef = useRef<Range | null>(null);
@@ -64,14 +64,13 @@ export default function SelectionToolbar({ onReply }: SelectionToolbarProps) {
     const handleSendToNotes = useCallback(() => {
         if (!toolbar) return;
 
-        // Persistimos directo en localStorage: funciona aunque NotesView
-        // no esté montada. El evento solo refresca la vista si ya está abierta.
-        appendToNotes(toolbar.text);
+        // App owns the notes of the active chat, so this works even when NotesView
+        // is not mounted.
+        onSendToNotes(toolbar.text);
         setToolbar(null);
 
-        // Limpiar la selección de texto
         window.getSelection()?.removeAllRanges();
-    }, [toolbar]);
+    }, [toolbar, onSendToNotes]);
 
     const handleReply = useCallback(() => {
         if (!toolbar) return;
