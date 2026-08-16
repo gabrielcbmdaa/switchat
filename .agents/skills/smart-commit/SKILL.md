@@ -100,10 +100,33 @@ When requested to create a commit, ALWAYS follow these exact steps:
 1. **Inspect status**: Run `git status` to identify all changed, untracked, or deleted files.
 2. **Inspect diff**: Run `git diff` (and `git diff --cached` if any files are staged) to inspect all exact code changes.
 3. **Draft commit message**: Draft the commit message according to the rules above (keeping header close to ~89 chars). Do **not** include any AI `Co-authored-by` trailer in the draft.
-4. **Print the message**: Display the complete commit message (header + optional body) so it lands in the transcript. Do **not** wait for approval — print it and move on. Nothing here is a gate: an unpushed commit is cheap to fix with `git commit --amend`, and stopping to ask on every commit would stall an implementation plan that commits after each task.
-5. **Execute commit**: Stage the relevant files using `git add` and run `git commit` with that exact message (no AI co-author trailers).
+4. **Print the message and STOP**: Display the complete commit message (header + optional body), together with the list of files you intend to stage. Then **stop and wait for the user to confirm.** Do not run `git add` or `git commit` in the same turn as printing the message.
+5. **Execute commit**: Only after the user has confirmed. Stage the relevant files using `git add` and run `git commit` with that exact message (no AI co-author trailers). If the user asked for changes, revise the message and go back to step 4.
 6. **Verify**: Run `git log -n 1 --format=full` to verify the commit message format **and** confirm there is no `Co-authored-by` line.
 7. **Verify the subject line did not swallow the body**: run `git log --oneline -1`. It must print **only the header**. If the bullets show up on that line, the blank line after the header is missing — fix it right away with `git commit --amend` (before the commit is pushed and before any further commit is stacked on top of it, which would force rewriting those too).
+
+### The confirmation gate (step 4) is absolute
+
+**The user commits. You draft.** Never create a commit the user has not seen and approved first.
+
+**No exceptions:**
+- Not for one-file changes, typos, or "obviously correct" fixes.
+- Not when the user said "commit this" earlier in the conversation — that authorizes drafting, not committing unseen. Show the message, then wait.
+- Not while executing an implementation plan that commits after each task. Each commit gets its own confirmation.
+- Not because the commit is unpushed and `--amend` would fix it. Amending is a repair, not a substitute for asking.
+- Not by printing the message and running `git commit` in the same turn. Printing without stopping is not a gate.
+
+`git add` on its own is fine before confirmation (it changes nothing that survives). Creating the commit object is what requires the yes.
+
+| Rationalization | Reality |
+|---|---|
+| "The change is trivial, asking is noise." | Trivial changes are where wrong scope hides. Asking costs one turn. |
+| "They already told me to commit." | That was permission to draft. The message they have not read is the thing being approved. |
+| "I'll commit now and amend if they object." | Amending rewrites history and only works before a push. Ask first instead. |
+| "Stopping every time stalls the plan." | A stalled plan is recoverable. An unwanted commit in shared history is not. |
+| "I printed the message, that counts as showing them." | Printing and committing in one turn gives them nothing to answer. Stop after printing. |
+
+**Red flags — stop and ask instead:** you are about to run `git commit` in the same turn you drafted the message; you are reasoning about why this particular commit is an exception; you are treating an earlier "commit it" as covering a message written afterwards.
 
 ### Repairing badly formatted messages already committed
 
