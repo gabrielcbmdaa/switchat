@@ -1,4 +1,4 @@
-import { useRef, useState, type ChangeEvent, type PointerEvent } from 'react';
+import { useEffect, useRef, useState, type ChangeEvent, type PointerEvent } from 'react';
 import styles from './NotesView.module.css';
 import toolbarStyles from '../components/SelectionToolbar.module.css';
 import { positionOver } from '../utils/floatingPosition';
@@ -52,12 +52,38 @@ export default function NotesView({ notes, onChange, onReply, onClose }: NotesVi
         setPill({ ...position, text: selected });
     };
 
+    // El evento que SI disparan los campos de formulario al cambiar su seleccion. Escribir,
+    // hacer clic suelto o mover el cursor la vacian, y ahi la pildora ya no apunta a nada.
+    const handleSelect = () => {
+        const textarea = textareaRef.current;
+        if (!textarea) return;
+
+        if (textarea.selectionStart === textarea.selectionEnd) setPill(null);
+    };
+
+    // Anclada al puntero, la pildora no sabe donde se fue el texto al desplazarse: quedarse
+    // quieta señalaria a la linea equivocada, que es peor que desaparecer.
+    const handleScroll = () => setPill(null);
+
     const handleReply = () => {
         if (!pill) return;
 
         onReply?.(pill.text);
         setPill(null);
     };
+
+    // La salida de teclado, igual que en el toolbar de los mensajes. Va en el documento y no
+    // en el textarea porque el foco puede haberse ido a otra parte con la pildora abierta.
+    useEffect(() => {
+        if (!pill) return;
+
+        const handleKeyDown = (e: KeyboardEvent) => {
+            if (e.key === 'Escape') setPill(null);
+        };
+
+        document.addEventListener('keydown', handleKeyDown);
+        return () => document.removeEventListener('keydown', handleKeyDown);
+    }, [pill]);
 
     return (
         <div className={styles.notesViewContainer}>
@@ -82,6 +108,8 @@ export default function NotesView({ notes, onChange, onReply, onClose }: NotesVi
                     value={notes}
                     onChange={handleChange}
                     onPointerUp={handlePointerUp}
+                    onSelect={handleSelect}
+                    onScroll={handleScroll}
                     placeholder="Write your notes here..."
                     autoFocus
                 />
