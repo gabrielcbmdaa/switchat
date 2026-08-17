@@ -91,6 +91,7 @@ interface ChatCompletionRequest {
     model: string;
     messages: ChatCompletionMessage[];
     reasoning_effort?: string;
+    prompt_cache_key?: string;
 }
 
 /**
@@ -275,7 +276,11 @@ async function sendToAnthropic(
     };
 
     if (systemPrompt) {
-        requestBody.system = systemPrompt;
+        requestBody.system = [{
+            type: 'text',
+            text: systemPrompt,
+            cache_control: { type: 'ephemeral' },
+        }];
     }
 
     applyAnthropicThinking(requestBody, config?.thinkingApi ?? 'budget', reasoningLevel, config);
@@ -311,6 +316,25 @@ async function sendToAnthropic(
 }
 
 /**
+ * Same notebook → same key; edit the notes → another key. OpenAI uses this to
+ * route repeats of a long prefix onto the machine that already read it.
+ */
+function promptCacheKey(systemText: string): string {
+    let hash = 5381;
+    for (let i = 0; i < systemText.length; i++) {
+        hash = ((hash << 5) + hash + systemText.charCodeAt(i)) | 0;
+    }
+    return `switchat-notes-${hash >>> 0}`;
+}
+
+function joinedSystemText(messagesHistory: Message[]): string {
+    return messagesHistory
+        .filter((msg) => msg.role === 'system')
+        .map((msg) => msg.parts?.[0]?.text || '')
+        .join('\n');
+}
+
+/**
  * Cliente estándar para OpenAI Chat Completions API.
  */
 async function sendToOpenAI(
@@ -326,13 +350,16 @@ async function sendToOpenAI(
 
     console.log(`🚀 [Providers] Request to OpenAI (${modelLowerCase})...`);
 
+    const systemText = joinedSystemText(messagesHistory);
     return sendToOpenAICompatible(
         'https://api.openai.com/v1/chat/completions',
         apiKey,
         modelLowerCase,
         messagesHistory,
         reasoningLevel,
-        signal
+        signal,
+        'openai',
+        systemText ? { prompt_cache_key: promptCacheKey(systemText) } : undefined
     );
 }
 
@@ -346,12 +373,10 @@ async function sendToOpenAICompatible(
     messagesHistory: Message[],
     reasoningLevel?: string,
     signal?: AbortSignal,
-    providerName: string = 'openai'
+    providerName: string = 'openai',
+    extraBody?: Pick<ChatCompletionRequest, 'prompt_cache_key'>
 ): Promise<ProviderResponse> {
-    const systemText = messagesHistory
-        .filter((msg) => msg.role === 'system')
-        .map((msg) => msg.parts?.[0]?.text || '')
-        .join('\n');
+    const systemText = joinedSystemText(messagesHistory);
 
     const formattedMessages: ChatCompletionMessage[] = [];
     if (systemText) {
@@ -367,7 +392,8 @@ async function sendToOpenAICompatible(
 
     const requestBody: ChatCompletionRequest = {
         model: modelLowerCase,
-        messages: formattedMessages
+        messages: formattedMessages,
+        ...extraBody,
     };
 
     if (reasoningLevel && reasoningLevel !== 'off') {

@@ -23,8 +23,8 @@ function stubAnthropicCall() {
     });
     vi.stubGlobal('fetch', fetchMock);
 
-    return async function sentBody(model: string, reasoningLevel: string) {
-        await fetchFromProvider(model, history, reasoningLevel);
+    return async function sentBody(model: string, reasoningLevel: string, messages: Message[] = history) {
+        await fetchFromProvider(model, messages, reasoningLevel);
         const [, init] = fetchMock.mock.calls[fetchMock.mock.calls.length - 1];
         return JSON.parse(init.body) as Record<string, unknown>;
     };
@@ -153,5 +153,51 @@ describe('joined system prefix on cloud providers', () => {
         expect(systemMessages[0].content).toContain('ship the notes reader first');
         expect(messages[0].role).toBe('system');
         expect(messages[1].role).toBe('user');
+    });
+});
+
+describe('prompt cache marks on Anthropic and OpenAI', () => {
+    it('marks the joined Anthropic system block as an ephemeral cache breakpoint', async () => {
+        localStorage.setItem('anthropicApiKey', 'test-key');
+        const sentBody = stubAnthropicCall();
+
+        const body = await sentBody('claude-sonnet-5', 'high', splitSystemHistory);
+
+        expect(body.system).toEqual([
+            {
+                type: 'text',
+                text: expect.stringContaining('be brief'),
+                cache_control: { type: 'ephemeral' },
+            },
+        ]);
+        expect((body.system as { text: string }[])[0].text).toContain('ship the notes reader first');
+    });
+
+    it('omits Anthropic system when history has no system message', async () => {
+        localStorage.setItem('anthropicApiKey', 'test-key');
+        const sentBody = stubAnthropicCall();
+
+        const body = await sentBody('claude-sonnet-5', 'high');
+
+        expect(body.system).toBeUndefined();
+    });
+
+    it('sends OpenAI a prompt_cache_key derived from the joined system text', async () => {
+        localStorage.setItem('openaiApiKey', 'test-key');
+        const sentBody = stubOpenAICall();
+
+        const body = await sentBody(splitSystemHistory);
+
+        expect(typeof body.prompt_cache_key).toBe('string');
+        expect(body.prompt_cache_key).toMatch(/^switchat-notes-/);
+    });
+
+    it('omits OpenAI prompt_cache_key when there is no system text', async () => {
+        localStorage.setItem('openaiApiKey', 'test-key');
+        const sentBody = stubOpenAICall();
+
+        const body = await sentBody(history);
+
+        expect(body.prompt_cache_key).toBeUndefined();
     });
 });
