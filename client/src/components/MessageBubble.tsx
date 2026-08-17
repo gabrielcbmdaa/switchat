@@ -127,8 +127,13 @@ export default function MessageBubble({ msg, isUser, onDelete, onRetry }: Messag
                         <use xlinkHref="#icon-trash" />
                     </svg>
                 </button>
+                {/* El nivel se pinta solo si el mensaje lo trae: las respuestas guardadas antes
+                    de que el campo existiera vienen sin el, y ahi la etiqueta se queda como
+                    estaba en vez de arrastrar un separador suelto. */}
                 {!isUser && msg.model && (
-                    <span className={styles.modelLabel}>{msg.model}</span>
+                    <span className={styles.modelLabel}>
+                        {msg.reasoningLevel ? `${msg.model} · ${msg.reasoningLevel}` : msg.model}
+                    </span>
                 )}
             </div>
         </div>
