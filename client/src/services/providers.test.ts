@@ -4,6 +4,12 @@ import type { Message } from '../types';
 
 const history: Message[] = [{ role: 'user', parts: [{ text: 'hello' }] }];
 
+const splitSystemHistory: Message[] = [
+    { role: 'system', parts: [{ text: 'be brief' }] },
+    { role: 'system', parts: [{ text: 'ship the notes reader first' }] },
+    { role: 'user', parts: [{ text: 'hello' }] },
+];
+
 /**
  * Stubs fetch with a valid Anthropic answer and returns a reader for the body that was
  * actually sent. Asserting on the request is the whole point: the bug this file guards
@@ -24,14 +30,46 @@ function stubAnthropicCall() {
     };
 }
 
-let sentBody: (model: string, reasoningLevel: string) => Promise<Record<string, unknown>>;
+function stubGoogleCall() {
+    const fetchMock = vi.fn().mockResolvedValue({
+        ok: true,
+        json: async () => ({
+            candidates: [{ content: { parts: [{ text: 'hi' }] } }],
+        }),
+    });
+    vi.stubGlobal('fetch', fetchMock);
 
-beforeEach(() => {
-    localStorage.setItem('anthropicApiKey', 'test-key');
-    sentBody = stubAnthropicCall();
-});
+    return async function sentBody(messages: Message[]) {
+        await fetchFromProvider('gemini-3.5-flash', messages, 'low');
+        const [, init] = fetchMock.mock.calls[fetchMock.mock.calls.length - 1];
+        return JSON.parse(init.body) as Record<string, unknown>;
+    };
+}
+
+function stubOpenAICall() {
+    const fetchMock = vi.fn().mockResolvedValue({
+        ok: true,
+        json: async () => ({
+            choices: [{ message: { content: 'hi' } }],
+        }),
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    return async function sentBody(messages: Message[]) {
+        await fetchFromProvider('gpt-5.6-sol', messages, 'low');
+        const [, init] = fetchMock.mock.calls[fetchMock.mock.calls.length - 1];
+        return JSON.parse(init.body) as Record<string, unknown>;
+    };
+}
 
 describe('sendToAnthropic — thinking shape per model', () => {
+    let sentBody: (model: string, reasoningLevel: string) => Promise<Record<string, unknown>>;
+
+    beforeEach(() => {
+        localStorage.setItem('anthropicApiKey', 'test-key');
+        sentBody = stubAnthropicCall();
+    });
+
     it('sends adaptive thinking plus effort on models that removed budget_tokens', async () => {
         const body = await sentBody('claude-sonnet-5', 'high');
 
@@ -86,5 +124,34 @@ describe('sendToAnthropic — thinking shape per model', () => {
 
         expect(body.thinking).toBeUndefined();
         expect(body.output_config).toBeUndefined();
+    });
+});
+
+describe('joined system prefix on cloud providers', () => {
+    it('sends Google one systemInstruction part even if history had two system messages', async () => {
+        localStorage.setItem('geminiApiKey', 'test-key');
+        const sentBody = stubGoogleCall();
+
+        const body = await sentBody(splitSystemHistory);
+        const systemInstruction = body.systemInstruction as { parts: { text: string }[] };
+
+        expect(systemInstruction.parts).toHaveLength(1);
+        expect(systemInstruction.parts[0].text).toContain('be brief');
+        expect(systemInstruction.parts[0].text).toContain('ship the notes reader first');
+    });
+
+    it('sends OpenAI one system message even if history had two', async () => {
+        localStorage.setItem('openaiApiKey', 'test-key');
+        const sentBody = stubOpenAICall();
+
+        const body = await sentBody(splitSystemHistory);
+        const messages = body.messages as { role: string; content: string }[];
+        const systemMessages = messages.filter((message) => message.role === 'system');
+
+        expect(systemMessages).toHaveLength(1);
+        expect(systemMessages[0].content).toContain('be brief');
+        expect(systemMessages[0].content).toContain('ship the notes reader first');
+        expect(messages[0].role).toBe('system');
+        expect(messages[1].role).toBe('user');
     });
 });

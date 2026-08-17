@@ -22,19 +22,22 @@ export function composeProviderHistory(
     notesText?: string,
     notesEnabled?: boolean
 ): Message[] {
-    const prefix: Message[] = [];
+    const prefixTexts: string[] = [];
     const trimmedPrompt = (systemPrompt || '').trim();
     if (trimmedPrompt) {
-        prefix.push({ role: 'system', parts: [{ text: trimmedPrompt }] });
+        prefixTexts.push(trimmedPrompt);
     }
     if (notesEnabled === false) {
         // The notebook stays on this machine. The model only learns that a switch exists.
-        prefix.push({ role: 'system', parts: [{ text: NOTES_DISABLED_INSTRUCTION }] });
+        prefixTexts.push(NOTES_DISABLED_INSTRUCTION);
     } else {
         const notesBlock = buildNotesSystemText(notesText || '');
         if (notesBlock) {
-            prefix.push({ role: 'system', parts: [{ text: notesBlock }] });
+            prefixTexts.push(notesBlock);
         }
     }
+    const prefix: Message[] = prefixTexts.length > 0
+        ? [{ role: 'system', parts: [{ text: prefixTexts.join('\n') }] }]
+        : [];
     return [...prefix, ...messagesHistory];
 }

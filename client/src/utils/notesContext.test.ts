@@ -44,11 +44,11 @@ describe('composeProviderHistory', () => {
 
     it('packs system prompt, then notes, then history', () => {
         const result = composeProviderHistory(history, 'be brief', 'ship the notes reader first');
-        expect(result).toHaveLength(3);
-        expect(result[0]).toEqual({ role: 'system', parts: [{ text: 'be brief' }] });
-        expect(result[1].role).toBe('system');
-        expect(result[1].parts[0].text).toContain('ship the notes reader first');
-        expect(result[2]).toEqual(history[0]);
+        expect(result).toHaveLength(2);
+        expect(result[0].role).toBe('system');
+        expect(result[0].parts[0].text).toContain('be brief');
+        expect(result[0].parts[0].text).toContain('ship the notes reader first');
+        expect(result[1]).toEqual(history[0]);
     });
 
     it('omits the notes block when the notebook is blank, even if a string was passed', () => {

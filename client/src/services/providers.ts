@@ -348,14 +348,22 @@ async function sendToOpenAICompatible(
     signal?: AbortSignal,
     providerName: string = 'openai'
 ): Promise<ProviderResponse> {
-    const formattedMessages: ChatCompletionMessage[] = messagesHistory.map((msg) => {
-        let role = 'user';
-        if (msg.role === 'model') role = 'assistant';
-        else if (msg.role === 'system') role = 'system';
+    const systemText = messagesHistory
+        .filter((msg) => msg.role === 'system')
+        .map((msg) => msg.parts?.[0]?.text || '')
+        .join('\n');
 
-        const contentText = msg.parts && msg.parts[0] ? msg.parts[0].text : '';
-        return { role, content: contentText };
-    });
+    const formattedMessages: ChatCompletionMessage[] = [];
+    if (systemText) {
+        formattedMessages.push({ role: 'system', content: systemText });
+    }
+    for (const msg of messagesHistory) {
+        if (msg.role === 'system') continue;
+        formattedMessages.push({
+            role: msg.role === 'model' ? 'assistant' : 'user',
+            content: msg.parts?.[0]?.text || '',
+        });
+    }
 
     const requestBody: ChatCompletionRequest = {
         model: modelLowerCase,
