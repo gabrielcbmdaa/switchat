@@ -1153,7 +1153,11 @@ export default function App() {
                 />
               )}
               {activeRightPanel === 'notes' && (
-                <NotesView notes={currentChat?.notes ?? ''} onChange={handleNotesChange} />
+                <NotesView
+                  notes={currentChat?.notes ?? ''}
+                  onChange={handleNotesChange}
+                  onReply={handleReplyWithSelection}
+                />
               )}
               <Toolbar
                 onNavNotes={() => setRightPanelView('notes')}
