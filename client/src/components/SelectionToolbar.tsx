@@ -1,10 +1,10 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import styles from './SelectionToolbar.module.css';
+import { positionOver } from '../utils/floatingPosition';
 
 // Medidas aproximadas del toolbar, para centrarlo sobre la selección
 const TOOLBAR_W = 230;
 const TOOLBAR_H = 36;
-const GAP = 8;
 
 interface SelectionToolbarProps {
     onReply: (text: string) => void;
@@ -14,17 +14,7 @@ interface SelectionToolbarProps {
 // Coloca el toolbar centrado sobre la selección, sin salirse del viewport.
 // Devuelve null si el rect ya no es válido o quedó fuera de pantalla.
 function positionFor(rect: DOMRect): { x: number; y: number } | null {
-    // Rect vacío: el rango se invalidó (ej. re-render durante el streaming)
-    if (!rect.width && !rect.height) return null;
-    if (rect.bottom < 0 || rect.top > window.innerHeight) return null;
-
-    let y = rect.top - TOOLBAR_H - GAP;
-    if (y < GAP) y = rect.bottom + GAP; // sin sitio arriba → debajo
-
-    const rawX = rect.left + rect.width / 2 - TOOLBAR_W / 2;
-    const x = Math.max(GAP, Math.min(rawX, window.innerWidth - TOOLBAR_W - GAP));
-
-    return { x, y };
+    return positionOver(rect, TOOLBAR_W, TOOLBAR_H);
 }
 
 export default function SelectionToolbar({ onReply, onSendToNotes }: SelectionToolbarProps) {
