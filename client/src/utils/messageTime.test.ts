@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { formatMessageTime } from './messageTime';
+import { formatMessageTime, formatExactTime } from './messageTime';
 
 // A fixed clock, so the ladder is measured against a date that never moves. Local time on
 // purpose: the function compares calendar days with getDate(), which is local too.
@@ -54,5 +54,20 @@ describe('formatMessageTime', () => {
     it('returns nothing for a date it cannot parse', () => {
         expect(formatMessageTime('not a date', NOW)).toBe('');
         expect(formatMessageTime('', NOW)).toBe('');
+    });
+});
+
+describe('formatExactTime', () => {
+    it('spells out the day and the time for the tooltip', () => {
+        const sent = new Date(2026, 7, 21, 15, 46, 45);
+
+        // Trailing seconds vary with the platform's en-GB pattern; the day and the minute
+        // are what the tooltip is for.
+        expect(formatExactTime(sent.toISOString())).toContain('21/08/2026');
+        expect(formatExactTime(sent.toISOString())).toContain('15:46');
+    });
+
+    it('returns nothing for a date it cannot parse', () => {
+        expect(formatExactTime('not a date')).toBe('');
     });
 });
