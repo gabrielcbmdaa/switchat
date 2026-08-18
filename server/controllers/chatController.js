@@ -43,6 +43,11 @@ exports.createMessage = async (req, res) => {
         });
         await message.save();
 
+        // La lista de chats se ordena por esta fecha. $max y no $set: un intercambio son dos
+        // peticiones (el prompt y la respuesta) y nada garantiza que lleguen en orden; con
+        // $set la que llegase tarde tiraría la fecha hacia atrás, y $max solo deja avanzar.
+        await Chat.updateOne({ id: chatId }, { $max: { lastMessageAt: message.createdAt } });
+
         return res.status(201).json({
             _id: message._id,
             createdAt: message.createdAt
@@ -131,6 +136,11 @@ exports.syncChat = async (req, res) => {
     try {
         const { messages, allowCreate, ...chatFields } = req.body;
         delete chatFields._id; // Evitamos romper MongoDB / schema Chat (messages no pertenece aquí)
+        // lastMessageAt es del servidor, no del cliente. El cliente manda el chat ENTERO en
+        // cada guardado (borrador, título, modelo...), así que aceptarlo aquí dejaría que una
+        // copia vieja pisara la fecha buena: createMessage la sube al llegar la respuesta y el
+        // guardado del título, que sale de un chat capturado antes, la devolvería atrás.
+        delete chatFields.lastMessageAt;
 
         chatFields.userId = req.user.id;
 
@@ -172,6 +182,14 @@ exports.syncChat = async (req, res) => {
 
                 if (docs.length > 0) {
                     await Message.insertMany(docs);
+                    // Un chat que sube de localStorage llega con toda su conversación de golpe,
+                    // y sin esto entraría en la lista sin fecha de actividad: caeria en su
+                    // createdAt, que es el momento de la migración y no el de la conversación.
+                    const newest = docs.reduce(
+                        (latest, doc) => (doc.createdAt > latest ? doc.createdAt : latest),
+                        docs[0].createdAt
+                    );
+                    await Chat.updateOne({ id: chatFields.id }, { $max: { lastMessageAt: newest } });
                 }
             }
         }
@@ -229,6 +247,18 @@ exports.deleteMessage = async (req, res) => {
         if (!deletedMessage) {
             return res.status(404).json({ message: 'Message not found' });
         }
+
+        // Se recalcula en vez de subirse con $max, porque este es el unico camino que mueve la
+        // fecha HACIA ATRAS: borrado el ultimo mensaje, el chat seguiria flotando arriba de la
+        // lista por una conversacion que ya no existe. Va sobre el indice { chatId, createdAt,
+        // _id } que ya usa getMessages, y sin mensajes el campo se retira del todo.
+        const newest = await Message.findOne({ chatId }).sort({ createdAt: -1, _id: -1 });
+        await Chat.updateOne(
+            { id: chatId },
+            newest
+                ? { $set: { lastMessageAt: newest.createdAt } }
+                : { $unset: { lastMessageAt: 1 } }
+        );
 
         res.json({ message: 'Message deleted successfully' });
     } catch (error) {

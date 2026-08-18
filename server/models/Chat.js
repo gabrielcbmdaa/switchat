@@ -11,7 +11,15 @@ const ChatSchema = new mongoose.Schema({
     notes: { type: String, default: '' },
     model: { type: String, default: '' },
     reasoningLevel: { type: String, default: '' },
-    createdAt: { type: Date, default: Date.now }
+    createdAt: { type: Date, default: Date.now },
+    // When the chat last saw a message, so the client can order the list by activity instead
+    // of by birth date. Deliberately WITHOUT a default: its absence is the signal for "chat
+    // older than this field", which is what makes the client fall back to createdAt. A
+    // default would erase that distinction and every legacy chat would claim to be fresh.
+    //
+    // The server owns it. Only createMessage, the migration in syncChat and deleteMessage
+    // write it — see the guard in syncChat for why the client is not allowed to.
+    lastMessageAt: { type: Date }
 });
 
 module.exports = mongoose.model('Chat', ChatSchema);
