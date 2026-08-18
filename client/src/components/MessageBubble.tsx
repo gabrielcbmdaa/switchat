@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Marked } from 'marked';
 import styles from './MessageBubble.module.css';
+import { formatMessageTime, formatExactTime } from '../utils/messageTime';
 import type { Message } from '../types';
 
 // Al sustituir el renderer de bloques de codigo perdemos el escapado que marked hacia por
@@ -64,6 +65,14 @@ export default function MessageBubble({ msg, isUser, onDelete, onRetry }: Messag
     const [copied, setCopied] = useState(false);
     const rawText = msg.parts[0]?.text || '';
     const htmlContent = { __html: isUser ? rawText : renderModelHtml(rawText) };
+
+    // Computed on every render, with no timer behind it: the label is only visible on hover
+    // and the tooltip carries the exact moment anyway, so a global interval refreshing text
+    // nobody is looking at would buy nothing. Empty in the two cases where there is no time
+    // worth printing: a message stored before the field existed, and the temporary bubbles
+    // ("Thinking...", the errors), which remove themselves.
+    const sentAt = msg.isTemporary ? '' : msg.createdAt ?? '';
+    const timeLabel = formatMessageTime(sentAt);
 
     // Un solo listener en la burbuja en vez de uno por bloque: los botones los crea marked
     // como HTML plano, no como elementos de React, asi que no se les puede poner onClick.
@@ -134,6 +143,14 @@ export default function MessageBubble({ msg, isUser, onDelete, onRetry }: Messag
                     <span className={styles.modelLabel}>
                         {msg.reasoningLevel ? `${msg.model} · ${msg.reasoningLevel}` : msg.model}
                     </span>
+                )}
+                {/* No separator between this and the model label: they are two elements with
+                    their own spacing, and a shared `·` would trip the tests that assert the
+                    label carries none. */}
+                {timeLabel && (
+                    <time className={styles.timestamp} dateTime={sentAt} title={formatExactTime(sentAt)}>
+                        {timeLabel}
+                    </time>
                 )}
             </div>
         </div>

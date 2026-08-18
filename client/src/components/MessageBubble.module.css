@@ -157,6 +157,20 @@
     user-select: none;
 }
 
+/* Cut from the same cloth as .modelLabel, its neighbour in the row: both are data, not
+   prose, so both are monospaced. It needs no visibility rule of its own — living inside
+   .messageActions it already inherits the hover fade and the fixed 0.75 on touch. */
+.timestamp {
+    font-family: ui-monospace, monospace;
+    font-size: 11px;
+    font-weight: 500;
+    color: #858585;
+    white-space: nowrap;
+    padding: 0 6px;
+    line-height: 28px;
+    user-select: none;
+}
+
 .actionButton {
     display: flex;
     justify-content: center;

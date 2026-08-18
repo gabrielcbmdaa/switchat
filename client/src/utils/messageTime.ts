@@ -49,3 +49,14 @@ export function formatMessageTime(iso: string, now: Date = new Date()): string {
 
     return date.toLocaleDateString(LOCALE);
 }
+
+/**
+ * The full date and time, for the tooltip that sits behind the relative label. It exists so
+ * the exact moment is one hover away without the row having to spend any width on it.
+ */
+export function formatExactTime(iso: string): string {
+    const date = new Date(iso);
+    if (Number.isNaN(date.getTime())) return '';
+
+    return date.toLocaleString(LOCALE);
+}
