@@ -266,3 +266,39 @@ exports.deleteMessage = async (req, res) => {
         res.status(500).json({ message: 'Failed to delete the message', error: error.message });
     }
 };
+
+// Rewrite the wording of a user message that already exists. createdAt and lastMessageAt
+// stay put: fixing a typo is not a new turn, and moving either date would reshuffle the
+// conversation or the chat list for no reason.
+exports.updateMessage = async (req, res) => {
+    try {
+        const { chatId, messageId } = req.params;
+        const { content } = req.body;
+
+        if (!content || content.trim() === '') {
+            return res.status(400).json({ message: 'The message content is required' });
+        }
+
+        const chatExists = await Chat.exists({ id: chatId, userId: req.user.id });
+        if (!chatExists) {
+            return res.status(404).json({ message: 'Chat not found' });
+        }
+
+        const message = await Message.findOne({ _id: messageId, chatId });
+        if (!message) {
+            return res.status(404).json({ message: 'Message not found' });
+        }
+
+        if (message.sender !== 'user') {
+            return res.status(400).json({ message: 'Only user messages can be edited' });
+        }
+
+        message.content = content.trim();
+        await message.save();
+
+        return res.json({ message: 'Message updated successfully' });
+    } catch (error) {
+        console.error('Error in updateMessage:', error);
+        res.status(500).json({ message: 'Failed to update the message', error: error.message });
+    }
+};
