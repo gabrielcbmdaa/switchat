@@ -29,6 +29,12 @@ export interface Chat {
   // the model falls back to the global preference and the level to the model.
   model?: string;
   reasoningLevel?: string;
+  // When the chat was born and when it last saw a message. Both optional: chats created
+  // before these fields exist without them, and the ordering helper falls back rather than
+  // assuming a value. lastMessageAt belongs to the server — it arrives with the chat and is
+  // never written from here, or a stale copy would undo the server's own bump.
+  createdAt?: string;
+  lastMessageAt?: string;
 }
 
 export interface GeminiModel {

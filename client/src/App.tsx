@@ -18,11 +18,12 @@ import { syncApiKeysWithServer } from './utils/apiKeys';
 import { matchPanelShortcut } from './utils/keyboardShortcuts';
 import type { LeftPanelView, RightPanelView } from './utils/uiPreferences';
 import { isNotesEnabled } from './utils/notesContext';
+import { sortChatsByActivity } from './utils/chatOrder';
 
 // El chat nuevo lleva su id real desde el principio: cuando se materialice al enviar
 // el primer mensaje no hay que reasignar nada.
 function createDraftChat(): Chat {
-  return { id: 'chat-' + Date.now(), title: 'New conversation', messages: [], draft: '', model: loadDefaultModel() };
+  return { id: 'chat-' + Date.now(), title: 'New conversation', messages: [], draft: '', model: loadDefaultModel(), createdAt: new Date().toISOString() };
 }
 
 // Lo que dura en pantalla un mensaje temporal antes de retirarse solo.
@@ -382,7 +383,7 @@ export default function App() {
             setActiveChatId(
               localActiveId && serverChats.some((chat: Chat) => chat.id === localActiveId)
                 ? localActiveId
-                : serverChats[0].id
+                : sortChatsByActivity(serverChats)[0].id
             );
             return;
           }
@@ -397,7 +398,7 @@ export default function App() {
           if (cancelled) return;
           if (serverChats && serverChats.length > 0) {
             setChatList(migrateRetiredModels(serverChats));
-            setActiveChatId(serverChats[0].id);
+            setActiveChatId(sortChatsByActivity(serverChats)[0].id);
             return;
           }
 
@@ -660,7 +661,7 @@ export default function App() {
 
       if (serverChats && serverChats.length > 0) {
         setChatList(migrateRetiredModels(serverChats));
-        setActiveChatId(serverChats[0].id);
+        setActiveChatId(sortChatsByActivity(serverChats)[0].id);
       } else {
         // Cuenta nueva: welcome real en servidor (id estable). No pisar chats locales.
         const session = await checkSession();
@@ -692,7 +693,7 @@ export default function App() {
       localActiveId = 'tutorial-welcome';
       saveToLocalDisk(localChats);
     } else if (!localChats.some((chat) => chat.id === localActiveId)) {
-      localActiveId = localChats[0].id;
+      localActiveId = sortChatsByActivity(localChats)[0].id;
     }
 
     setChatList(migrateRetiredModels(localChats));
@@ -938,7 +939,7 @@ export default function App() {
       // Sin chats a los que caer: abrimos la vista de chat nuevo
       startDraftChat(updatedChats);
     } else {
-      const newActiveId = chatId === activeId ? updatedChats[0].id : activeId;
+      const newActiveId = chatId === activeId ? sortChatsByActivity(updatedChats)[0].id : activeId;
       setActiveChatId(newActiveId);
       persistIfOffline(updatedChats);
     }

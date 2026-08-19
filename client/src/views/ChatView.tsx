@@ -1,5 +1,6 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import styles from './ChatView.module.css';
+import { sortChatsByActivity } from '../utils/chatOrder';
 import type { Chat } from '../types';
 import DefaultButton from '../components/DefaultButton';
 
@@ -14,6 +15,12 @@ interface ChatViewProps {
 }
 
 export default function ChatView({ chatList, activeChatId, onChatClick, onCreateNewChat, onDeleteChat, onReTitleChat }: ChatViewProps) {
+    // El orden es una vista sobre los datos, no una propiedad del array: chatList sigue en el
+    // orden en que se fue llenando, y aquí se decide cómo se lee. Ponerlo al revés obligaría a
+    // acordarse de reordenar en cada uno de los sitios que escriben la lista, y el primero que
+    // se olvidara devolvería el desorden sin que nada avisara.
+    const orderedChats = useMemo(() => sortChatsByActivity(chatList), [chatList]);
+
     // Estado para rastrear qué chat está esperando confirmación de borrado
     const [confirmingDeleteId, setConfirmingDeleteId] = useState<string | null>(null);
 
@@ -74,7 +81,7 @@ export default function ChatView({ chatList, activeChatId, onChatClick, onCreate
                 New Chat
             </button>
             {/* Usamos .map() en lugar de .forEach() para imprimir el HTML */}
-            {chatList.map((chat) => {
+            {orderedChats.map((chat) => {
                 // Preguntamos si este botón es el activo
                 const isActive = chat.id === activeChatId;
                 const isConfirming = confirmingDeleteId === chat.id;
