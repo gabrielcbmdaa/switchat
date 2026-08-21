@@ -77,4 +77,44 @@ describe('sortChatList', () => {
 
         expect(sortChatList(chats).map((c) => c.id)).toEqual(['first', 'second']);
     });
+
+    // El caso que motiva la funcionalidad entera: el chat que quieres a mano es justo el que no
+    // estas escribiendo, asi que la fecha lo hunde y el pin tiene que poder mas que la fecha.
+    it('lifts a pinned chat above a conversation that is being used right now', () => {
+        const chats = [
+            chat('busy', { lastMessageAt: ago(MINUTE) }),
+            chat('reference', { createdAt: ago(30 * DAY), pinned: true }),
+        ];
+
+        expect(sortChatList(chats).map((c) => c.id)).toEqual(['reference', 'busy']);
+    });
+
+    // El pin decide el grupo, no el puesto: dentro de los fijados sigue mandando la actividad.
+    it('orders the pinned chats among themselves by activity', () => {
+        const chats = [
+            chat('pinned-old', { createdAt: ago(10 * DAY), pinned: true }),
+            chat('loose', { lastMessageAt: ago(MINUTE) }),
+            chat('pinned-fresh', { lastMessageAt: ago(2 * MINUTE), pinned: true }),
+        ];
+
+        expect(sortChatList(chats).map((c) => c.id)).toEqual(['pinned-fresh', 'pinned-old', 'loose']);
+    });
+
+    // Desfijar no es un estado propio: el chat vuelve al sitio que le da su fecha, sin rastro.
+    it('returns an unpinned chat to its place by date', () => {
+        const chats = [
+            chat('quiet', { createdAt: ago(10 * DAY), pinned: false }),
+            chat('recent', { lastMessageAt: ago(MINUTE) }),
+        ];
+
+        expect(sortChatList(chats).map((c) => c.id)).toEqual(['recent', 'quiet']);
+    });
+
+    // Un chat guardado antes del campo llega sin el, y ausente tiene que leerse como no fijado
+    // y no como un valor raro que rompa la comparacion.
+    it('reads a chat without the field as not pinned', () => {
+        const chats = [chat('legacy', { createdAt: ago(DAY) }), chat('pinned', { createdAt: ago(10 * DAY), pinned: true })];
+
+        expect(sortChatList(chats).map((c) => c.id)).toEqual(['pinned', 'legacy']);
+    });
 });
