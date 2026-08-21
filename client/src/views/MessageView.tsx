@@ -15,6 +15,7 @@ interface MessageViewProps {
     onDeleteMessage: (messageIndex: number) => void;
     onRetryMessage: (messageIndex: number) => void;
     onSaveMessage?: (messageIndex: number, text: string) => void;
+    onSaveAndReply?: (messageIndex: number, text: string) => void;
     token: string | null;
     draft: string;
     onDraftChange: (draft: string) => void;
@@ -37,6 +38,7 @@ export default function MessageView({
     onDeleteMessage,
     onRetryMessage,
     onSaveMessage,
+    onSaveAndReply,
     token,
     draft,
     onDraftChange,
@@ -221,6 +223,8 @@ export default function MessageView({
                                     onDelete={() => onDeleteMessage(realIndex)}
                                     onRetry={() => onRetryMessage(realIndex)}
                                     onSave={onSaveMessage ? (text) => onSaveMessage(realIndex, text) : undefined}
+                                    onSaveAndReply={onSaveAndReply ? (text) => onSaveAndReply(realIndex, text) : undefined}
+                                    editDisabled={isGenerating}
                                 />
                             );
                         })}

@@ -721,6 +721,9 @@ export default function App() {
       beforeRequest?: () => Promise<void>;
       // El "y además" de quien llama: enviar lo usa para pedir el título del chat.
       onSuccess?: (responseText: string) => void;
+      // Save-and-reply already PATCHed the user message. Posting it again would
+      // duplicate it and rewrite createdAt.
+      saveUserMessage?: boolean;
     } = {}
   ) {
     // La convención de arriba, comprobada: sin mensaje de usuario al final no hay nada
@@ -766,7 +769,7 @@ export default function App() {
     try {
       await options.beforeRequest?.();
 
-      if (isAuthenticatedRef.current) {
+      if (isAuthenticatedRef.current && options.saveUserMessage !== false) {
         // Se lanza sin await, en paralelo a la generación: la respuesta del modelo tarda
         // segundos, así que el viaje extra al servidor queda solapado y no se nota.
         pendingUserMessageId = saveMessageToServer(chatId, {
@@ -1026,6 +1029,39 @@ export default function App() {
     }
   }
 
+  async function handleSaveAndReply(messageIndex: number, text: string) {
+    if (!currentChat || isDraftChat || generatingChatIds.includes(currentChat.id)) return;
+
+    const trimmed = text.trim();
+    if (!trimmed) return;
+
+    const message = currentChat.messages[messageIndex];
+    if (!message || message.role !== 'user' || message.isTemporary) return;
+
+    const chatId = currentChat.id;
+    const editedMessage = { ...message, parts: [{ text: trimmed }] };
+    const historyToSend = [
+      ...currentChat.messages.slice(0, messageIndex),
+      editedMessage,
+    ];
+    const messagesToDelete = currentChat.messages.slice(messageIndex + 1);
+
+    await sendChatHistory(historyToSend, chatListRef.current, chatId, {
+      saveUserMessage: false,
+      beforeRequest: async () => {
+        if (!isAuthenticated) return;
+        if (editedMessage._id) {
+          await updateMessageOnServer(chatId, editedMessage._id, trimmed);
+        }
+        messagesToDelete.forEach((msg) => {
+          if (msg._id) {
+            deleteMessageFromServer(chatId, msg._id);
+          }
+        });
+      },
+    });
+  }
+
   async function handleRetryMessage(messageIndex: number) {
     if (!currentChat || generatingChatIds.includes(currentChat.id)) return;
 
@@ -1152,6 +1188,7 @@ export default function App() {
               onDeleteMessage={handleDeleteMessage}
               onRetryMessage={handleRetryMessage}
               onSaveMessage={handleSaveMessage}
+              onSaveAndReply={handleSaveAndReply}
               token={isAuthenticated ? 'active' : null}
               draft={currentChat?.draft || ''}
               onDraftChange={handleDraftChange}

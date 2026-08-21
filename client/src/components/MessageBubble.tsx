@@ -60,9 +60,11 @@ interface MessageBubbleProps {
     onDelete: () => void;
     onRetry?: () => void;
     onSave?: (text: string) => void;
+    onSaveAndReply?: (text: string) => void;
+    editDisabled?: boolean;
 }
 
-export default function MessageBubble({ msg, isUser, onDelete, onRetry, onSave }: MessageBubbleProps) {
+export default function MessageBubble({ msg, isUser, onDelete, onRetry, onSave, onSaveAndReply, editDisabled = false }: MessageBubbleProps) {
     const [copied, setCopied] = useState(false);
     const [isEditing, setIsEditing] = useState(false);
     const [draft, setDraft] = useState('');
@@ -130,6 +132,13 @@ export default function MessageBubble({ msg, isUser, onDelete, onRetry, onSave }
         setIsEditing(false);
     };
 
+    const saveAndReply = () => {
+        const trimmed = draft.trim();
+        if (!trimmed) return;
+        onSaveAndReply?.(trimmed);
+        setIsEditing(false);
+    };
+
     useEffect(() => {
         const textarea = textareaRef.current;
         if (!textarea) return;
@@ -178,6 +187,18 @@ export default function MessageBubble({ msg, isUser, onDelete, onRetry, onSave }
                                 <use xlinkHref="#icon-save" />
                             </svg>
                         </button>
+                        {onSaveAndReply && (
+                            <button
+                                className={styles.actionButton}
+                                title="Save and reply"
+                                onClick={saveAndReply}
+                                disabled={!draft.trim()}
+                            >
+                                <svg width="16" height="16">
+                                    <use xlinkHref="#icon-retry" />
+                                </svg>
+                            </button>
+                        )}
                     </>
                 ) : (
                     <>
@@ -191,7 +212,7 @@ export default function MessageBubble({ msg, isUser, onDelete, onRetry, onSave }
                             </svg>
                         </button>
                         {canEdit && (
-                            <button className={styles.actionButton} title="Edit message" onClick={startEditing}>
+                            <button className={styles.actionButton} title="Edit message" onClick={startEditing} disabled={editDisabled}>
                                 <svg width="16" height="16">
                                     <use xlinkHref="#icon-pencil" />
                                 </svg>
