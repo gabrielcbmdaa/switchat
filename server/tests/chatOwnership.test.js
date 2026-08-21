@@ -128,4 +128,86 @@ describe('propiedad del chat', () => {
             assert.equal(await Message.countDocuments({ _id: messageId }), 1);
         });
     });
+
+    describe('PATCH /api/chats/:chatId/messages/:messageId', () => {
+        test('the owner updates their own message', async () => {
+            await request(app)
+                .patch(`/api/chats/${CHAT_ID}/messages/${messageId}`)
+                .set('Cookie', victima)
+                .send({ content: 'the number was a joke' })
+                .expect(200);
+
+            const stored = await Message.findById(messageId);
+            assert.equal(stored.content, 'the number was a joke');
+        });
+
+        test('a stranger cannot change it', async () => {
+            await request(app)
+                .patch(`/api/chats/${CHAT_ID}/messages/${messageId}`)
+                .set('Cookie', atacante)
+                .send({ content: 'stolen' })
+                .expect(404);
+
+            const stored = await Message.findById(messageId);
+            assert.equal(stored.content, 'mi numero de tarjeta es 1234-5678');
+        });
+
+        test('an owned chatId does not unlock a foreign messageId', async () => {
+            await request(app)
+                .post('/api/chats')
+                .set('Cookie', atacante)
+                .send({ id: 'chat-senyuelo', title: 'Señuelo', allowCreate: true })
+                .expect(200);
+
+            await request(app)
+                .patch(`/api/chats/chat-senyuelo/messages/${messageId}`)
+                .set('Cookie', atacante)
+                .send({ content: 'stolen' })
+                .expect(404);
+
+            const stored = await Message.findById(messageId);
+            assert.equal(stored.content, 'mi numero de tarjeta es 1234-5678');
+        });
+
+        test('empty content is rejected', async () => {
+            await request(app)
+                .patch(`/api/chats/${CHAT_ID}/messages/${messageId}`)
+                .set('Cookie', victima)
+                .send({ content: '   ' })
+                .expect(400);
+
+            const stored = await Message.findById(messageId);
+            assert.equal(stored.content, 'mi numero de tarjeta es 1234-5678');
+        });
+
+        test('a model message cannot be patched', async () => {
+            const created = await request(app)
+                .post(`/api/chats/${CHAT_ID}/messages`)
+                .set('Cookie', victima)
+                .send({ sender: 'ai', content: 'the original answer' })
+                .expect(201);
+
+            await request(app)
+                .patch(`/api/chats/${CHAT_ID}/messages/${created.body._id}`)
+                .set('Cookie', victima)
+                .send({ content: 'rewritten by the user' })
+                .expect(400);
+
+            const stored = await Message.findById(created.body._id);
+            assert.equal(stored.content, 'the original answer');
+        });
+
+        test('patching does not rewrite createdAt', async () => {
+            const before = await Message.findById(messageId);
+
+            await request(app)
+                .patch(`/api/chats/${CHAT_ID}/messages/${messageId}`)
+                .set('Cookie', victima)
+                .send({ content: 'the number was a joke' })
+                .expect(200);
+
+            const after = await Message.findById(messageId);
+            assert.equal(after.createdAt.getTime(), before.createdAt.getTime());
+        });
+    });
 });

@@ -113,6 +113,21 @@ describe('lastMessageAt on a chat', () => {
         assert.equal(new Date(chat.lastMessageAt).getTime(), new Date(afterFirst).getTime());
     });
 
+    test('patching a message does not move the date', async () => {
+        await createChat('chat-edit');
+        const messageId = await sendMessage('chat-edit', 'Hello');
+        const before = (await readChat('chat-edit')).lastMessageAt;
+
+        await request(app)
+            .patch(`/api/chats/chat-edit/messages/${messageId}`)
+            .set('Cookie', cookie)
+            .send({ content: 'Hello, edited' })
+            .expect(200);
+
+        const chat = await readChat('chat-edit');
+        assert.equal(new Date(chat.lastMessageAt).getTime(), new Date(before).getTime());
+    });
+
     test('deleting the only message leaves the chat with no date', async () => {
         await createChat('chat-last');
         const onlyId = await sendMessage('chat-last', 'Only');
