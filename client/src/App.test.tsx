@@ -478,4 +478,61 @@ describe('editing a sent message', () => {
         expect(api.fetchChatResponse).not.toHaveBeenCalled();
         expect(api.updateMessageOnServer).toHaveBeenCalledWith('chat-a', 'id-A question 2', 'A question 2 edited');
     });
+
+    it('drops later turns and asks the model again', async () => {
+        const answer = deferred<{ text: string }>();
+        api.fetchChatResponse.mockReturnValue(answer.promise);
+
+        render(<App />);
+        await screen.findByText('A question 2');
+
+        const bubble = screen.getByText('A question 2').closest('[class*="messageWrapper"]') as HTMLElement;
+        await userEvent.click(within(bubble).getByTitle('Edit message'));
+
+        const textarea = within(bubble).getByRole('textbox');
+        await userEvent.clear(textarea);
+        await userEvent.type(textarea, 'A question 2 edited');
+        await userEvent.click(within(bubble).getByTitle('Save and reply'));
+
+        expect(screen.queryByText('A answer 2')).not.toBeInTheDocument();
+        expect(screen.queryByText('A question 3')).not.toBeInTheDocument();
+        expect(screen.queryByText('A answer 3')).not.toBeInTheDocument();
+        await screen.findByText('Thinking...');
+
+        expect(api.fetchChatResponse).toHaveBeenCalled();
+        const history = api.fetchChatResponse.mock.calls[0][0] as Message[];
+        expect(history.at(-1)?.parts[0].text).toBe('A question 2 edited');
+        expect(api.saveMessageToServer).not.toHaveBeenCalledWith('chat-a', expect.objectContaining({
+            sender: 'user',
+            content: 'A question 2 edited',
+        }));
+        expect(api.updateMessageOnServer).toHaveBeenCalledWith('chat-a', 'id-A question 2', 'A question 2 edited');
+        expect(api.deleteMessageFromServer).toHaveBeenCalledWith('chat-a', 'id-A answer 2');
+        expect(api.deleteMessageFromServer).toHaveBeenCalledWith('chat-a', 'id-A question 3');
+        expect(api.deleteMessageFromServer).toHaveBeenCalledWith('chat-a', 'id-A answer 3');
+
+        await act(async () => {
+            answer.resolve({ text: 'the new answer' });
+        });
+        await screen.findByText('the new answer');
+    });
+
+    it('does not open edit while that chat is generating', async () => {
+        const answer = deferred<{ text: string }>();
+        api.fetchChatResponse.mockReturnValue(answer.promise);
+
+        render(<App />);
+        await screen.findByText('A question 1');
+
+        await userEvent.type(screen.getByPlaceholderText('Write a message...'), 'a new prompt');
+        await userEvent.click(screen.getByTitle('Send message'));
+        await screen.findByText('Thinking...');
+
+        const bubble = screen.getByText('A question 3').closest('[class*="messageWrapper"]') as HTMLElement;
+        expect(within(bubble).getByTitle('Edit message')).toBeDisabled();
+
+        await act(async () => {
+            answer.resolve({ text: 'later' });
+        });
+    });
 });

@@ -151,4 +151,24 @@ describe('editing a user message', () => {
 
         expect(onSave).toHaveBeenCalledWith('pregunta corregida');
     });
+
+    it('saves and asks for a new reply', async () => {
+        const onSaveAndReply = vi.fn();
+        render(
+            <MessageBubble
+                msg={userMessage()}
+                isUser={true}
+                onDelete={() => { }}
+                onSave={() => { }}
+                onSaveAndReply={onSaveAndReply}
+            />
+        );
+
+        await userEvent.click(screen.getByTitle('Edit message'));
+        await userEvent.clear(screen.getByRole('textbox'));
+        await userEvent.type(screen.getByRole('textbox'), 'pregunta corregida');
+        await userEvent.click(screen.getByTitle('Save and reply'));
+
+        expect(onSaveAndReply).toHaveBeenCalledWith('pregunta corregida');
+    });
 });
