@@ -25,6 +25,9 @@ export interface Chat {
   // Absent on chats created before this field; absent means off.
   notesEnabled?: boolean;
   notes?: string;
+  // Whether the user nailed the chat to the top of the list. Absent means not pinned:
+  // chats stored before this field exist without it, same as notesEnabled above.
+  pinned?: boolean;
   // Absent on chats created before these settings were per-chat:
   // the model falls back to the global preference and the level to the model.
   model?: string;

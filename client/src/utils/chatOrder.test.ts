@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { chatActivityAt, sortChatsByActivity } from './chatOrder';
+import { chatActivityAt, sortChatList } from './chatOrder';
 import type { Chat, Message } from '../types';
 
 const NOW = Date.now();
@@ -51,7 +51,7 @@ describe('chatActivityAt', () => {
     });
 });
 
-describe('sortChatsByActivity', () => {
+describe('sortChatList', () => {
     it('puts the most recently active first', () => {
         const chats = [
             chat('quiet', { createdAt: ago(10 * DAY) }),
@@ -59,14 +59,14 @@ describe('sortChatsByActivity', () => {
             chat('middle', { messages: [message(ago(DAY))] }),
         ];
 
-        expect(sortChatsByActivity(chats).map((c) => c.id)).toEqual(['newest', 'middle', 'quiet']);
+        expect(sortChatList(chats).map((c) => c.id)).toEqual(['newest', 'middle', 'quiet']);
     });
 
     // El estado de React se pasa tal cual: reordenarlo en su sitio seria mutarlo a su espalda.
     it('leaves the array it receives untouched', () => {
         const chats = [chat('old', { createdAt: ago(10 * DAY) }), chat('new', { createdAt: ago(MINUTE) })];
 
-        sortChatsByActivity(chats);
+        sortChatList(chats);
 
         expect(chats.map((c) => c.id)).toEqual(['old', 'new']);
     });
@@ -75,6 +75,6 @@ describe('sortChatsByActivity', () => {
         const same = ago(DAY);
         const chats = [chat('first', { createdAt: same }), chat('second', { createdAt: same })];
 
-        expect(sortChatsByActivity(chats).map((c) => c.id)).toEqual(['first', 'second']);
+        expect(sortChatList(chats).map((c) => c.id)).toEqual(['first', 'second']);
     });
 });
