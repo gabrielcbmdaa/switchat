@@ -21,6 +21,7 @@ function renderChats(chatList: Chat[]) {
             onCreateNewChat={vi.fn()}
             onDeleteChat={vi.fn()}
             onReTitleChat={vi.fn()}
+            onTogglePin={vi.fn()}
         />
     );
 }

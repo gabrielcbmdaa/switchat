@@ -1126,6 +1126,30 @@ export default function App() {
     }
   }
 
+  // Fijar es escribir un campo más del chat, así que sigue el camino de handleReTitleChat:
+  // lista, disco si estamos offline, y servidor si hay sesión.
+  function handleTogglePinChat(chatId: string) {
+    const targetChat = chatList.find((chat) => chat.id === chatId);
+    if (!targetChat) return;
+
+    const pinnedChat = { ...targetChat, pinned: !targetChat.pinned };
+    const updatedChats = chatList.map((chat) => (chat.id === chatId ? pinnedChat : chat));
+
+    setChatList(updatedChats);
+    persistIfOffline(updatedChats);
+
+    if (!isAuthenticated) return;
+
+    // Un envío de borrador pendiente lleva una FOTO del chat tomada antes de este clic, y sale
+    // dos segundos después: dejarla salir devolvería pinned a su valor viejo en Mongo. Se
+    // cancela sin perder nada, porque lo que subimos aquí ya lleva el borrador de la lista, que
+    // es la misma copia que iba en esa foto o una más nueva.
+    if (draftSyncChatIdRef.current === chatId) clearDraftSyncTimer();
+    // messages: [] igual que en applyGeneratedTitle: esta ruta actualiza un campo, y el sembrado
+    // de mensajes de syncChat no tiene nada que hacer aquí.
+    saveChatToServer({ ...pinnedChat, messages: [] });
+  }
+
   return (
     <>
       {/* 1. Inyectamos los símbolos en el DOM */}
@@ -1161,6 +1185,7 @@ export default function App() {
                   onCreateNewChat={handleCreateNewChat}
                   onDeleteChat={handleDeleteChat}
                   onReTitleChat={handleReTitleChat}
+                  onTogglePin={handleTogglePinChat}
                 />
               )}
               <Toolbar

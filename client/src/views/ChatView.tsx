@@ -12,9 +12,10 @@ interface ChatViewProps {
     onCreateNewChat: () => void;           // Función para crear un chat
     onDeleteChat: (chatId: string) => void; // Función para borrar un chat
     onReTitleChat: (chatId: string, newTitle: string) => void; // Función para renombrar un chat
+    onTogglePin: (chatId: string) => void; // Fija o desfija un chat en lo alto de la lista
 }
 
-export default function ChatView({ chatList, activeChatId, onChatClick, onCreateNewChat, onDeleteChat, onReTitleChat }: ChatViewProps) {
+export default function ChatView({ chatList, activeChatId, onChatClick, onCreateNewChat, onDeleteChat, onReTitleChat, onTogglePin }: ChatViewProps) {
     // El orden es una vista sobre los datos, no una propiedad del array: chatList sigue en el
     // orden en que se fue llenando, y aquí se decide cómo se lee. Ponerlo al revés obligaría a
     // acordarse de reordenar en cada uno de los sitios que escriben la lista, y el primero que
@@ -149,6 +150,19 @@ export default function ChatView({ chatList, activeChatId, onChatClick, onCreate
                                 className={styles.optionsButton}
                                 onClick={(e) => handleDeleteClick(e, chat.id)}
                                 iconId={isConfirming ? 'icon-confirm' : 'icon-trash'}
+                                size={22}
+                                iconSize={14}
+                            />
+                        </div>
+                        <div className={`${styles.pinSlot} ${chat.pinned ? styles.pinSlotVisible : ''}`}>
+                            <DefaultButton
+                                className={styles.optionsButton}
+                                onClick={(e) => {
+                                    e.stopPropagation();
+                                    onTogglePin(chat.id);
+                                }}
+                                aria-label={chat.pinned ? 'Unpin chat' : 'Pin chat'}
+                                iconId="icon-pin"
                                 size={22}
                                 iconSize={14}
                             />
