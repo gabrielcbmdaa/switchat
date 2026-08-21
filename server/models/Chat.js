@@ -11,6 +11,11 @@ const ChatSchema = new mongoose.Schema({
     notes: { type: String, default: '' },
     model: { type: String, default: '' },
     reasoningLevel: { type: String, default: '' },
+    // Whether the chat stays at the top of the list no matter how long it has been quiet.
+    // WITH a default, unlike lastMessageAt below: there the absence of the field means "chat
+    // older than the field" and a default would erase that, while here a chat nobody ever
+    // pinned and a chat from before this feature are the same case.
+    pinned: { type: Boolean, default: false },
     createdAt: { type: Date, default: Date.now },
     // When the chat last saw a message, so the client can order the list by activity instead
     // of by birth date. Deliberately WITHOUT a default: its absence is the signal for "chat
