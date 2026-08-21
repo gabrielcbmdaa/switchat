@@ -1,4 +1,4 @@
-import { render, screen, act } from '@testing-library/react';
+import { render, screen, act, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import type { Message } from './types';
@@ -16,6 +16,7 @@ const api = vi.hoisted(() => ({
     syncChatDraftToServer: vi.fn(),
     deleteChatFromServer: vi.fn(),
     deleteMessageFromServer: vi.fn(),
+    updateMessageOnServer: vi.fn(),
     generateChatTitle: vi.fn(),
     logoutFromServer: vi.fn(),
     fetchApiKeysFromServer: vi.fn(),
@@ -72,6 +73,7 @@ beforeEach(() => {
         chatId === 'chat-a' ? messagesA : messagesB
     );
     api.saveMessageToServer.mockResolvedValue('saved-id');
+    api.updateMessageOnServer.mockResolvedValue(undefined);
     api.saveChatToServer.mockResolvedValue(true);
     api.syncChatDraftToServer.mockResolvedValue(true);
     api.generateChatTitle.mockResolvedValue('');
@@ -453,5 +455,27 @@ describe('a chat that can read notes', () => {
         const synced = api.syncChatDraftToServer.mock.calls.map((call) => call[0]);
         const savedChatA = synced.reverse().find((chat) => chat?.id === 'chat-a');
         expect(savedChatA?.notes).toBe('ship the notes reader first!');
+    });
+});
+
+describe('editing a sent message', () => {
+    it('saves the new wording and leaves later turns in place', async () => {
+        render(<App />);
+        await screen.findByText('A question 2');
+
+        const bubble = screen.getByText('A question 2').closest('[class*="messageWrapper"]') as HTMLElement;
+        await userEvent.click(within(bubble).getByTitle('Edit message'));
+
+        const textarea = within(bubble).getByRole('textbox');
+        await userEvent.clear(textarea);
+        await userEvent.type(textarea, 'A question 2 edited');
+        await userEvent.click(within(bubble).getByTitle('Save'));
+
+        expect(screen.getByText('A question 2 edited')).toBeInTheDocument();
+        expect(screen.getByText('A answer 2')).toBeInTheDocument();
+        expect(screen.getByText('A question 3')).toBeInTheDocument();
+        expect(screen.getByText('A answer 3')).toBeInTheDocument();
+        expect(api.fetchChatResponse).not.toHaveBeenCalled();
+        expect(api.updateMessageOnServer).toHaveBeenCalledWith('chat-a', 'id-A question 2', 'A question 2 edited');
     });
 });

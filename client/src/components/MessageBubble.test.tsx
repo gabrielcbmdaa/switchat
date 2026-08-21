@@ -1,5 +1,6 @@
 import { render, screen } from '@testing-library/react';
-import { describe, it, expect } from 'vitest';
+import userEvent from '@testing-library/user-event';
+import { describe, it, expect, vi } from 'vitest';
 import MessageBubble from './MessageBubble';
 import type { Message } from '../types';
 
@@ -84,5 +85,70 @@ describe('the message timestamp', () => {
 
         expect(screen.getByText('gemini-3.5-flash · high')).toBeInTheDocument();
         expect(screen.getByText('12m ago')).toBeInTheDocument();
+    });
+});
+
+describe('editing a user message', () => {
+    function userMessage(extra: Partial<Message> = {}): Message {
+        return { _id: 'id-2', role: 'user', parts: [{ text: 'La pregunta' }], ...extra };
+    }
+
+    it('shows a pencil on a user bubble', () => {
+        render(<MessageBubble msg={userMessage()} isUser={true} onDelete={() => { }} onSave={() => { }} />);
+
+        expect(screen.getByTitle('Edit message')).toBeInTheDocument();
+    });
+
+    it('hides the pencil on a model bubble', () => {
+        renderBubble(answer());
+
+        expect(screen.queryByTitle('Edit message')).not.toBeInTheDocument();
+    });
+
+    it('hides the pencil on a temporary user bubble', () => {
+        render(
+            <MessageBubble
+                msg={userMessage({ isTemporary: true })}
+                isUser={true}
+                onDelete={() => { }}
+                onSave={() => { }}
+            />
+        );
+
+        expect(screen.queryByTitle('Edit message')).not.toBeInTheDocument();
+    });
+
+    it('opens a textarea with the raw text', async () => {
+        render(<MessageBubble msg={userMessage()} isUser={true} onDelete={() => { }} onSave={() => { }} />);
+
+        await userEvent.click(screen.getByTitle('Edit message'));
+
+        expect(screen.getByRole('textbox')).toHaveValue('La pregunta');
+    });
+
+    it('restores the original text on cancel and does not save', async () => {
+        const onSave = vi.fn();
+        render(<MessageBubble msg={userMessage()} isUser={true} onDelete={() => { }} onSave={onSave} />);
+
+        await userEvent.click(screen.getByTitle('Edit message'));
+        await userEvent.clear(screen.getByRole('textbox'));
+        await userEvent.type(screen.getByRole('textbox'), 'otra cosa');
+        await userEvent.click(screen.getByTitle('Cancel'));
+
+        expect(onSave).not.toHaveBeenCalled();
+        expect(screen.getByText('La pregunta')).toBeInTheDocument();
+        expect(screen.queryByRole('textbox')).not.toBeInTheDocument();
+    });
+
+    it('saves the edited text', async () => {
+        const onSave = vi.fn();
+        render(<MessageBubble msg={userMessage()} isUser={true} onDelete={() => { }} onSave={onSave} />);
+
+        await userEvent.click(screen.getByTitle('Edit message'));
+        await userEvent.clear(screen.getByRole('textbox'));
+        await userEvent.type(screen.getByRole('textbox'), 'pregunta corregida');
+        await userEvent.click(screen.getByTitle('Save'));
+
+        expect(onSave).toHaveBeenCalledWith('pregunta corregida');
     });
 });
