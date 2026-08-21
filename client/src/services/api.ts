@@ -326,6 +326,30 @@ export async function saveMessageToServer(
 }
 
 /**
+ * Rewrites a user message that already exists. The server leaves createdAt alone,
+ * so this is a typo fix, not a new turn.
+ */
+export async function updateMessageOnServer(
+  chatId: string,
+  messageId: string,
+  content: string
+): Promise<void> {
+  const response = await apiFetch(`/chats/${chatId}/messages/${messageId}`, {
+    method: 'PATCH',
+    body: JSON.stringify({ content }),
+  });
+
+  if (response.status === 401) {
+    throw new Error('SESSION_EXPIRED');
+  }
+
+  if (!response.ok) {
+    const data = await response.json().catch(() => ({}));
+    throw new Error(data.message || 'Could not update the message on the server');
+  }
+}
+
+/**
  * Asks the provider for a reply. Always from the browser: the server never calls
  * a provider, so there are no longer two paths to keep in sync.
  *

@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import type { Chat, Message } from './types';
 import { loadLocalChats, saveToLocalDisk, getTutorialChat } from './utils/storage';
-import { loadChatsFromServer, fetchChatResponse, saveMessageToServer, generateChatTitle, saveChatToServer, syncChatDraftToServer, deleteChatFromServer, deleteMessageFromServer, fetchChatMessagesFromServer, checkSession, logoutFromServer } from './services/api';
+import { loadChatsFromServer, fetchChatResponse, saveMessageToServer, updateMessageOnServer, generateChatTitle, saveChatToServer, syncChatDraftToServer, deleteChatFromServer, deleteMessageFromServer, fetchChatMessagesFromServer, checkSession, logoutFromServer } from './services/api';
 import { SvgIcons } from './components/SvgIcons';
 import { initResizer } from './utils/resizer';
 import Toolbar from './components/Toolbar';
@@ -996,6 +996,36 @@ export default function App() {
     handleDeleteChat(chatId);
   }
 
+  async function handleSaveMessage(messageIndex: number, text: string) {
+    if (!currentChat || isDraftChat) return;
+
+    const trimmed = text.trim();
+    if (!trimmed) return;
+
+    const message = currentChat.messages[messageIndex];
+    if (!message || message.role !== 'user' || message.isTemporary) return;
+
+    const chatId = currentChat.id;
+    const updatedMessages = currentChat.messages.map((msg, index) =>
+      index === messageIndex ? { ...msg, parts: [{ text: trimmed }] } : msg
+    );
+    commitChatMessages(chatId, updatedMessages);
+
+    if (isAuthenticatedRef.current && message._id) {
+      try {
+        await updateMessageOnServer(chatId, message._id, trimmed);
+      } catch (error) {
+        const err = error as Error;
+        if (err.message === 'SESSION_EXPIRED') {
+          resetSessionToDefault();
+          alert('Session expired. Please log in again.');
+        } else {
+          console.error('Failed to update the message on the server:', err);
+        }
+      }
+    }
+  }
+
   async function handleRetryMessage(messageIndex: number) {
     if (!currentChat || generatingChatIds.includes(currentChat.id)) return;
 
@@ -1121,6 +1151,7 @@ export default function App() {
               onLoadMore={() => handleLoadMoreMessages(activeChatId)}
               onDeleteMessage={handleDeleteMessage}
               onRetryMessage={handleRetryMessage}
+              onSaveMessage={handleSaveMessage}
               token={isAuthenticated ? 'active' : null}
               draft={currentChat?.draft || ''}
               onDraftChange={handleDraftChange}

@@ -142,8 +142,27 @@
     transition: opacity 0.2s ease-in-out;
 }
 
-.messageWrapper:hover .messageActions {
+.messageWrapper:hover .messageActions,
+.editing .messageActions {
     opacity: 1;
+}
+
+.editTextarea {
+    max-width: 85%;
+    width: 85%;
+    box-sizing: border-box;
+    padding: 10px;
+    border: 1px solid #858585;
+    border-radius: 20px;
+    background-color: transparent;
+    color: #858585;
+    font-family: 'Space Grotesk', sans-serif;
+    font-size: 14px;
+    line-height: 1.5;
+    resize: none;
+    outline: none;
+    min-height: 24px;
+    overflow-y: hidden;
 }
 
 .modelLabel {
@@ -186,13 +205,18 @@
     transition: background-color 0.2s ease, color 0.2s ease;
 }
 
-.actionButton:hover {
+.actionButton:hover:not(:disabled) {
     background-color: #858585;
     color: #191919;
 }
 
+.actionButton:disabled {
+    cursor: not-allowed;
+}
+
 @media (max-width: 767px) {
-    .userBubble {
+    .userBubble,
+    .editTextarea {
         max-width: 92%;
     }
     .messageActions {

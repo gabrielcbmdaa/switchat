@@ -14,6 +14,7 @@ interface MessageViewProps {
     onLoadMore: () => void;
     onDeleteMessage: (messageIndex: number) => void;
     onRetryMessage: (messageIndex: number) => void;
+    onSaveMessage?: (messageIndex: number, text: string) => void;
     token: string | null;
     draft: string;
     onDraftChange: (draft: string) => void;
@@ -35,6 +36,7 @@ export default function MessageView({
     onLoadMore,
     onDeleteMessage,
     onRetryMessage,
+    onSaveMessage,
     token,
     draft,
     onDraftChange,
@@ -218,6 +220,7 @@ export default function MessageView({
                                     isUser={msg.role === 'user'}
                                     onDelete={() => onDeleteMessage(realIndex)}
                                     onRetry={() => onRetryMessage(realIndex)}
+                                    onSave={onSaveMessage ? (text) => onSaveMessage(realIndex, text) : undefined}
                                 />
                             );
                         })}

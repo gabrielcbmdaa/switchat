@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Marked } from 'marked';
 import styles from './MessageBubble.module.css';
 import { formatMessageTime, formatExactTime } from '../utils/messageTime';
@@ -59,12 +59,17 @@ interface MessageBubbleProps {
     isUser: boolean;
     onDelete: () => void;
     onRetry?: () => void;
+    onSave?: (text: string) => void;
 }
 
-export default function MessageBubble({ msg, isUser, onDelete, onRetry }: MessageBubbleProps) {
+export default function MessageBubble({ msg, isUser, onDelete, onRetry, onSave }: MessageBubbleProps) {
     const [copied, setCopied] = useState(false);
+    const [isEditing, setIsEditing] = useState(false);
+    const [draft, setDraft] = useState('');
+    const textareaRef = useRef<HTMLTextAreaElement>(null);
     const rawText = msg.parts[0]?.text || '';
     const htmlContent = { __html: isUser ? rawText : renderModelHtml(rawText) };
+    const canEdit = Boolean(isUser && onSave && !msg.isTemporary);
 
     // Computed on every render, with no timer behind it: the label is only visible on hover
     // and the tooltip carries the exact moment anyway, so a global interval refreshing text
@@ -106,36 +111,106 @@ export default function MessageBubble({ msg, isUser, onDelete, onRetry }: Messag
         }
     };
 
+    const startEditing = () => {
+        setDraft(rawText);
+        setIsEditing(true);
+    };
+
+    const cancelEditing = () => {
+        setDraft(rawText);
+        setIsEditing(false);
+    };
+
+    const saveEditing = () => {
+        const trimmed = draft.trim();
+        if (!trimmed) return;
+        if (trimmed !== rawText) {
+            onSave?.(trimmed);
+        }
+        setIsEditing(false);
+    };
+
+    useEffect(() => {
+        const textarea = textareaRef.current;
+        if (!textarea) return;
+        textarea.style.height = 'auto';
+        textarea.style.height = `${textarea.scrollHeight}px`;
+    }, [draft, isEditing]);
+
     return (
-        <div className={`${styles.messageWrapper} ${isUser ? styles.userWrapper : styles.geminiWrapper}`}>
-            <div
-                className={`${styles.messageBubble} ${isUser ? styles.userBubble : styles.geminiBubble}`}
-                data-message-bubble
-                onClick={handleCodeCopy}
-                dangerouslySetInnerHTML={htmlContent}
-            />
+        <div className={`${styles.messageWrapper} ${isUser ? styles.userWrapper : styles.geminiWrapper} ${isEditing ? styles.editing : ''}`}>
+            {isEditing ? (
+                <textarea
+                    ref={textareaRef}
+                    className={styles.editTextarea}
+                    value={draft}
+                    onChange={(event) => setDraft(event.target.value)}
+                    onKeyDown={(event) => {
+                        if (event.key === 'Escape') {
+                            cancelEditing();
+                        }
+                    }}
+                    autoFocus
+                />
+            ) : (
+                <div
+                    className={`${styles.messageBubble} ${isUser ? styles.userBubble : styles.geminiBubble}`}
+                    data-message-bubble
+                    onClick={handleCodeCopy}
+                    dangerouslySetInnerHTML={htmlContent}
+                />
+            )}
             <div className={styles.messageActions}>
-                <button
-                    className={styles.actionButton}
-                    title={copied ? "Copied!" : "Copy message"}
-                    onClick={handleCopy}
-                >
-                    <svg width="16" height="16">
-                        <use xlinkHref={copied ? "#icon-confirm" : "#icon-copy"} />
-                    </svg>
-                </button>
-                {onRetry && !msg.isTemporary && (
-                    <button className={styles.actionButton} title="Retry message" onClick={onRetry}>
-                        <svg width="16" height="16">
-                            <use xlinkHref="#icon-retry" />
-                        </svg>
-                    </button>
+                {isEditing ? (
+                    <>
+                        <button className={styles.actionButton} title="Cancel" onClick={cancelEditing}>
+                            <svg width="16" height="16">
+                                <use xlinkHref="#icon-back" />
+                            </svg>
+                        </button>
+                        <button
+                            className={styles.actionButton}
+                            title="Save"
+                            onClick={saveEditing}
+                            disabled={!draft.trim()}
+                        >
+                            <svg width="16" height="16">
+                                <use xlinkHref="#icon-save" />
+                            </svg>
+                        </button>
+                    </>
+                ) : (
+                    <>
+                        <button
+                            className={styles.actionButton}
+                            title={copied ? "Copied!" : "Copy message"}
+                            onClick={handleCopy}
+                        >
+                            <svg width="16" height="16">
+                                <use xlinkHref={copied ? "#icon-confirm" : "#icon-copy"} />
+                            </svg>
+                        </button>
+                        {canEdit && (
+                            <button className={styles.actionButton} title="Edit message" onClick={startEditing}>
+                                <svg width="16" height="16">
+                                    <use xlinkHref="#icon-pencil" />
+                                </svg>
+                            </button>
+                        )}
+                        {onRetry && !msg.isTemporary && (
+                            <button className={styles.actionButton} title="Retry message" onClick={onRetry}>
+                                <svg width="16" height="16">
+                                    <use xlinkHref="#icon-retry" />
+                                </svg>
+                            </button>
+                        )}
+                        <button className={styles.actionButton} title="Delete message" onClick={onDelete} disabled={msg.isTemporary}>
+                            <svg width="16" height="16">
+                                <use xlinkHref="#icon-trash" />
+                            </svg>
+                        </button>
+                    </>
                 )}
-                <button className={styles.actionButton} title="Delete message" onClick={onDelete} disabled={msg.isTemporary}>
-                    <svg width="16" height="16">
-                        <use xlinkHref="#icon-trash" />
-                    </svg>
-                </button>
                 {/* El nivel se pinta solo si el mensaje lo trae: las respuestas guardadas antes
                     de que el campo existiera vienen sin el, y ahi la etiqueta se queda como
                     estaba en vez de arrastrar un separador suelto. */}
