@@ -1,4 +1,5 @@
 import { render, screen, fireEvent } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { describe, it, expect, vi } from 'vitest';
 import MessageView from './MessageView';
 import type { Message } from '../types';
@@ -51,5 +52,55 @@ describe('cargar mensajes antiguos', () => {
         fireEvent.scroll(scroller);
 
         expect(onLoadMore).toHaveBeenCalledTimes(1);
+    });
+});
+
+describe('the editor follows the message, not the seat', () => {
+    // Loading older turns prepends them. A key that is just 0, 1, 2 would leave the
+    // open editor on seat 0, which is now a different message, and Save would rewrite
+    // the wrong turn.
+    it('keeps the open editor on the message that was being edited', async () => {
+        const onSaveMessage = vi.fn();
+        const current: Message[] = [
+            message('user', 'pregunta actual'),
+            message('model', 'respuesta actual'),
+        ];
+        const viewProps = {
+            chatId: 'chat-a',
+            hasMoreMap: {},
+            loadedChatIds: { 'chat-a': true },
+            onLoadMore: () => { },
+            onDeleteMessage: () => { },
+            onRetryMessage: () => { },
+            onSaveMessage,
+            token: 'un-token',
+            draft: '',
+            onDraftChange: () => { },
+            onSendMessage: () => { },
+        };
+        const { rerender } = render(
+            <MessageView messages={current} {...viewProps} />
+        );
+
+        await userEvent.click(screen.getByTitle('Edit message'));
+        const editor = screen.getAllByRole('textbox').find((el) => (el as HTMLTextAreaElement).value === 'pregunta actual');
+        expect(editor).toBeDefined();
+        await userEvent.clear(editor!);
+        await userEvent.type(editor!, 'pregunta corregida');
+
+        rerender(
+            <MessageView
+                messages={[
+                    message('user', 'pregunta vieja'),
+                    message('model', 'respuesta vieja'),
+                    ...current,
+                ]}
+                {...viewProps}
+            />
+        );
+
+        await userEvent.click(screen.getByTitle('Save'));
+
+        expect(onSaveMessage).toHaveBeenCalledWith(2, 'pregunta corregida');
     });
 });
