@@ -536,3 +536,29 @@ describe('editing a sent message', () => {
         });
     });
 });
+
+describe('pinning a chat', () => {
+    it('does not let a pending draft sync undo the pin it just saved', async () => {
+        // Installed before render so the debounce timer lands on the fake clock.
+        vi.useFakeTimers({ shouldAdvanceTime: true });
+        const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+
+        render(<App />);
+        await screen.findByText('A question 1');
+
+        // Typing arms the two-second debounce, whose closure holds the chat as it is NOW:
+        // unpinned. The sync route writes every field it receives, so letting that snapshot
+        // out after the pin would put pinned back to false in Mongo.
+        await user.type(screen.getByPlaceholderText('Write a message...'), 'half a thought');
+
+        await user.click(screen.getAllByLabelText('Pin chat')[0]);
+        await act(async () => { vi.advanceTimersByTime(2000); });
+
+        expect(api.syncChatDraftToServer).not.toHaveBeenCalled();
+
+        // And cancelling that timer costs nothing, because the save the pin sends carries the
+        // same draft. Asserting it is what separates "cancelled it" from "dropped the draft".
+        const pinSaves = api.saveChatToServer.mock.calls.filter((call) => call[0]?.id === 'chat-a');
+        expect(pinSaves.at(-1)?.[0]).toMatchObject({ pinned: true, draft: 'half a thought' });
+    });
+});

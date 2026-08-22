@@ -78,6 +78,20 @@ describe('the pin button of the chat list', () => {
         expect(screen.getByLabelText('Pin chat')).toBeTruthy();
     });
 
+    // The one requirement the accessibility tree cannot show: the pin of a pinned chat has to
+    // be visible WITHOUT hovering the row. Without this check the class can be deleted and no
+    // test notices, while the feature loses exactly what tells it apart from "the most recent
+    // one". Hover is CSS and jsdom does not simulate it, so the class is what gets asserted.
+    it('shows the pin of a pinned chat without hovering the row', () => {
+        renderChats([chat('pinned', { pinned: true }), chat('loose')]);
+
+        const pinnedSlot = screen.getByLabelText('Unpin chat').parentElement;
+        const looseSlot = screen.getByLabelText('Pin chat').parentElement;
+
+        expect(pinnedSlot?.className).toMatch(/pinSlotVisible/);
+        expect(looseSlot?.className).not.toMatch(/pinSlotVisible/);
+    });
+
     it('reports which chat was clicked', async () => {
         const onTogglePin = renderChats([chat('pinned', { pinned: true }), chat('loose')]);
 
