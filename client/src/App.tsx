@@ -1135,6 +1135,13 @@ export default function App() {
     const pinnedChat = { ...targetChat, pinned: !targetChat.pinned };
     const updatedChats = chatList.map((chat) => (chat.id === chatId ? pinnedChat : chat));
 
+    // The ref is advanced by hand, same as in commitChatMessages and handleDeleteChat. The
+    // effect that syncs it runs one turn later than this click, and an answer can land in that
+    // gap: it would read the list from before the pin and write the whole thing back. The pin
+    // would not only vanish from the screen — applyGeneratedTitle saves that same stale chat to
+    // the server, and since syncChat writes every field it receives, the chat would come back
+    // unpinned from the database too.
+    chatListRef.current = updatedChats;
     setChatList(updatedChats);
     persistIfOffline(updatedChats);
 
