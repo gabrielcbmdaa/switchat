@@ -217,7 +217,7 @@ export default function MessageView({
                             const realIndex = token ? index : (messages.length - visibleMessages.length + index);
                             return (
                                 <MessageBubble
-                                    key={index}
+                                    key={msg._id ?? msg.createdAt ?? `orphan-${index}`}
                                     msg={msg}
                                     isUser={msg.role === 'user'}
                                     onDelete={() => onDeleteMessage(realIndex)}
