@@ -10,6 +10,8 @@ const {
 } = require('./helpers/testEnv');
 
 const app = require('../app');
+const Chat = require('../models/Chat');
+const User = require('../models/User');
 
 // El pin lo decide el cliente y el servidor solo lo custodia, así que lo que se vigila aquí es
 // el viaje de ida y vuelta: que suba, que baje, y sobre todo que se pueda DESFIJAR. Eso último
@@ -49,13 +51,30 @@ describe('pinned on a chat', () => {
         assert.equal(chat.pinned, true);
     });
 
-    // Un chat anterior al campo llega sin él, y el default es lo que impide que la lista tenga
-    // que adivinar: se lee como no fijado, igual que uno que nadie fijó nunca.
     test('a chat saved without the field is not treated as pinned', async () => {
         await saveChat({ id: 'chat-plain', title: 'Old chat', allowCreate: true });
 
         const chat = await readChat('chat-plain');
-        assert.notEqual(chat.pinned, true);
+        // equal(false) y no notEqual(true): "no es true" tambien pasa cuando el campo no existe,
+        // asi que la version tolerante seguia en verde aunque se quitara el default del esquema,
+        // que es justo lo unico que este caso vigila.
+        assert.equal(chat.pinned, false);
+    });
+
+    // El caso de verdad de un chat anterior al campo: se inserta saltandose Mongoose, que es la
+    // unica forma de tener un documento SIN pinned. Por la ruta normal no se puede, porque al
+    // crear ya escribe el default y entonces el test no probaria nada.
+    test('a chat stored before the field existed reads as not pinned', async () => {
+        const user = await User.findOne({ email: 'pinned@test.local' });
+        await Chat.collection.insertOne({
+            id: 'chat-legacy',
+            userId: user._id,
+            title: 'Older than the field',
+            createdAt: new Date(),
+        });
+
+        const chat = await readChat('chat-legacy');
+        assert.equal(chat.pinned, false);
     });
 
     // Desfijar es una escritura como cualquier otra, no la ausencia del campo: si el false no
