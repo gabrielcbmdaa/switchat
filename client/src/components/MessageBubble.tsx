@@ -146,6 +146,14 @@ export default function MessageBubble({ msg, isUser, onDelete, onRetry, onSave, 
         textarea.style.height = `${textarea.scrollHeight}px`;
     }, [draft, isEditing]);
 
+    // The pencil is already off while this chat generates. An editor left open
+    // would still Save, and the in-flight reply would later overwrite that write.
+    useEffect(() => {
+        if (!editDisabled) return;
+        setDraft(rawText);
+        setIsEditing(false);
+    }, [editDisabled, rawText]);
+
     return (
         <div className={`${styles.messageWrapper} ${isUser ? styles.userWrapper : styles.geminiWrapper} ${isEditing ? styles.editing : ''}`}>
             {isEditing ? (
@@ -181,7 +189,7 @@ export default function MessageBubble({ msg, isUser, onDelete, onRetry, onSave, 
                             className={styles.actionButton}
                             title="Save"
                             onClick={saveEditing}
-                            disabled={!draft.trim()}
+                            disabled={editDisabled || !draft.trim()}
                         >
                             <svg width="16" height="16">
                                 <use xlinkHref="#icon-save" />
@@ -192,7 +200,7 @@ export default function MessageBubble({ msg, isUser, onDelete, onRetry, onSave, 
                                 className={styles.actionButton}
                                 title="Save and reply"
                                 onClick={saveAndReply}
-                                disabled={!draft.trim()}
+                                disabled={editDisabled || !draft.trim()}
                             >
                                 <svg width="16" height="16">
                                     <use xlinkHref="#icon-retry" />

@@ -1000,7 +1000,7 @@ export default function App() {
   }
 
   async function handleSaveMessage(messageIndex: number, text: string) {
-    if (!currentChat || isDraftChat) return;
+    if (!currentChat || isDraftChat || generatingChatIds.includes(currentChat.id)) return;
 
     const trimmed = text.trim();
     if (!trimmed) return;
