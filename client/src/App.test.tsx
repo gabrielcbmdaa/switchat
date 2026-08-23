@@ -272,6 +272,36 @@ describe('clicking Stop', () => {
         await act(async () => { resolvers[1]({ text: 'the second answer' }); });
         await screen.findByText('the second answer');
     });
+
+    it('does not let you edit a stopped prompt until its id has landed', async () => {
+        mockAbortableFetch();
+        const savedMessageId = deferred<string>();
+        api.saveMessageToServer.mockReturnValue(savedMessageId.promise);
+
+        render(<App />);
+        await screen.findByText('A question 1');
+
+        await userEvent.type(screen.getByPlaceholderText('Write a message...'), 'a message to stop');
+        await userEvent.click(screen.getByTitle('Send message'));
+        await screen.findByText('Thinking...');
+        await userEvent.click(screen.getByTitle('Stop generating'));
+        await screen.findByTitle('Send message');
+
+        const pending = screen.getByText('a message to stop').closest('[class*="messageWrapper"]') as HTMLElement;
+        expect(within(pending).getByTitle('Edit message')).toBeDisabled();
+
+        await act(async () => { savedMessageId.resolve('sealed-id'); });
+
+        const sealed = screen.getByText('a message to stop').closest('[class*="messageWrapper"]') as HTMLElement;
+        expect(within(sealed).getByTitle('Edit message')).not.toBeDisabled();
+
+        await userEvent.click(within(sealed).getByTitle('Edit message'));
+        await userEvent.clear(within(sealed).getByRole('textbox'));
+        await userEvent.type(within(sealed).getByRole('textbox'), 'a message to stop, edited');
+        await userEvent.click(within(sealed).getByTitle('Save'));
+
+        expect(api.updateMessageOnServer).toHaveBeenCalledWith('chat-a', 'sealed-id', 'a message to stop, edited');
+    });
 });
 
 describe('deleting a chat', () => {
