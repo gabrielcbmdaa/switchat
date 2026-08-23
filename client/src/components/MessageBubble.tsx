@@ -67,11 +67,26 @@ interface MessageBubbleProps {
 export default function MessageBubble({ msg, isUser, onDelete, onRetry, onSave, onSaveAndReply, editDisabled = false }: MessageBubbleProps) {
     const [copied, setCopied] = useState(false);
     const [isEditing, setIsEditing] = useState(false);
+    const [editWasDisabled, setEditWasDisabled] = useState(editDisabled);
     const [draft, setDraft] = useState('');
     const textareaRef = useRef<HTMLTextAreaElement>(null);
     const rawText = msg.parts[0]?.text || '';
     const htmlContent = { __html: isUser ? rawText : renderModelHtml(rawText) };
     const canEdit = Boolean(isUser && onSave && !msg.isTemporary);
+
+    // The pencil is already off while this chat generates. An editor left open would still
+    // Save, and the in-flight reply would later overwrite that write.
+    //
+    // Adjusted during render instead of from an effect, which is what React asks for when
+    // state has to follow a prop: an effect closes it one paint late, so the editor flashes
+    // on screen after it should already be gone. React discards this render and redoes it
+    // with the new state before anything reaches the screen. The draft is not reset here
+    // because it is write-only while the editor is closed, and startEditing rewrites it from
+    // the message every time it opens.
+    if (editDisabled !== editWasDisabled) {
+        setEditWasDisabled(editDisabled);
+        if (editDisabled) setIsEditing(false);
+    }
 
     // Computed on every render, with no timer behind it: the label is only visible on hover
     // and the tooltip carries the exact moment anyway, so a global interval refreshing text
@@ -145,14 +160,6 @@ export default function MessageBubble({ msg, isUser, onDelete, onRetry, onSave, 
         textarea.style.height = 'auto';
         textarea.style.height = `${textarea.scrollHeight}px`;
     }, [draft, isEditing]);
-
-    // The pencil is already off while this chat generates. An editor left open
-    // would still Save, and the in-flight reply would later overwrite that write.
-    useEffect(() => {
-        if (!editDisabled) return;
-        setDraft(rawText);
-        setIsEditing(false);
-    }, [editDisabled, rawText]);
 
     return (
         <div className={`${styles.messageWrapper} ${isUser ? styles.userWrapper : styles.geminiWrapper} ${isEditing ? styles.editing : ''}`}>
