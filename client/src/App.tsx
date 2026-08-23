@@ -29,6 +29,11 @@ function createDraftChat(): Chat {
 // Lo que dura en pantalla un mensaje temporal antes de retirarse solo.
 const TEMPORARY_MESSAGE_MS = 5000;
 
+// Both edit routes say the same thing because the same thing is true in both: the server kept
+// the old wording, and the screen has been put back to match it. Silence here used to leave the
+// two showing different text until the next reload.
+const EDIT_NOT_SAVED = 'Could not save the edit. The message was left as it was.';
+
 export default function App() {
   const [chatList, setChatList] = useState<Chat[]>([]);
   const [activeChatId, setActiveChatId] = useState<string>('');
@@ -1016,6 +1021,7 @@ export default function App() {
     if (!message || message.role !== 'user' || message.isTemporary) return;
 
     const chatId = currentChat.id;
+    const originalText = message.parts[0]?.text ?? '';
     const updatedMessages = currentChat.messages.map((msg, index) =>
       index === messageIndex ? { ...msg, parts: [{ text: trimmed }] } : msg
     );
@@ -1027,10 +1033,21 @@ export default function App() {
       } catch (error) {
         const err = error as Error;
         if (err.message === 'SESSION_EXPIRED') {
+          // Nothing to put back: resetSessionToDefault swaps the whole list for the offline
+          // chats, and this one is not among them.
           resetSessionToDefault();
           alert('Session expired. Please log in again.');
         } else {
           console.error('Failed to update the message on the server:', err);
+          // Put the bubble back to the wording the server still holds. Only this message, and
+          // over the live list: the array this handler closed over is older than the await.
+          const live = chatListRef.current.find((chat) => chat.id === chatId);
+          if (live) {
+            commitChatMessages(chatId, live.messages.map((msg) =>
+              msg._id === message._id ? { ...msg, parts: [{ text: originalText }] } : msg
+            ));
+          }
+          alert(EDIT_NOT_SAVED);
         }
       }
     }
@@ -1053,13 +1070,31 @@ export default function App() {
     ];
     const messagesToDelete = currentChat.messages.slice(messageIndex + 1);
 
+    // The edit is written to the server BEFORE anything moves on screen. sendChatHistory paints
+    // the cut branch the moment it starts, so a PATCH failing from inside beforeRequest left the
+    // later turns gone from the screen and still in Mongo, and brought them back on the next
+    // reload. Convince the server first; move the screen after.
+    if (isAuthenticatedRef.current && message._id) {
+      try {
+        await updateMessageOnServer(chatId, message._id, trimmed);
+      } catch (error) {
+        const err = error as Error;
+        if (err.message === 'SESSION_EXPIRED') {
+          resetSessionToDefault();
+          alert('Session expired. Please log in again.');
+        } else {
+          console.error('Failed to update the message on the server:', err);
+          alert(EDIT_NOT_SAVED);
+        }
+        // Nothing to undo: the screen still shows the conversation as it was.
+        return;
+      }
+    }
+
     await sendChatHistory(historyToSend, chatListRef.current, chatId, {
       saveUserMessage: false,
       beforeRequest: async () => {
-        if (!isAuthenticated) return;
-        if (editedMessage._id) {
-          await updateMessageOnServer(chatId, editedMessage._id, trimmed);
-        }
+        if (!isAuthenticatedRef.current) return;
         messagesToDelete.forEach((msg) => {
           if (msg._id) {
             deleteMessageFromServer(chatId, msg._id);
