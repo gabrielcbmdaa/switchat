@@ -171,4 +171,24 @@ describe('editing a user message', () => {
 
         expect(onSaveAndReply).toHaveBeenCalledWith('pregunta corregida');
     });
+
+    it('closes the editor without saving when editing is disabled', async () => {
+        const onSave = vi.fn();
+        const msg = userMessage();
+        const { rerender } = render(
+            <MessageBubble msg={msg} isUser={true} onDelete={() => { }} onSave={onSave} />
+        );
+
+        await userEvent.click(screen.getByTitle('Edit message'));
+        await userEvent.clear(screen.getByRole('textbox'));
+        await userEvent.type(screen.getByRole('textbox'), 'pregunta corregida');
+
+        rerender(
+            <MessageBubble msg={msg} isUser={true} onDelete={() => { }} onSave={onSave} editDisabled={true} />
+        );
+
+        expect(screen.queryByRole('textbox')).not.toBeInTheDocument();
+        expect(screen.getByText('La pregunta')).toBeInTheDocument();
+        expect(onSave).not.toHaveBeenCalled();
+    });
 });

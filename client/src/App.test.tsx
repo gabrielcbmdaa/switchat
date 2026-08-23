@@ -535,6 +535,34 @@ describe('editing a sent message', () => {
             answer.resolve({ text: 'later' });
         });
     });
+
+    it('closes an open editor when that chat starts generating', async () => {
+        const answer = deferred<{ text: string }>();
+        api.fetchChatResponse.mockReturnValue(answer.promise);
+
+        render(<App />);
+        await screen.findByText('A question 2');
+
+        const bubble = screen.getByText('A question 2').closest('[class*="messageWrapper"]') as HTMLElement;
+        await userEvent.click(within(bubble).getByTitle('Edit message'));
+        await userEvent.clear(within(bubble).getByRole('textbox'));
+        await userEvent.type(within(bubble).getByRole('textbox'), 'A question 2 edited');
+
+        await userEvent.type(screen.getByPlaceholderText('Write a message...'), 'a new prompt');
+        await userEvent.click(screen.getByTitle('Send message'));
+        await screen.findByText('Thinking...');
+
+        expect(screen.queryByDisplayValue('A question 2 edited')).not.toBeInTheDocument();
+        expect(screen.getByText('A question 2')).toBeInTheDocument();
+        expect(api.updateMessageOnServer).not.toHaveBeenCalled();
+
+        await act(async () => {
+            answer.resolve({ text: 'later' });
+        });
+        await screen.findByText('later');
+        expect(screen.getByText('A question 2')).toBeInTheDocument();
+        expect(screen.queryByText('A question 2 edited')).not.toBeInTheDocument();
+    });
 });
 
 describe('pinning a chat', () => {
