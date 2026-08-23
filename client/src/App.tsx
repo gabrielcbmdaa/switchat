@@ -817,8 +817,8 @@ export default function App() {
         // Abortar deja la conversación tal y como se envió, sin respuesta. El botón se
         // libera ya mismo: lo único que puede seguir en vuelo es el guardado del mensaje de
         // usuario, no la generación, que ya está cortada. Su _id se sella en cuanto llegue,
-        // parcheando solo ese mensaje por referencia para no pisar lo que el usuario haga
-        // mientras tanto (p.ej. mandar el siguiente prompt antes de que el guardado vuelva).
+        // parcheando el mensaje que comparte createdAt, no el objeto original: un edit
+        // in-place lo sustituye, y un segundo prompt nace con otra fecha.
         if (abortControllersRef.current.get(chatId) === controller) {
           abortControllersRef.current.delete(chatId);
           setGeneratingChatIds(prev => prev.filter(id => id !== chatId));
@@ -828,8 +828,15 @@ export default function App() {
           if (!savedUserMessageId) return;
           const chat = chatListRef.current.find((item) => item.id === chatId);
           if (!chat) return;
+          // By createdAt, not by object identity: an in-place edit replaces the
+          // object, and stamping only the original would leave the prompt without
+          // an _id and skip every later PATCH.
           const patched = chat.messages.map((message) =>
-            message === userMessage ? { ...message, _id: savedUserMessageId } : message
+            message.role === 'user' &&
+            userMessage.createdAt &&
+            message.createdAt === userMessage.createdAt
+              ? { ...message, _id: savedUserMessageId }
+              : message
           );
           commitChatMessages(chatId, patched);
         });

@@ -226,7 +226,7 @@ export default function MessageView({
                                     onRetry={() => onRetryMessage(realIndex)}
                                     onSave={onSaveMessage ? (text) => onSaveMessage(realIndex, text) : undefined}
                                     onSaveAndReply={onSaveAndReply ? (text) => onSaveAndReply(realIndex, text) : undefined}
-                                    editDisabled={isGenerating}
+                                    editDisabled={isGenerating || Boolean(token && msg.role === 'user' && !msg._id)}
                                 />
                             );
                         })}
