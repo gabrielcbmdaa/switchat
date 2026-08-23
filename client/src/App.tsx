@@ -1116,31 +1116,43 @@ export default function App() {
   function handleReTitleChat(chatId: string, newTitle: string) {
     const trimmedTitle = newTitle.trim();
     if (!trimmedTitle) return;
-    const targetChat = chatList.find((chat) => chat.id === chatId);
-    if (targetChat?.title === trimmedTitle) return;
-    const updatedChats = chatList.map((chat) => {
-      if (chat.id === chatId) {
-        return { ...chat, title: trimmedTitle };
-      }
-      return chat;
-    });
+
+    // The live list, not the render snapshot: an answer that landed a moment ago has already
+    // advanced the ref while this render has not caught up, so starting from chatList would
+    // write that answer out of existence. Same rule as commitChatMessages.
+    const chats = chatListRef.current;
+    const targetChat = chats.find((chat) => chat.id === chatId);
+    if (!targetChat || targetChat.title === trimmedTitle) return;
+
+    const retitledChat = { ...targetChat, title: trimmedTitle };
+    const updatedChats = chats.map((chat) => (chat.id === chatId ? retitledChat : chat));
+
+    // Advanced by hand for the same reason: the effect that syncs the ref runs a turn later
+    // than this call, and an answer landing in that gap would read a ref without the new
+    // title and hand the old one back.
+    chatListRef.current = updatedChats;
     setChatList(updatedChats);
     persistIfOffline(updatedChats);
-    const retitledChat = updatedChats.find((chat) => chat.id === chatId);
 
-    if (retitledChat && isAuthenticated) {
+    if (isAuthenticated) {
       saveChatToServer(retitledChat);
     }
   }
 
-  // Fijar es escribir un campo más del chat, así que sigue el camino de handleReTitleChat:
-  // lista, disco si estamos offline, y servidor si hay sesión.
+  // Pinning writes one more field of the chat, so it walks the same path as handleReTitleChat:
+  // the list, the disk while offline, and the server when there is a session.
   function handleTogglePinChat(chatId: string) {
-    const targetChat = chatList.find((chat) => chat.id === chatId);
+    // Read AND write the ref: the list this click starts from must be the live one, or the
+    // hand-off below would put a stale list in charge. An answer that landed a moment ago
+    // already advanced the ref while this render still holds the list from before it, and
+    // pinning from that snapshot would erase the answer from the screen — and, offline,
+    // persistIfOffline would erase it from localStorage for good.
+    const chats = chatListRef.current;
+    const targetChat = chats.find((chat) => chat.id === chatId);
     if (!targetChat) return;
 
     const pinnedChat = { ...targetChat, pinned: !targetChat.pinned };
-    const updatedChats = chatList.map((chat) => (chat.id === chatId ? pinnedChat : chat));
+    const updatedChats = chats.map((chat) => (chat.id === chatId ? pinnedChat : chat));
 
     // The ref is advanced by hand, same as in commitChatMessages and handleDeleteChat. The
     // effect that syncs it runs one turn later than this click, and an answer can land in that
@@ -1154,13 +1166,13 @@ export default function App() {
 
     if (!isAuthenticated) return;
 
-    // Un envío de borrador pendiente lleva una FOTO del chat tomada antes de este clic, y sale
-    // dos segundos después: dejarla salir devolvería pinned a su valor viejo en Mongo. Se
-    // cancela sin perder nada, porque lo que subimos aquí ya lleva el borrador de la lista, que
-    // es la misma copia que iba en esa foto o una más nueva.
+    // A pending draft sync carries a SNAPSHOT of the chat taken before this click and leaves
+    // two seconds later: letting it go would hand pinned its old value back in Mongo. Cancelling
+    // it loses nothing, because what we upload here already carries the draft from the list,
+    // which is the same copy that snapshot held, or a newer one.
     if (draftSyncChatIdRef.current === chatId) clearDraftSyncTimer();
-    // messages: [] igual que en applyGeneratedTitle: esta ruta actualiza un campo, y el sembrado
-    // de mensajes de syncChat no tiene nada que hacer aquí.
+    // messages: [] as in applyGeneratedTitle: this route updates one field, and syncChat's
+    // message seeding has no business running here.
     saveChatToServer({ ...pinnedChat, messages: [] });
   }
 
