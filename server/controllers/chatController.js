@@ -1,5 +1,20 @@
+const mongoose = require('mongoose');
 const Message = require('../models/Message');
 const Chat = require('../models/Chat');
+
+// A :messageId that is not shaped like an ObjectId cannot name a message that exists, and
+// handing it to a query makes Mongoose throw a CastError the handler answers with a 500 —
+// an "our fault" for what is plainly a bad address. Checked up front, it is the 404 the
+// route already promises for a message that is not there.
+function isMissingId(messageId) {
+    return !mongoose.isValidObjectId(messageId);
+}
+
+// The body arrives as whatever the caller typed: { content: 5 } passes a falsy check and then
+// blows up on .trim(), so the type has to be part of the guard and not an assumption.
+function isBlankContent(content) {
+    return typeof content !== 'string' || content.trim() === '';
+}
 
 // 💾 GUARDAR UN MENSAJE SUELTO
 // Escritura pura: el cliente llama al proveedor y nos manda el resultado. El cliente
@@ -18,7 +33,7 @@ exports.createMessage = async (req, res) => {
             return res.status(400).json({ message: 'The sender field must be "user" or "ai"' });
         }
 
-        if (!content || content.trim() === '') {
+        if (isBlankContent(content)) {
             return res.status(400).json({ message: 'The message content is required' });
         }
 
@@ -233,16 +248,18 @@ exports.deleteMessage = async (req, res) => {
     try {
         const { chatId, messageId } = req.params;
 
-        // Mismo permiso que en createMessage: sale del chat padre, no del mensaje.
+        // Same permission as in createMessage: it comes from the parent chat, not the message.
         const chatExists = await Chat.exists({ id: chatId, userId: req.user.id });
         if (!chatExists) {
             return res.status(404).json({ message: 'Chat not found' });
         }
 
-        // El borrado se acota también por chatId. Comprobar solo el chat padre dejaría un
-        // chat propio como llave para el messageId de otro: la ruta lleva los dos en la URL
-        // y nada obliga a que se correspondan.
-        const deletedMessage = await Message.findOneAndDelete({ _id: messageId, chatId });
+        // The delete is narrowed by chatId too. Checking only the parent chat would leave a
+        // chat of your own as the key to somebody else's messageId: the route carries both in
+        // the URL and nothing forces them to match.
+        const deletedMessage = isMissingId(messageId)
+            ? null
+            : await Message.findOneAndDelete({ _id: messageId, chatId });
 
         if (!deletedMessage) {
             return res.status(404).json({ message: 'Message not found' });
@@ -275,7 +292,7 @@ exports.updateMessage = async (req, res) => {
         const { chatId, messageId } = req.params;
         const { content } = req.body;
 
-        if (!content || content.trim() === '') {
+        if (isBlankContent(content)) {
             return res.status(400).json({ message: 'The message content is required' });
         }
 
@@ -284,7 +301,9 @@ exports.updateMessage = async (req, res) => {
             return res.status(404).json({ message: 'Chat not found' });
         }
 
-        const message = await Message.findOne({ _id: messageId, chatId });
+        const message = isMissingId(messageId)
+            ? null
+            : await Message.findOne({ _id: messageId, chatId });
         if (!message) {
             return res.status(404).json({ message: 'Message not found' });
         }
