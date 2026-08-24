@@ -64,6 +64,10 @@ beforeEach(() => {
     // everyone after it. Starting each test on the real one costs nothing and makes that
     // impossible.
     vi.useRealTimers();
+    // Same story with the spies a test installs on window or console: a failure would leave
+    // them in place for everyone after it. clearAllMocks empties the api mocks but does not
+    // give a spied-on original back.
+    vi.restoreAllMocks();
     api.checkSession.mockResolvedValue({ authenticated: true, userId: 'user-1' });
     api.loadChatsFromServer.mockResolvedValue([
         { id: 'chat-a', title: 'Chat A', draft: '', messages: [], model: 'gemini-3.5-flash' },
@@ -592,6 +596,51 @@ describe('editing a sent message', () => {
         await screen.findByText('later');
         expect(screen.getByText('A question 2')).toBeInTheDocument();
         expect(screen.queryByText('A question 2 edited')).not.toBeInTheDocument();
+    });
+
+    it('puts the wording back and warns when the server refuses the edit', async () => {
+        const alerted = vi.spyOn(window, 'alert').mockImplementation(() => { });
+        vi.spyOn(console, 'error').mockImplementation(() => { });
+        api.updateMessageOnServer.mockRejectedValueOnce(new Error('the server said no'));
+
+        render(<App />);
+        await screen.findByText('A question 2');
+
+        const bubble = screen.getByText('A question 2').closest('[class*="messageWrapper"]') as HTMLElement;
+        await userEvent.click(within(bubble).getByTitle('Edit message'));
+        await userEvent.clear(within(bubble).getByRole('textbox'));
+        await userEvent.type(within(bubble).getByRole('textbox'), 'A question 2 edited');
+        await userEvent.click(within(bubble).getByTitle('Save'));
+
+        // The screen has to end up showing what Mongo still holds, not what the user typed.
+        expect(await screen.findByText('A question 2')).toBeInTheDocument();
+        expect(screen.queryByText('A question 2 edited')).not.toBeInTheDocument();
+        expect(alerted).toHaveBeenCalledTimes(1);
+    });
+
+    it('leaves the later turns alone when the server refuses a save and reply', async () => {
+        const alerted = vi.spyOn(window, 'alert').mockImplementation(() => { });
+        vi.spyOn(console, 'error').mockImplementation(() => { });
+        api.updateMessageOnServer.mockRejectedValueOnce(new Error('the server said no'));
+
+        render(<App />);
+        await screen.findByText('A question 2');
+
+        const bubble = screen.getByText('A question 2').closest('[class*="messageWrapper"]') as HTMLElement;
+        await userEvent.click(within(bubble).getByTitle('Edit message'));
+        await userEvent.clear(within(bubble).getByRole('textbox'));
+        await userEvent.type(within(bubble).getByRole('textbox'), 'A question 2 edited');
+        await userEvent.click(within(bubble).getByTitle('Save and reply'));
+
+        // The branch is only cut once the edit is safe: no model call, nothing deleted, and
+        // the conversation exactly as it was.
+        expect(api.fetchChatResponse).not.toHaveBeenCalled();
+        expect(api.deleteMessageFromServer).not.toHaveBeenCalled();
+        expect(screen.getByText('A question 2')).toBeInTheDocument();
+        expect(screen.getByText('A answer 2')).toBeInTheDocument();
+        expect(screen.getByText('A question 3')).toBeInTheDocument();
+        expect(screen.getByText('A answer 3')).toBeInTheDocument();
+        expect(alerted).toHaveBeenCalledTimes(1);
     });
 });
 
