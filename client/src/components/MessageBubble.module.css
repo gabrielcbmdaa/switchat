@@ -162,7 +162,12 @@
     resize: none;
     outline: none;
     min-height: 24px;
-    overflow-y: hidden;
+    /* Same pair as .promptTextarea, and for the same reason: the effect in MessageBubble.tsx
+       sets the height to the content, so without a ceiling a pasted code block gives a box
+       taller than the screen, and with the overflow hidden there is no way to scroll inside
+       it — the whole conversation has to move instead. */
+    max-height: 400px;
+    overflow-y: auto;
 }
 
 .modelLabel {
