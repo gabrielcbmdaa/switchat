@@ -669,3 +669,100 @@ describe('pinning a chat', () => {
         expect(pinSaves.at(-1)?.[0]).toMatchObject({ pinned: true, draft: 'half a thought' });
     });
 });
+
+// Signed out, localStorage is not a backup of the database: it IS the database. Nothing about
+// editing changes shape between the two modes except where the result lands, so what these
+// cases watch is that the disk ends up holding the same conversation the screen shows — and
+// that not one server call escapes on the way.
+describe('editing a sent message while signed out', () => {
+    const OFFLINE_CHAT = 'offline-chat';
+
+    /** No _id, like every message a signed-out browser has ever stored. */
+    function localMessage(role: 'user' | 'model', text: string, minute: number): Message {
+        return {
+            role,
+            parts: [{ text }],
+            createdAt: new Date(Date.UTC(2026, 0, 1, 12, minute)).toISOString(),
+        };
+    }
+
+    function storedMessages() {
+        const chats = JSON.parse(localStorage.getItem('chatList') || '[]');
+        return chats.find((chat: { id: string }) => chat.id === OFFLINE_CHAT)
+            ?.messages.map((msg: Message) => msg.parts[0].text);
+    }
+
+    beforeEach(() => {
+        api.checkSession.mockResolvedValue({ authenticated: false });
+        // Seeded before render: initializeApp reads the disk on its very first line, before
+        // the session call it then finds unauthenticated.
+        localStorage.setItem('chatList', JSON.stringify([{
+            id: OFFLINE_CHAT,
+            title: 'Offline chat',
+            draft: '',
+            model: 'gemini-3.5-flash',
+            messages: [
+                localMessage('user', 'a local question', 1),
+                localMessage('model', 'a local answer', 2),
+                localMessage('user', 'a second local question', 3),
+                localMessage('model', 'a second local answer', 4),
+            ],
+        }]));
+        localStorage.setItem('activeChatId', OFFLINE_CHAT);
+    });
+
+    it('writes the new wording to the disk and calls no one', async () => {
+        render(<App />);
+        await screen.findByText('a local question');
+
+        const bubble = screen.getByText('a local question').closest('[class*="messageWrapper"]') as HTMLElement;
+        await userEvent.click(within(bubble).getByTitle('Edit message'));
+        await userEvent.clear(within(bubble).getByRole('textbox'));
+        await userEvent.type(within(bubble).getByRole('textbox'), 'a local question edited');
+        await userEvent.click(within(bubble).getByTitle('Save'));
+
+        expect(screen.getByText('a local question edited')).toBeInTheDocument();
+        expect(screen.getByText('a second local answer')).toBeInTheDocument();
+        expect(storedMessages()).toEqual([
+            'a local question edited',
+            'a local answer',
+            'a second local question',
+            'a second local answer',
+        ]);
+        expect(api.updateMessageOnServer).not.toHaveBeenCalled();
+        expect(api.saveMessageToServer).not.toHaveBeenCalled();
+        expect(api.fetchChatResponse).not.toHaveBeenCalled();
+    });
+
+    it('cuts the branch on the disk when it asks for a new reply', async () => {
+        const answer = deferred<{ text: string }>();
+        api.fetchChatResponse.mockReturnValue(answer.promise);
+
+        render(<App />);
+        await screen.findByText('a local question');
+
+        const bubble = screen.getByText('a local question').closest('[class*="messageWrapper"]') as HTMLElement;
+        await userEvent.click(within(bubble).getByTitle('Edit message'));
+        await userEvent.clear(within(bubble).getByRole('textbox'));
+        await userEvent.type(within(bubble).getByRole('textbox'), 'a local question edited');
+        await userEvent.click(within(bubble).getByTitle('Save and reply'));
+
+        await screen.findByText('Thinking...');
+        expect(screen.queryByText('a second local answer')).not.toBeInTheDocument();
+        // The prompt reaches the disk before the answer exists: closing the tab mid-generation
+        // loses the reply, never the question. And "Thinking..." is not part of it.
+        expect(storedMessages()).toEqual(['a local question edited']);
+
+        const history = api.fetchChatResponse.mock.calls[0][0] as Message[];
+        expect(history.at(-1)?.parts[0].text).toBe('a local question edited');
+        expect(api.updateMessageOnServer).not.toHaveBeenCalled();
+        expect(api.deleteMessageFromServer).not.toHaveBeenCalled();
+        expect(api.saveMessageToServer).not.toHaveBeenCalled();
+
+        await act(async () => {
+            answer.resolve({ text: 'a fresh local answer' });
+        });
+        await screen.findByText('a fresh local answer');
+        expect(storedMessages()).toEqual(['a local question edited', 'a fresh local answer']);
+    });
+});
