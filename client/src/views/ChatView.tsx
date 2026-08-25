@@ -142,6 +142,7 @@ export default function ChatView({ chatList, activeChatId, onChatClick, onCreate
                                         setEditTitle(chat.title);
                                     }
                                 }}
+                                aria-label={editingChatId === chat.id ? 'Confirm rename' : 'Rename chat'}
                                 iconId={editingChatId === chat.id ? 'icon-confirm' : 'icon-pencil'}
                                 size={22}
                                 iconSize={14}

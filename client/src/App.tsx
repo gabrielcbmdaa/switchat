@@ -1197,7 +1197,11 @@ export default function App() {
     persistIfOffline(updatedChats);
 
     if (isAuthenticated) {
-      saveChatToServer(retitledChat);
+      void saveChatFieldsToServer(
+        { ...retitledChat, messages: [] },
+        { title: targetChat.title },
+        { title: retitledChat.title },
+      );
     }
   }
 

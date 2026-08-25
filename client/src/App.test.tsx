@@ -732,6 +732,60 @@ describe('pinning a chat', () => {
     });
 });
 
+describe('renaming a chat', () => {
+    it('puts the title back and warns when the server refuses the save', async () => {
+        const alerted = vi.spyOn(window, 'alert').mockImplementation(() => { });
+        const save = deferred<boolean>();
+        api.saveChatToServer.mockReturnValueOnce(save.promise);
+
+        render(<App />);
+        await screen.findByText('A question 1');
+
+        const row = screen.getByText('Chat A').closest('[class*="chatButton"]') as HTMLElement;
+        await userEvent.click(within(row).getByLabelText('Rename chat'));
+        const titleInput = screen.getByDisplayValue('Chat A');
+        await userEvent.clear(titleInput);
+        await userEvent.type(titleInput, 'Renamed A');
+        await userEvent.keyboard('{Enter}');
+
+        expect(screen.getByText('Renamed A')).toBeInTheDocument();
+
+        await act(async () => {
+            save.resolve(false);
+        });
+
+        expect(screen.getByText('Chat A')).toBeInTheDocument();
+        expect(screen.queryByText('Renamed A')).not.toBeInTheDocument();
+        expect(alerted).toHaveBeenCalledTimes(1);
+    });
+
+    it('renames without calling the server when signed out', async () => {
+        api.checkSession.mockResolvedValue({ authenticated: false });
+        localStorage.setItem('chatList', JSON.stringify([{
+            id: 'offline-chat',
+            title: 'Offline chat',
+            draft: '',
+            model: 'gemini-3.5-flash',
+            messages: [message('user', 'a local question', 1)],
+        }]));
+        localStorage.setItem('activeChatId', 'offline-chat');
+        const alerted = vi.spyOn(window, 'alert').mockImplementation(() => { });
+
+        render(<App />);
+        await screen.findByText('a local question');
+
+        await userEvent.click(screen.getByLabelText('Rename chat'));
+        const titleInput = screen.getByDisplayValue('Offline chat');
+        await userEvent.clear(titleInput);
+        await userEvent.type(titleInput, 'Renamed offline');
+        await userEvent.keyboard('{Enter}');
+
+        expect(screen.getByText('Renamed offline')).toBeInTheDocument();
+        expect(api.saveChatToServer).not.toHaveBeenCalled();
+        expect(alerted).not.toHaveBeenCalled();
+    });
+});
+
 // Signed out, localStorage is not a backup of the database: it IS the database. Nothing about
 // editing changes shape between the two modes except where the result lands, so what these
 // cases watch is that the disk ends up holding the same conversation the screen shows — and
