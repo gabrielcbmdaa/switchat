@@ -709,6 +709,34 @@ describe('pinning a chat', () => {
         expect(alerted).toHaveBeenCalledTimes(1);
     });
 
+    it('does not leave a pin on screen when pin and unpin both fail', async () => {
+        const alerted = vi.spyOn(window, 'alert').mockImplementation(() => { });
+        const pinSave = deferred<boolean>();
+        const unpinSave = deferred<boolean>();
+        api.saveChatToServer
+            .mockReturnValueOnce(pinSave.promise)
+            .mockReturnValueOnce(unpinSave.promise);
+
+        render(<App />);
+        await screen.findByText('A question 1');
+
+        await userEvent.click(screen.getAllByLabelText('Pin chat')[0]);
+        expect(screen.getByLabelText('Unpin chat')).toBeInTheDocument();
+
+        await userEvent.click(screen.getByLabelText('Unpin chat'));
+        expect(screen.queryByLabelText('Unpin chat')).not.toBeInTheDocument();
+
+        await act(async () => {
+            pinSave.resolve(false);
+        });
+        await act(async () => {
+            unpinSave.resolve(false);
+        });
+
+        expect(screen.queryByLabelText('Unpin chat')).not.toBeInTheDocument();
+        expect(alerted).toHaveBeenCalled();
+    });
+
     it('pins without calling the server when signed out', async () => {
         api.checkSession.mockResolvedValue({ authenticated: false });
         localStorage.setItem('chatList', JSON.stringify([{
@@ -844,6 +872,37 @@ describe('saving chat settings', () => {
         });
 
         expect(promptSwitch).toHaveAttribute('aria-checked', 'true');
+        expect(alerted).toHaveBeenCalledTimes(1);
+    });
+
+    it('keeps a later reasoning change when the earlier model save fails', async () => {
+        const alerted = vi.spyOn(window, 'alert').mockImplementation(() => { });
+        const modelSave = deferred<boolean>();
+        const reasoningSave = deferred<boolean>();
+        api.saveChatToServer
+            .mockReturnValueOnce(modelSave.promise)
+            .mockReturnValueOnce(reasoningSave.promise);
+
+        render(<App />);
+        await screen.findByText('A question 1');
+
+        await userEvent.click(screen.getByText('claude-fable-5'));
+        expect(document.querySelector('[class*="modelSelected"]')).toHaveTextContent('claude-fable-5');
+
+        fireEvent.change(screen.getByLabelText('Reasoning'), { target: { value: '4' } });
+        expect(screen.getByText('high')).toBeInTheDocument();
+
+        await act(async () => {
+            modelSave.resolve(false);
+        });
+
+        expect(document.querySelector('[class*="modelSelected"]')).toHaveTextContent('gemini-3.5-flash');
+
+        await act(async () => {
+            reasoningSave.resolve(true);
+        });
+
+        expect(screen.getByText('high')).toBeInTheDocument();
         expect(alerted).toHaveBeenCalledTimes(1);
     });
 

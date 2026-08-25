@@ -35,6 +35,21 @@ const TEMPORARY_MESSAGE_MS = 5000;
 const EDIT_NOT_SAVED = 'Could not save the edit. The message was left as it was.';
 const CHAT_NOT_SAVED = 'Could not save the change. The chat was left as it was.';
 
+// The fields this helper owns. Draft and notes text travel on a different timer;
+// messages never go through saveChatFieldsToServer (syncChat would reseed them).
+const MANAGED_CHAT_FIELDS = [
+  'pinned', 'title', 'model', 'reasoningLevel',
+  'systemPromptEnabled', 'notesEnabled',
+] as const;
+
+function snapshotManagedFields(chat: Chat): Partial<Chat> {
+  const snap: Partial<Chat> = {};
+  for (const key of MANAGED_CHAT_FIELDS) {
+    snap[key] = chat[key];
+  }
+  return snap;
+}
+
 export default function App() {
   const [chatList, setChatList] = useState<Chat[]>([]);
   const [activeChatId, setActiveChatId] = useState<string>('');
@@ -89,6 +104,11 @@ export default function App() {
   // Espejo del estado para los callbacks que resuelven después de un await
   const chatListRef = useRef(chatList);
   const activeChatIdRef = useRef(activeChatId);
+  // Last snapshot Mongo accepted for the managed fields. Revert goes here, not to
+  // whatever was on screen at the click — that may already be another optimistic try.
+  const lastAckedRef = useRef<Record<string, Partial<Chat>>>({});
+  // One in-flight save per chat: the next click waits, then reapplies its own fields.
+  const saveChainRef = useRef<Record<string, Promise<void>>>({});
   // Preferencia global: solo decide con qué modelo nacen los chats nuevos.
   // El modelo que se usa de verdad es el del chat activo.
   const [defaultModel, setDefaultModel] = useState<string>(loadDefaultModel);
@@ -240,30 +260,54 @@ export default function App() {
     }
   }
 
-  // Field-only save: messages stay out so syncChat cannot reseed them. On failure, restore
-  // only the fields this click changed, over the live list — a draft typed while we waited
-  // must survive. If the chat is gone, or those fields already moved on, drop the answer.
-  async function saveChatFieldsToServer(
+  function rememberAckedChats(chats: Chat[]) {
+    const next: Record<string, Partial<Chat>> = {};
+    for (const chat of chats) {
+      next[chat.id] = snapshotManagedFields(chat);
+    }
+    lastAckedRef.current = next;
+  }
+
+  function enqueueChatSave(chatId: string, job: () => Promise<void>): void {
+    const previous = saveChainRef.current[chatId] ?? Promise.resolve();
+    const next = previous.catch(() => undefined).then(job);
+    saveChainRef.current[chatId] = next;
+  }
+
+  function applyLiveChatFields(chatId: string, fields: Partial<Chat>): Chat | undefined {
+    const live = chatListRef.current.find((item) => item.id === chatId);
+    if (!live) return undefined;
+    const next = { ...live, ...fields };
+    const updatedChats = chatListRef.current.map((item) => (item.id === chatId ? next : item));
+    chatListRef.current = updatedChats;
+    setChatList(updatedChats);
+    return next;
+  }
+
+  // Field-only save: messages stay out so syncChat cannot reseed them. Clicks paint
+  // immediately; this work waits its turn per chat. On failure, restore the last
+  // snapshot Mongo accepted (or this click's previousFields if there is no ack yet)
+  // over the live list — a draft typed while we waited must survive. If the chat is
+  // gone, drop the answer.
+  function saveChatFieldsToServer(
     chat: Chat,
     previousFields: Partial<Chat>,
     expectedFields: Partial<Chat>,
-  ): Promise<void> {
-    const ok = await saveChatToServer({ ...chat, messages: [] });
-    if (ok) return;
+  ): void {
+    enqueueChatSave(chat.id, async () => {
+      const intended = applyLiveChatFields(chat.id, expectedFields);
+      if (!intended) return;
 
-    const live = chatListRef.current.find((item) => item.id === chat.id);
-    if (!live) return;
+      const ok = await saveChatToServer({ ...intended, messages: [] });
+      if (ok) {
+        lastAckedRef.current[chat.id] = snapshotManagedFields(intended);
+        return;
+      }
 
-    const stillOurs = Object.entries(expectedFields).every(
-      ([key, value]) => live[key as keyof Chat] === value,
-    );
-    if (!stillOurs) return;
-
-    const restored = { ...live, ...previousFields };
-    const updatedChats = chatListRef.current.map((item) => (item.id === chat.id ? restored : item));
-    chatListRef.current = updatedChats;
-    setChatList(updatedChats);
-    alert(CHAT_NOT_SAVED);
+      const ack = lastAckedRef.current[chat.id] ?? previousFields;
+      if (!applyLiveChatFields(chat.id, ack)) return;
+      alert(CHAT_NOT_SAVED);
+    });
   }
 
   // Punto único para editar el chat activo: aplica el cambio en la lista y persiste
@@ -411,7 +455,9 @@ export default function App() {
 
           if (serverChats && serverChats.length > 0) {
             // Online: solo state. No escribir chats del servidor en localStorage.
-            setChatList(migrateRetiredModels(serverChats));
+            const chats = migrateRetiredModels(serverChats);
+            rememberAckedChats(chats);
+            setChatList(chats);
             setActiveChatId(
               localActiveId && serverChats.some((chat: Chat) => chat.id === localActiveId)
                 ? localActiveId
@@ -429,13 +475,16 @@ export default function App() {
           serverChats = await loadChatsFromServer();
           if (cancelled) return;
           if (serverChats && serverChats.length > 0) {
-            setChatList(migrateRetiredModels(serverChats));
+            const chats = migrateRetiredModels(serverChats);
+            rememberAckedChats(chats);
+            setChatList(chats);
             setActiveChatId(sortChatList(serverChats)[0].id);
             return;
           }
 
           const welcome = await materializeOnlineWelcomeChat(session.userId);
           if (cancelled) return;
+          rememberAckedChats([welcome]);
           setChatList([welcome]);
           setActiveChatId(welcome.id);
           return;
@@ -698,6 +747,8 @@ export default function App() {
     localStorage.setItem('isLoggedIn', 'true');
     setLeftPanelView('chats');
     setIsAuthenticated(true);
+    lastAckedRef.current = {};
+    saveChainRef.current = {};
     setChatList([]);
     setActiveChatId('');
     setDraftChat(null);
@@ -713,7 +764,9 @@ export default function App() {
       const serverChats = await loadChatsFromServer();
 
       if (serverChats && serverChats.length > 0) {
-        setChatList(migrateRetiredModels(serverChats));
+        const chats = migrateRetiredModels(serverChats);
+        rememberAckedChats(chats);
+        setChatList(chats);
         setActiveChatId(sortChatList(serverChats)[0].id);
       } else {
         // Cuenta nueva: welcome real en servidor (id estable). No pisar chats locales.
@@ -723,6 +776,7 @@ export default function App() {
           return;
         }
         const welcome = await materializeOnlineWelcomeChat(session.userId);
+        rememberAckedChats([welcome]);
         setChatList([welcome]);
         setActiveChatId(welcome.id);
       }
@@ -737,6 +791,8 @@ export default function App() {
     localStorage.removeItem('isLoggedIn');
     await logoutFromServer();
     setIsAuthenticated(false);
+    lastAckedRef.current = {};
+    saveChainRef.current = {};
 
     // Restaurar chats offline intactos; solo persistir tutorial si no había ninguno.
     let localChats = loadLocalChats() || [];
@@ -993,6 +1049,7 @@ export default function App() {
     // Un borrador suyo esperando a salir lo resucitaría: la ruta de sincronización hace
     // upsert, así que ese envío tardío recrea en Mongo el chat que acabas de borrar.
     if (draftSyncChatIdRef.current === chatId) clearDraftSyncTimer();
+    delete lastAckedRef.current[chatId];
     const activeId = activeChatIdRef.current;
     const updatedChats = chatListRef.current.filter(chat => chat.id !== chatId);
     chatListRef.current = updatedChats;
