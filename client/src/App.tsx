@@ -33,6 +33,7 @@ const TEMPORARY_MESSAGE_MS = 5000;
 // the old wording, and the screen has been put back to match it. Silence here used to leave the
 // two showing different text until the next reload.
 const EDIT_NOT_SAVED = 'Could not save the edit. The message was left as it was.';
+const CHAT_NOT_SAVED = 'Could not save the change. The chat was left as it was.';
 
 export default function App() {
   const [chatList, setChatList] = useState<Chat[]>([]);
@@ -237,6 +238,32 @@ export default function App() {
     if (!isAuthenticatedRef.current) {
       saveToLocalDisk(chats);
     }
+  }
+
+  // Field-only save: messages stay out so syncChat cannot reseed them. On failure, restore
+  // only the fields this click changed, over the live list — a draft typed while we waited
+  // must survive. If the chat is gone, or those fields already moved on, drop the answer.
+  async function saveChatFieldsToServer(
+    chat: Chat,
+    previousFields: Partial<Chat>,
+    expectedFields: Partial<Chat>,
+  ): Promise<void> {
+    const ok = await saveChatToServer({ ...chat, messages: [] });
+    if (ok) return;
+
+    const live = chatListRef.current.find((item) => item.id === chat.id);
+    if (!live) return;
+
+    const stillOurs = Object.entries(expectedFields).every(
+      ([key, value]) => live[key as keyof Chat] === value,
+    );
+    if (!stillOurs) return;
+
+    const restored = { ...live, ...previousFields };
+    const updatedChats = chatListRef.current.map((item) => (item.id === chat.id ? restored : item));
+    chatListRef.current = updatedChats;
+    setChatList(updatedChats);
+    alert(CHAT_NOT_SAVED);
   }
 
   // Punto único para editar el chat activo: aplica el cambio en la lista y persiste
@@ -1208,7 +1235,11 @@ export default function App() {
     if (draftSyncChatIdRef.current === chatId) clearDraftSyncTimer();
     // messages: [] as in applyGeneratedTitle: this route updates one field, and syncChat's
     // message seeding has no business running here.
-    saveChatToServer({ ...pinnedChat, messages: [] });
+    void saveChatFieldsToServer(
+      { ...pinnedChat, messages: [] },
+      { pinned: targetChat.pinned },
+      { pinned: pinnedChat.pinned },
+    );
   }
 
   return (

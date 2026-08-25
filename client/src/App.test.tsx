@@ -668,6 +668,68 @@ describe('pinning a chat', () => {
         const pinSaves = api.saveChatToServer.mock.calls.filter((call) => call[0]?.id === 'chat-a');
         expect(pinSaves.at(-1)?.[0]).toMatchObject({ pinned: true, draft: 'half a thought' });
     });
+
+    it('puts the pin back and warns when the server refuses the save', async () => {
+        const alerted = vi.spyOn(window, 'alert').mockImplementation(() => { });
+        const save = deferred<boolean>();
+        api.saveChatToServer.mockReturnValueOnce(save.promise);
+
+        render(<App />);
+        await screen.findByText('A question 1');
+
+        await userEvent.click(screen.getAllByLabelText('Pin chat')[0]);
+        expect(screen.getByLabelText('Unpin chat')).toBeInTheDocument();
+
+        await act(async () => {
+            save.resolve(false);
+        });
+
+        expect(screen.queryByLabelText('Unpin chat')).not.toBeInTheDocument();
+        expect(alerted).toHaveBeenCalledTimes(1);
+    });
+
+    it('keeps a draft typed before the pin when the save fails', async () => {
+        const alerted = vi.spyOn(window, 'alert').mockImplementation(() => { });
+        const save = deferred<boolean>();
+        api.saveChatToServer.mockReturnValueOnce(save.promise);
+
+        render(<App />);
+        await screen.findByText('A question 1');
+
+        await userEvent.type(screen.getByPlaceholderText('Write a message...'), 'half a thought');
+        await userEvent.click(screen.getAllByLabelText('Pin chat')[0]);
+        expect(screen.getByLabelText('Unpin chat')).toBeInTheDocument();
+
+        await act(async () => {
+            save.resolve(false);
+        });
+
+        expect(screen.getByPlaceholderText('Write a message...')).toHaveValue('half a thought');
+        expect(screen.queryByLabelText('Unpin chat')).not.toBeInTheDocument();
+        expect(alerted).toHaveBeenCalledTimes(1);
+    });
+
+    it('pins without calling the server when signed out', async () => {
+        api.checkSession.mockResolvedValue({ authenticated: false });
+        localStorage.setItem('chatList', JSON.stringify([{
+            id: 'offline-chat',
+            title: 'Offline chat',
+            draft: '',
+            model: 'gemini-3.5-flash',
+            messages: [message('user', 'a local question', 1)],
+        }]));
+        localStorage.setItem('activeChatId', 'offline-chat');
+        const alerted = vi.spyOn(window, 'alert').mockImplementation(() => { });
+
+        render(<App />);
+        await screen.findByText('a local question');
+
+        await userEvent.click(screen.getByLabelText('Pin chat'));
+
+        expect(screen.getByLabelText('Unpin chat')).toBeInTheDocument();
+        expect(api.saveChatToServer).not.toHaveBeenCalled();
+        expect(alerted).not.toHaveBeenCalled();
+    });
 });
 
 // Signed out, localStorage is not a backup of the database: it IS the database. Nothing about
