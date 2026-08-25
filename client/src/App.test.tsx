@@ -1,4 +1,4 @@
-import { render, screen, act, within } from '@testing-library/react';
+import { render, screen, act, within, fireEvent } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import type { Message } from './types';
@@ -783,6 +783,88 @@ describe('renaming a chat', () => {
         expect(screen.getByText('Renamed offline')).toBeInTheDocument();
         expect(api.saveChatToServer).not.toHaveBeenCalled();
         expect(alerted).not.toHaveBeenCalled();
+    });
+});
+
+describe('saving chat settings', () => {
+    it('puts the model back and warns when the server refuses the save', async () => {
+        const alerted = vi.spyOn(window, 'alert').mockImplementation(() => { });
+        const save = deferred<boolean>();
+        api.saveChatToServer.mockReturnValueOnce(save.promise);
+
+        render(<App />);
+        await screen.findByText('A question 1');
+
+        await userEvent.click(screen.getByText('claude-fable-5'));
+        expect(document.querySelector('[class*="modelSelected"]')).toHaveTextContent('claude-fable-5');
+        expect(api.saveChatToServer.mock.calls.at(-1)?.[0].messages).toEqual([]);
+
+        await act(async () => {
+            save.resolve(false);
+        });
+
+        expect(document.querySelector('[class*="modelSelected"]')).toHaveTextContent('gemini-3.5-flash');
+        expect(alerted).toHaveBeenCalledTimes(1);
+    });
+
+    it('puts the notes switch back and warns when the server refuses the save', async () => {
+        const alerted = vi.spyOn(window, 'alert').mockImplementation(() => { });
+        const save = deferred<boolean>();
+        api.saveChatToServer.mockReturnValueOnce(save.promise);
+
+        render(<App />);
+        await screen.findByText('A question 1');
+
+        const notesSwitch = screen.getByRole('switch', { name: 'Notes' });
+        await userEvent.click(notesSwitch);
+        expect(notesSwitch).toHaveAttribute('aria-checked', 'true');
+
+        await act(async () => {
+            save.resolve(false);
+        });
+
+        expect(notesSwitch).toHaveAttribute('aria-checked', 'false');
+        expect(alerted).toHaveBeenCalledTimes(1);
+    });
+
+    it('puts the system prompt switch back and warns when the server refuses the save', async () => {
+        const alerted = vi.spyOn(window, 'alert').mockImplementation(() => { });
+        const save = deferred<boolean>();
+        api.saveChatToServer.mockReturnValueOnce(save.promise);
+
+        render(<App />);
+        await screen.findByText('A question 1');
+
+        const promptSwitch = screen.getByRole('switch', { name: 'System Prompt' });
+        await userEvent.click(promptSwitch);
+        expect(promptSwitch).toHaveAttribute('aria-checked', 'false');
+
+        await act(async () => {
+            save.resolve(false);
+        });
+
+        expect(promptSwitch).toHaveAttribute('aria-checked', 'true');
+        expect(alerted).toHaveBeenCalledTimes(1);
+    });
+
+    it('puts the reasoning level back and warns when the server refuses the save', async () => {
+        const alerted = vi.spyOn(window, 'alert').mockImplementation(() => { });
+        const save = deferred<boolean>();
+        api.saveChatToServer.mockReturnValueOnce(save.promise);
+
+        render(<App />);
+        await screen.findByText('A question 1');
+
+        fireEvent.change(screen.getByLabelText('Reasoning'), { target: { value: '4' } });
+        expect(screen.getByText('high')).toBeInTheDocument();
+
+        await act(async () => {
+            save.resolve(false);
+        });
+
+        expect(screen.getByText('medium')).toBeInTheDocument();
+        expect(screen.queryByText('high')).not.toBeInTheDocument();
+        expect(alerted).toHaveBeenCalledTimes(1);
     });
 });
 

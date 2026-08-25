@@ -609,11 +609,17 @@ export default function App() {
     // Los niveles de reasoning no son universales: el nivel se revalida contra el
     // modelo nuevo y viaja con él en la misma edición, para no dejar al chat un
     // instante con un nivel que su proveedor no entiende.
+    const previousModel = currentChat?.model;
+    const previousReasoning = currentChat?.reasoningLevel;
     const nextReasoning = resolveReasoningLevel(newModel, activeReasoning);
     const updatedChat = updateActiveChat((chat) => ({ ...chat, model: newModel, reasoningLevel: nextReasoning }));
 
     if (updatedChat && isAuthenticated && !isDraftChat) {
-      saveChatToServer(updatedChat);
+      void saveChatFieldsToServer(
+        updatedChat,
+        { model: previousModel, reasoningLevel: previousReasoning },
+        { model: newModel, reasoningLevel: nextReasoning },
+      );
     }
 
     // El último modelo elegido pasa a ser con el que nacen los chats nuevos.
@@ -622,10 +628,15 @@ export default function App() {
   }
 
   function handleReasoningChange(level: string) {
+    const previousLevel = currentChat?.reasoningLevel;
     const updatedChat = updateActiveChat((chat) => ({ ...chat, reasoningLevel: level }));
 
     if (updatedChat && isAuthenticated && !isDraftChat) {
-      saveChatToServer(updatedChat);
+      void saveChatFieldsToServer(
+        updatedChat,
+        { reasoningLevel: previousLevel },
+        { reasoningLevel: level },
+      );
     }
   }
 
@@ -638,18 +649,28 @@ export default function App() {
   }
 
   function handleSystemPromptEnabledChange(isEnabled: boolean) {
+    const previousEnabled = currentChat?.systemPromptEnabled;
     const updatedChat = updateActiveChat((chat) => ({ ...chat, systemPromptEnabled: isEnabled }));
 
     if (updatedChat && isAuthenticated && !isDraftChat) {
-      saveChatToServer(updatedChat);
+      void saveChatFieldsToServer(
+        updatedChat,
+        { systemPromptEnabled: previousEnabled },
+        { systemPromptEnabled: isEnabled },
+      );
     }
   }
 
   function handleNotesEnabledChange(isEnabled: boolean) {
+    const previousEnabled = currentChat?.notesEnabled;
     const updatedChat = updateActiveChat((chat) => ({ ...chat, notesEnabled: isEnabled }));
 
     if (updatedChat && isAuthenticated && !isDraftChat) {
-      saveChatToServer(updatedChat);
+      void saveChatFieldsToServer(
+        updatedChat,
+        { notesEnabled: previousEnabled },
+        { notesEnabled: isEnabled },
+      );
     }
   }
 
