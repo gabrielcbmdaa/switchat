@@ -35,25 +35,20 @@ const TEMPORARY_MESSAGE_MS = 5000;
 const EDIT_NOT_SAVED = 'Could not save the edit. The message was left as it was.';
 const CHAT_NOT_SAVED = 'Could not save the change. The chat was left as it was.';
 
-// The fields this helper owns. Draft and notes text travel on a different timer;
-// messages never go through saveChatFieldsToServer (syncChat would reseed them).
-const MANAGED_CHAT_FIELDS = [
-  'pinned', 'title', 'model', 'reasoningLevel',
-  'systemPromptEnabled', 'notesEnabled',
-] as const;
-
 function snapshotManagedFields(chat: Chat): Partial<Chat> {
-  const snap: Partial<Chat> = {};
-  for (const key of MANAGED_CHAT_FIELDS) {
-    snap[key] = chat[key];
-  }
+  // The fields this helper owns. Draft and notes text travel on a different timer;
+  // messages never go through saveChatFieldsToServer (syncChat would reseed them).
   // Mongo stores model as '' on chats that never picked one. The dropdown does not
   // show that empty string: it shows the seed for new chats. Revert must land on
   // that visible id, or '' || defaultModel paints the model we just failed to save.
-  if (!snap.model) {
-    snap.model = loadDefaultModel();
-  }
-  return snap;
+  return {
+    pinned: chat.pinned,
+    title: chat.title,
+    model: chat.model || loadDefaultModel(),
+    reasoningLevel: chat.reasoningLevel,
+    systemPromptEnabled: chat.systemPromptEnabled,
+    notesEnabled: chat.notesEnabled,
+  };
 }
 
 export default function App() {
@@ -301,6 +296,12 @@ export default function App() {
     expectedFields: Partial<Chat>,
   ): void {
     enqueueChatSave(chat.id, async () => {
+      // A pending draft sync carries a SNAPSHOT of the chat taken before this click
+      // and leaves two seconds later. syncChat writes every field it receives, so
+      // that photo would hand a just-saved title or pin its old value back in Mongo.
+      // Cancelling it loses nothing on success: this POST already carries the live draft.
+      if (draftSyncChatIdRef.current === chat.id) clearDraftSyncTimer();
+
       const intended = applyLiveChatFields(chat.id, expectedFields);
       if (!intended) return;
 
@@ -311,8 +312,12 @@ export default function App() {
       }
 
       const ack = lastAckedRef.current[chat.id] ?? previousFields;
-      if (!applyLiveChatFields(chat.id, ack)) return;
+      const restored = applyLiveChatFields(chat.id, ack);
+      if (!restored) return;
       alert(CHAT_NOT_SAVED);
+      // The cancelled timer never uploaded the text. Arm it again on the restored
+      // chat so a failed pin or rename does not also drop the draft.
+      scheduleDraftSyncToServer(restored);
     });
   }
 
@@ -1320,11 +1325,6 @@ export default function App() {
 
     if (!isAuthenticated) return;
 
-    // A pending draft sync carries a SNAPSHOT of the chat taken before this click and leaves
-    // two seconds later: letting it go would hand pinned its old value back in Mongo. Cancelling
-    // it loses nothing, because what we upload here already carries the draft from the list,
-    // which is the same copy that snapshot held, or a newer one.
-    if (draftSyncChatIdRef.current === chatId) clearDraftSyncTimer();
     // messages: [] as in applyGeneratedTitle: this route updates one field, and syncChat's
     // message seeding has no business running here.
     void saveChatFieldsToServer(

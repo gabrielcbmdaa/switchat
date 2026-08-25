@@ -709,6 +709,36 @@ describe('pinning a chat', () => {
         expect(alerted).toHaveBeenCalledTimes(1);
     });
 
+    it('reschedules the draft sync when the pin save fails', async () => {
+        vi.useFakeTimers({ shouldAdvanceTime: true });
+        const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+        const alerted = vi.spyOn(window, 'alert').mockImplementation(() => { });
+        const save = deferred<boolean>();
+        api.saveChatToServer.mockReturnValueOnce(save.promise);
+
+        render(<App />);
+        await screen.findByText('A question 1');
+
+        await user.type(screen.getByPlaceholderText('Write a message...'), 'half a thought');
+        await user.click(screen.getAllByLabelText('Pin chat')[0]);
+
+        await act(async () => {
+            save.resolve(false);
+        });
+
+        expect(screen.getByPlaceholderText('Write a message...')).toHaveValue('half a thought');
+        expect(screen.queryByLabelText('Unpin chat')).not.toBeInTheDocument();
+        expect(alerted).toHaveBeenCalledTimes(1);
+
+        await act(async () => { vi.advanceTimersByTime(2000); });
+
+        expect(api.syncChatDraftToServer).toHaveBeenCalled();
+        expect(api.syncChatDraftToServer.mock.calls.at(-1)?.[0]).toMatchObject({
+            draft: 'half a thought',
+        });
+        expect(api.syncChatDraftToServer.mock.calls.at(-1)?.[0].pinned).toBeFalsy();
+    });
+
     it('does not leave a pin on screen when pin and unpin both fail', async () => {
         const alerted = vi.spyOn(window, 'alert').mockImplementation(() => { });
         const pinSave = deferred<boolean>();
@@ -761,6 +791,30 @@ describe('pinning a chat', () => {
 });
 
 describe('renaming a chat', () => {
+    it('does not let a pending draft sync undo the title it just saved', async () => {
+        vi.useFakeTimers({ shouldAdvanceTime: true });
+        const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+
+        render(<App />);
+        await screen.findByText('A question 1');
+
+        await user.type(screen.getByPlaceholderText('Write a message...'), 'half a thought');
+
+        const row = screen.getByText('Chat A').closest('[class*="chatButton"]') as HTMLElement;
+        await user.click(within(row).getByLabelText('Rename chat'));
+        const titleInput = screen.getByDisplayValue('Chat A');
+        await user.clear(titleInput);
+        await user.type(titleInput, 'Renamed A');
+        await user.keyboard('{Enter}');
+
+        await act(async () => { vi.advanceTimersByTime(2000); });
+
+        expect(api.syncChatDraftToServer).not.toHaveBeenCalled();
+
+        const titleSaves = api.saveChatToServer.mock.calls.filter((call) => call[0]?.id === 'chat-a');
+        expect(titleSaves.at(-1)?.[0]).toMatchObject({ title: 'Renamed A', draft: 'half a thought' });
+    });
+
     it('puts the title back and warns when the server refuses the save', async () => {
         const alerted = vi.spyOn(window, 'alert').mockImplementation(() => { });
         const save = deferred<boolean>();
