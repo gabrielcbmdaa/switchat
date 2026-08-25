@@ -47,6 +47,12 @@ function snapshotManagedFields(chat: Chat): Partial<Chat> {
   for (const key of MANAGED_CHAT_FIELDS) {
     snap[key] = chat[key];
   }
+  // Mongo stores model as '' on chats that never picked one. The dropdown does not
+  // show that empty string: it shows the seed for new chats. Revert must land on
+  // that visible id, or '' || defaultModel paints the model we just failed to save.
+  if (!snap.model) {
+    snap.model = loadDefaultModel();
+  }
   return snap;
 }
 
@@ -655,11 +661,15 @@ export default function App() {
   }
 
   function handleModelChange(newModel: string) {
-    // Los niveles de reasoning no son universales: el nivel se revalida contra el
-    // modelo nuevo y viaja con él en la misma edición, para no dejar al chat un
-    // instante con un nivel que su proveedor no entiende.
-    const previousModel = currentChat?.model;
-    const previousReasoning = currentChat?.reasoningLevel;
+    // Reasoning scales are not universal: the level is revalidated against the new
+    // model and saved with it, so the chat is never left on a level its provider
+    // does not understand. previousModel is the id the dropdown showed — Mongo may
+    // still hold '', which is not what was on screen.
+    const previousModel = currentChat?.model || defaultModel;
+    const previousReasoning = resolveReasoningLevel(
+      previousModel,
+      currentChat?.reasoningLevel,
+    );
     const nextReasoning = resolveReasoningLevel(newModel, activeReasoning);
     const updatedChat = updateActiveChat((chat) => ({ ...chat, model: newModel, reasoningLevel: nextReasoning }));
 

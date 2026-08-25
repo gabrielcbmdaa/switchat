@@ -835,6 +835,32 @@ describe('saving chat settings', () => {
         expect(alerted).toHaveBeenCalledTimes(1);
     });
 
+    it('puts back the dropdown model when the chat had none of its own', async () => {
+        localStorage.removeItem('model');
+        const alerted = vi.spyOn(window, 'alert').mockImplementation(() => { });
+        const save = deferred<boolean>();
+        api.saveChatToServer.mockReturnValueOnce(save.promise);
+        api.loadChatsFromServer.mockResolvedValue([
+            { id: 'chat-a', title: 'Chat A', draft: '', messages: [], model: '' },
+            { id: 'chat-b', title: 'Chat B', draft: '', messages: [], model: 'gemini-3.5-flash' },
+        ]);
+
+        render(<App />);
+        await screen.findByText('A question 1');
+
+        expect(document.querySelector('[class*="modelSelected"]')).toHaveTextContent('gemini-3.5-flash');
+
+        await userEvent.click(screen.getByText('claude-fable-5'));
+        expect(document.querySelector('[class*="modelSelected"]')).toHaveTextContent('claude-fable-5');
+
+        await act(async () => {
+            save.resolve(false);
+        });
+
+        expect(document.querySelector('[class*="modelSelected"]')).toHaveTextContent('gemini-3.5-flash');
+        expect(alerted).toHaveBeenCalledTimes(1);
+    });
+
     it('puts the notes switch back and warns when the server refuses the save', async () => {
         const alerted = vi.spyOn(window, 'alert').mockImplementation(() => { });
         const save = deferred<boolean>();
