@@ -29,6 +29,9 @@ export default function ChatView({ chatList, activeChatId, onChatClick, onCreate
     const [editingChatId, setEditingChatId] = useState<string | null>(null);
     // Estado temporal para guardar el texto que el usuario escribe en el input
     const [editTitle, setEditTitle] = useState('');
+    // Which row has the overflow menu open. Touch has no hover, so the three-dot button
+    // is the handle that reveals pencil, trash and pin. One row at a time.
+    const [actionsOpenId, setActionsOpenId] = useState<string | null>(null);
 
     // Si estamos en modo "confirmación", arrancamos un cronómetro de 5 segundos para cancelar
     useEffect(() => {
@@ -86,15 +89,21 @@ export default function ChatView({ chatList, activeChatId, onChatClick, onCreate
                 // Preguntamos si este botón es el activo
                 const isActive = chat.id === activeChatId;
                 const isConfirming = confirmingDeleteId === chat.id;
+                const isActionsOpen = actionsOpenId === chat.id;
 
                 return (
                     <div
                         key={chat.id} // React necesita un "key" único cuando creas listas
-                        className={styles.chatButton}
+                        className={[styles.chatButton, isActionsOpen ? styles.actionsOpen : '']
+                            .filter(Boolean)
+                            .join(' ')}
                         style={{
                             paddingLeft: isActive ? '6px' : '26px',
                         }}
-                        onClick={() => onChatClick(chat.id)} // Enganchamos el clic de selección
+                        onClick={() => {
+                            setActionsOpenId(null);
+                            onChatClick(chat.id);
+                        }}
                     >
                         {/* Si es el activo, dibujamos el puntito usando el operador && */}
                         {isActive && <div className={styles.point}></div>}
@@ -164,6 +173,19 @@ export default function ChatView({ chatList, activeChatId, onChatClick, onCreate
                                 }}
                                 aria-label={chat.pinned ? 'Unpin chat' : 'Pin chat'}
                                 iconId="icon-pin"
+                                size={22}
+                                iconSize={14}
+                            />
+                        </div>
+                        <div className={styles.overflowSlot}>
+                            <DefaultButton
+                                className={`${styles.optionsButton}${isActionsOpen ? ` ${styles.overflowButtonOpen}` : ''}`}
+                                onClick={(e) => {
+                                    e.stopPropagation();
+                                    setActionsOpenId((openId) => (openId === chat.id ? null : chat.id));
+                                }}
+                                aria-label={isActionsOpen ? 'Close chat actions' : 'Chat actions'}
+                                iconId="icon-options"
                                 size={22}
                                 iconSize={14}
                             />
