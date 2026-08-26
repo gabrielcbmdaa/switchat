@@ -169,12 +169,14 @@
 }
 
 /* ============================
-   Option buttons (pencil, trash)
+   Option buttons (pencil, trash, pin)
    ============================ */
+/* Transparent until THAT button is hovered. Color inherits from the row so the icons stay
+   visible when the row itself inverts to gray — gray-on-gray would hide them. */
 button.optionsButton {
   border-radius: 100%;
-  color: #191919;
-  background-color: #858585;
+  color: inherit;
+  background-color: transparent;
   border: none;
 }
 
