@@ -60,14 +60,15 @@
 }
 
 /* Hover only when NOT hovering over the button container */
-.chatButton:hover:not(:has(.buttonContainer:hover)):not(:has(.pinSlot:hover)) {
+.chatButton:hover:not(:has(.buttonContainer:hover)):not(:has(.pinSlot:hover)):not(:has(.overflowSlot:hover)) {
   background-color: #858585;
   color: #000000;
   border-radius: 30px;
 }
 
-/* Show action buttons on chat item hover */
-.chatButton:hover .buttonContainer {
+/* Show action buttons on chat item hover, or when the touch overflow menu is open */
+.chatButton:hover .buttonContainer,
+.actionsOpen .buttonContainer {
   visibility: visible;
   width: auto;
   padding: 4px 4px 4px 0;
@@ -124,19 +125,17 @@
 /* ============================
    Pin slot
    ============================ */
-/* Su propio hueco, y no un tercer botón dentro de .buttonContainer, porque su regla de
-   visibilidad es otra: el lápiz y la papelera solo existen al pasar el ratón, y la chincheta de
-   un chat fijado tiene que verse sin tocar la fila. Sin esa señal, "fijado" y "el más reciente"
-   se ven exactamente igual y nada explica por qué ese chat está arriba.
+/* Its own slot, not a third button inside .buttonContainer, because its visibility rule is
+   different: pencil and trash only exist on hover, and a pinned chat's pin has to show
+   without touching the row. Without that signal, "pinned" and "the most recent one" look
+   the same and nothing explains why that chat is at the top.
 
-   Y va la ÚLTIMA de la fila por ese mismo motivo. Colocada antes de .buttonContainer, acercar
-   el ratón para pulsarla hacía aparecer los otros dos botones, y al ensancharse el contenedor
-   la chincheta se corría a la izquierda y se escapaba del cursor: apuntabas al pin y pulsabas
-   otra cosa. Anclada al borde derecho, lo que crece lo hace a su izquierda y ella no se mueve. */
+   It sits just before .overflowSlot. Growing to its left keeps it from sliding out from
+   under the cursor (or the finger, once the three-dot handle is showing). */
 .pinSlot {
   display: flex;
   flex-shrink: 0;
-  /* Oculta por defecto — no ocupa sitio, igual que el contenedor de abajo */
+  /* Hidden by default — occupies no space, same as the container below */
   visibility: hidden;
   width: 0;
   padding: 0;
@@ -145,11 +144,42 @@
 }
 
 .chatButton:hover .pinSlot,
-.pinSlotVisible {
+.pinSlotVisible,
+.actionsOpen .pinSlot {
   visibility: visible;
   width: auto;
   padding: 4px 4px 4px 0;
   opacity: 1;
+}
+
+/* ============================
+   Overflow slot (three-dot handle)
+   ============================ */
+/* The right-edge anchor on touch. Desktop collapses it to width 0, so the pin stays the
+   last visible control. On devices with no hover it stays put, and opening the menu grows
+   pencil, trash and pin to its left instead of moving the handle under the finger. */
+.overflowSlot {
+  display: flex;
+  flex-shrink: 0;
+  visibility: hidden;
+  width: 0;
+  padding: 0;
+  opacity: 0;
+  overflow: hidden;
+}
+
+@media (hover: none) {
+  .overflowSlot {
+    visibility: visible;
+    width: auto;
+    padding: 4px 4px 4px 0;
+    opacity: 1;
+  }
+}
+
+button.overflowButtonOpen {
+  color: #191919;
+  background-color: #858585;
 }
 
 /* ============================
