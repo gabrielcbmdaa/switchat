@@ -59,15 +59,34 @@
   cursor: pointer;
 }
 
-/* Hover only when NOT hovering over the button container */
-.chatButton:hover:not(:has(.buttonContainer:hover)):not(:has(.pinSlot:hover)):not(:has(.overflowSlot:hover)) {
-  background-color: #858585;
-  color: #000000;
-  border-radius: 30px;
+/* Invert the row and reveal actions only when a real pointer can hover. On touch, :hover
+   still fires on tap; without this gate the title shrinks as pencil/trash/pin appear on
+   the same press that is meant to open the chat, and the three-dot handle is not the
+   only way the drawer opens. */
+@media (hover: hover) {
+  /* Hover only when NOT hovering over the action slots */
+  .chatButton:hover:not(:has(.buttonContainer:hover)):not(:has(.pinSlot:hover)):not(:has(.overflowSlot:hover)) {
+    background-color: #858585;
+    color: #000000;
+    border-radius: 30px;
+  }
+
+  .chatButton:hover .buttonContainer {
+    visibility: visible;
+    width: auto;
+    padding: 4px 4px 4px 0;
+    opacity: 1;
+  }
+
+  .chatButton:hover .pinSlot {
+    visibility: visible;
+    width: auto;
+    padding: 4px 4px 4px 0;
+    opacity: 1;
+  }
 }
 
-/* Show action buttons on chat item hover, or when the touch overflow menu is open */
-.chatButton:hover .buttonContainer,
+/* Touch overflow menu, or a pinned chat's always-visible pin */
 .actionsOpen .buttonContainer {
   visibility: visible;
   width: auto;
@@ -143,7 +162,6 @@
   overflow: hidden;
 }
 
-.chatButton:hover .pinSlot,
 .pinSlotVisible,
 .actionsOpen .pinSlot {
   visibility: visible;
