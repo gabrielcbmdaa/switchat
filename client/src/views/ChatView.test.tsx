@@ -207,4 +207,25 @@ describe('the overflow button of the chat list', () => {
         expect(onChatClick).toHaveBeenCalledWith('loose');
         expect(screen.queryByLabelText('Close chat actions')).toBeNull();
     });
+
+    it('closes when New Chat is pressed', async () => {
+        const onCreateNewChat = vi.fn();
+        render(
+            <ChatView
+                chatList={[chat('loose')]}
+                activeChatId="loose"
+                onChatClick={vi.fn()}
+                onCreateNewChat={onCreateNewChat}
+                onDeleteChat={vi.fn()}
+                onReTitleChat={vi.fn()}
+                onTogglePin={vi.fn()}
+            />
+        );
+
+        await userEvent.click(screen.getByLabelText('Chat actions'));
+        await userEvent.click(screen.getByRole('button', { name: 'New Chat' }));
+
+        expect(onCreateNewChat).toHaveBeenCalled();
+        expect(screen.queryByLabelText('Close chat actions')).toBeNull();
+    });
 });
