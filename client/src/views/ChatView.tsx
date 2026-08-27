@@ -79,7 +79,10 @@ export default function ChatView({ chatList, activeChatId, onChatClick, onCreate
             <button
                 className={styles.newChatButton}
                 style={{ paddingLeft: isNewChatActive ? '6px' : '26px' }}
-                onClick={onCreateNewChat}
+                onClick={() => {
+                    setActionsOpenId(null);
+                    onCreateNewChat();
+                }}
             >
                 {isNewChatActive && <div className={styles.point}></div>}
                 New Chat
