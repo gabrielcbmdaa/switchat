@@ -21,6 +21,7 @@ const api = vi.hoisted(() => ({
     logoutFromServer: vi.fn(),
     fetchApiKeysFromServer: vi.fn(),
     replaceApiKeysOnServer: vi.fn(),
+    loginOrRegister: vi.fn(),
 }));
 
 vi.mock('./services/api', () => ({ ...api, API_BACKEND_URL: '/api' }));
@@ -82,6 +83,7 @@ beforeEach(() => {
     api.syncChatDraftToServer.mockResolvedValue(true);
     api.generateChatTitle.mockResolvedValue('');
     api.fetchApiKeysFromServer.mockResolvedValue(null);
+    api.logoutFromServer.mockResolvedValue(undefined);
 });
 
 describe('switching chats while the model is answering', () => {
@@ -200,6 +202,20 @@ describe('a failed generation', () => {
         expect(screen.queryByText('Error: 429 quota exceeded')).not.toBeInTheDocument();
         // Only the failed answer is temporary. The question stays, ready to be retried.
         expect(screen.getByText('a doomed prompt')).toBeInTheDocument();
+    });
+
+    it('warns on the prompt when the session expires mid-answer', async () => {
+        api.fetchChatResponse.mockRejectedValue(new Error('SESSION_EXPIRED'));
+
+        render(<App />);
+        await screen.findByText('A question 1');
+
+        await userEvent.type(screen.getByPlaceholderText('Write a message...'), 'a doomed prompt');
+        await userEvent.click(screen.getByTitle('Send message'));
+
+        expect(await screen.findByRole('status')).toHaveTextContent(
+            'Session expired. Please log in again.'
+        );
     });
 });
 
@@ -792,6 +808,30 @@ describe('pinning a chat', () => {
         expect(api.saveChatToServer).not.toHaveBeenCalled();
         expect(screen.queryByRole('status')).not.toBeInTheDocument();
     });
+
+    it('clears the notice after five seconds when the server refuses the pin', async () => {
+        vi.useFakeTimers({ shouldAdvanceTime: true });
+        const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+        const save = deferred<boolean>();
+        api.saveChatToServer.mockReturnValueOnce(save.promise);
+
+        render(<App />);
+        await screen.findByText('A question 1');
+
+        await user.click(screen.getAllByLabelText('Pin chat')[0]);
+
+        await act(async () => {
+            save.resolve(false);
+        });
+
+        expect(screen.getByRole('status')).toHaveTextContent(
+            'Could not save the change. The chat was left as it was.'
+        );
+
+        await act(async () => { vi.advanceTimersByTime(5000); });
+
+        expect(screen.queryByRole('status')).not.toBeInTheDocument();
+    });
 });
 
 describe('renaming a chat', () => {
@@ -1110,5 +1150,31 @@ describe('editing a sent message while signed out', () => {
         });
         await screen.findByText('a fresh local answer');
         expect(storedMessages()).toEqual(['a local question edited', 'a fresh local answer']);
+    });
+});
+
+describe('notices from Account', () => {
+    it('shows a failed login above the prompt', async () => {
+        api.checkSession.mockResolvedValue({ authenticated: false });
+        api.loginOrRegister.mockRejectedValue(new Error('Invalid credentials'));
+        localStorage.setItem('chatList', JSON.stringify([{
+            id: 'offline-chat',
+            title: 'Offline chat',
+            draft: '',
+            model: 'gemini-3.5-flash',
+            messages: [message('user', 'a local question', 1)],
+        }]));
+        localStorage.setItem('activeChatId', 'offline-chat');
+
+        render(<App />);
+        await screen.findByText('a local question');
+
+        await userEvent.click(screen.getByTitle('Account'));
+        await userEvent.type(screen.getByPlaceholderText('Your email'), 'user@example.com');
+        await userEvent.type(screen.getByPlaceholderText('Password'), 'wrong-password');
+        await userEvent.click(screen.getByRole('button', { name: 'Sign In' }));
+
+        expect(await screen.findByRole('status')).toHaveTextContent('Error: Invalid credentials');
+        expect(screen.getByPlaceholderText('Write a message...')).toBeInTheDocument();
     });
 });

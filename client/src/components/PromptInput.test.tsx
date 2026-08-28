@@ -44,4 +44,30 @@ describe('PromptInput', () => {
         expect(onStopGeneration).toHaveBeenCalledOnce();
         expect(onSendMessage).not.toHaveBeenCalled();
     });
+
+    it('shows the notice when one is passed and still sends on Enter', async () => {
+        const onSendMessage = vi.fn();
+        render(
+            <PromptInput
+                draft="hello"
+                onDraftChange={() => { }}
+                onSendMessage={onSendMessage}
+                notice="Invalid credentials"
+            />
+        );
+
+        expect(screen.getByRole('status')).toHaveTextContent('Invalid credentials');
+
+        await userEvent.type(screen.getByPlaceholderText('Write a message...'), '{Enter}');
+
+        expect(onSendMessage).toHaveBeenCalledOnce();
+    });
+
+    it('hides the notice when none is passed', () => {
+        render(
+            <PromptInput draft="hello" onDraftChange={() => { }} onSendMessage={() => { }} />
+        );
+
+        expect(screen.queryByRole('status')).not.toBeInTheDocument();
+    });
 });
