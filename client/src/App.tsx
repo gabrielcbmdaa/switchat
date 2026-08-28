@@ -67,6 +67,7 @@ export default function App() {
   // so it takes over the center instead of living in the right panel. It is not
   // persisted: reopening the app always lands on the conversation.
   const [isLegalOpen, setIsLegalOpen] = useState(false);
+  const [notice, setNotice] = useState<string | null>(null);
   // Dos hechos distintos sobre el mismo chat, que antes compartían mapa: hasMoreMap dice
   // si quedan mensajes MÁS ANTIGUOS detrás del cursor, y loadedChatIds si ya le hemos
   // pedido su primera página al servidor. Juntarlos los hacía indistinguibles justo en el
@@ -100,6 +101,7 @@ export default function App() {
   // Los temporizadores de los mensajes temporales, para poder cancelarlos al desmontar:
   // un setTimeout que sobrevive al componente escribiría estado en un árbol que ya no está.
   const temporaryMessageTimersRef = useRef<Set<number>>(new Set());
+  const noticeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const currentChatRef = useRef(currentChat);
   const isAuthenticatedRef = useRef(isAuthenticated);
   // Espejo del estado para los callbacks que resuelven después de un await
@@ -314,7 +316,7 @@ export default function App() {
       const ack = lastAckedRef.current[chat.id] ?? previousFields;
       const restored = applyLiveChatFields(chat.id, ack);
       if (!restored) return;
-      alert(CHAT_NOT_SAVED);
+      showNotice(CHAT_NOT_SAVED);
       // The cancelled timer never uploaded the text. Arm it again on the restored
       // chat so a failed pin or rename does not also drop the draft.
       scheduleDraftSyncToServer(restored);
@@ -394,6 +396,15 @@ export default function App() {
     persistIfOffline(messagesToPersist
       ? updatedChats.map((chat) => (chat.id === chatId ? { ...chat, messages: messagesToPersist } : chat))
       : updatedChats);
+  }
+
+  function showNotice(message: string) {
+    if (noticeTimerRef.current) clearTimeout(noticeTimerRef.current);
+    setNotice(message);
+    noticeTimerRef.current = setTimeout(() => {
+      noticeTimerRef.current = null;
+      setNotice(null);
+    }, TEMPORARY_MESSAGE_MS);
   }
 
   // Retira un mensaje temporal pasados unos segundos. Guarda el mensaje exacto que puso y
@@ -556,6 +567,7 @@ export default function App() {
     return () => {
       timers.forEach((timer) => window.clearTimeout(timer));
       timers.clear();
+      if (noticeTimerRef.current) clearTimeout(noticeTimerRef.current);
     };
   }, []);
 
@@ -978,7 +990,7 @@ export default function App() {
 
       if (err.message === 'SESSION_EXPIRED') {
         resetSessionToDefault();
-        alert("Session expired. Please log in again.");
+        showNotice("Session expired. Please log in again.");
       } else {
         // El error ocupa el sitio del "pensando", pero no es parte de la conversación: se
         // enseña unos segundos y se retira, dejando la pregunta lista para reintentar. Se
@@ -1156,7 +1168,7 @@ export default function App() {
           // Nothing to put back: resetSessionToDefault swaps the whole list for the offline
           // chats, and this one is not among them.
           resetSessionToDefault();
-          alert('Session expired. Please log in again.');
+          showNotice('Session expired. Please log in again.');
         } else {
           console.error('Failed to update the message on the server:', err);
           // Put the bubble back to the wording the server still holds. Only this message, and
@@ -1167,7 +1179,7 @@ export default function App() {
               msg._id === message._id ? { ...msg, parts: [{ text: originalText }] } : msg
             ));
           }
-          alert(EDIT_NOT_SAVED);
+          showNotice(EDIT_NOT_SAVED);
         }
       }
     }
@@ -1201,10 +1213,10 @@ export default function App() {
         const err = error as Error;
         if (err.message === 'SESSION_EXPIRED') {
           resetSessionToDefault();
-          alert('Session expired. Please log in again.');
+          showNotice('Session expired. Please log in again.');
         } else {
           console.error('Failed to update the message on the server:', err);
-          alert(EDIT_NOT_SAVED);
+          showNotice(EDIT_NOT_SAVED);
         }
         // Nothing to undo: the screen still shows the conversation as it was.
         return;
@@ -1408,6 +1420,7 @@ export default function App() {
               isRightSidebarOpen={activeRightPanel !== null}
               onToggleLeftSidebar={toggleLeftPanel}
               onToggleRightSidebar={toggleRightPanel}
+              notice={notice}
             />
           )}
         </main>

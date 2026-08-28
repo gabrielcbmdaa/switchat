@@ -599,7 +599,6 @@ describe('editing a sent message', () => {
     });
 
     it('puts the wording back and warns when the server refuses the edit', async () => {
-        const alerted = vi.spyOn(window, 'alert').mockImplementation(() => { });
         vi.spyOn(console, 'error').mockImplementation(() => { });
         api.updateMessageOnServer.mockRejectedValueOnce(new Error('the server said no'));
 
@@ -615,11 +614,12 @@ describe('editing a sent message', () => {
         // The screen has to end up showing what Mongo still holds, not what the user typed.
         expect(await screen.findByText('A question 2')).toBeInTheDocument();
         expect(screen.queryByText('A question 2 edited')).not.toBeInTheDocument();
-        expect(alerted).toHaveBeenCalledTimes(1);
+        expect(await screen.findByRole('status')).toHaveTextContent(
+            'Could not save the edit. The message was left as it was.'
+        );
     });
 
     it('leaves the later turns alone when the server refuses a save and reply', async () => {
-        const alerted = vi.spyOn(window, 'alert').mockImplementation(() => { });
         vi.spyOn(console, 'error').mockImplementation(() => { });
         api.updateMessageOnServer.mockRejectedValueOnce(new Error('the server said no'));
 
@@ -640,7 +640,9 @@ describe('editing a sent message', () => {
         expect(screen.getByText('A answer 2')).toBeInTheDocument();
         expect(screen.getByText('A question 3')).toBeInTheDocument();
         expect(screen.getByText('A answer 3')).toBeInTheDocument();
-        expect(alerted).toHaveBeenCalledTimes(1);
+        expect(await screen.findByRole('status')).toHaveTextContent(
+            'Could not save the edit. The message was left as it was.'
+        );
     });
 });
 
@@ -670,7 +672,6 @@ describe('pinning a chat', () => {
     });
 
     it('puts the pin back and warns when the server refuses the save', async () => {
-        const alerted = vi.spyOn(window, 'alert').mockImplementation(() => { });
         const save = deferred<boolean>();
         api.saveChatToServer.mockReturnValueOnce(save.promise);
 
@@ -685,11 +686,12 @@ describe('pinning a chat', () => {
         });
 
         expect(screen.queryByLabelText('Unpin chat')).not.toBeInTheDocument();
-        expect(alerted).toHaveBeenCalledTimes(1);
+        expect(await screen.findByRole('status')).toHaveTextContent(
+            'Could not save the change. The chat was left as it was.'
+        );
     });
 
     it('keeps a draft typed before the pin when the save fails', async () => {
-        const alerted = vi.spyOn(window, 'alert').mockImplementation(() => { });
         const save = deferred<boolean>();
         api.saveChatToServer.mockReturnValueOnce(save.promise);
 
@@ -706,13 +708,14 @@ describe('pinning a chat', () => {
 
         expect(screen.getByPlaceholderText('Write a message...')).toHaveValue('half a thought');
         expect(screen.queryByLabelText('Unpin chat')).not.toBeInTheDocument();
-        expect(alerted).toHaveBeenCalledTimes(1);
+        expect(await screen.findByRole('status')).toHaveTextContent(
+            'Could not save the change. The chat was left as it was.'
+        );
     });
 
     it('reschedules the draft sync when the pin save fails', async () => {
         vi.useFakeTimers({ shouldAdvanceTime: true });
         const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
-        const alerted = vi.spyOn(window, 'alert').mockImplementation(() => { });
         const save = deferred<boolean>();
         api.saveChatToServer.mockReturnValueOnce(save.promise);
 
@@ -728,7 +731,9 @@ describe('pinning a chat', () => {
 
         expect(screen.getByPlaceholderText('Write a message...')).toHaveValue('half a thought');
         expect(screen.queryByLabelText('Unpin chat')).not.toBeInTheDocument();
-        expect(alerted).toHaveBeenCalledTimes(1);
+        expect(screen.getByRole('status')).toHaveTextContent(
+            'Could not save the change. The chat was left as it was.'
+        );
 
         await act(async () => { vi.advanceTimersByTime(2000); });
 
@@ -740,7 +745,6 @@ describe('pinning a chat', () => {
     });
 
     it('does not leave a pin on screen when pin and unpin both fail', async () => {
-        const alerted = vi.spyOn(window, 'alert').mockImplementation(() => { });
         const pinSave = deferred<boolean>();
         const unpinSave = deferred<boolean>();
         api.saveChatToServer
@@ -764,7 +768,9 @@ describe('pinning a chat', () => {
         });
 
         expect(screen.queryByLabelText('Unpin chat')).not.toBeInTheDocument();
-        expect(alerted).toHaveBeenCalled();
+        expect(await screen.findByRole('status')).toHaveTextContent(
+            'Could not save the change. The chat was left as it was.'
+        );
     });
 
     it('pins without calling the server when signed out', async () => {
@@ -777,8 +783,6 @@ describe('pinning a chat', () => {
             messages: [message('user', 'a local question', 1)],
         }]));
         localStorage.setItem('activeChatId', 'offline-chat');
-        const alerted = vi.spyOn(window, 'alert').mockImplementation(() => { });
-
         render(<App />);
         await screen.findByText('a local question');
 
@@ -786,7 +790,7 @@ describe('pinning a chat', () => {
 
         expect(screen.getByLabelText('Unpin chat')).toBeInTheDocument();
         expect(api.saveChatToServer).not.toHaveBeenCalled();
-        expect(alerted).not.toHaveBeenCalled();
+        expect(screen.queryByRole('status')).not.toBeInTheDocument();
     });
 });
 
@@ -816,7 +820,6 @@ describe('renaming a chat', () => {
     });
 
     it('puts the title back and warns when the server refuses the save', async () => {
-        const alerted = vi.spyOn(window, 'alert').mockImplementation(() => { });
         const save = deferred<boolean>();
         api.saveChatToServer.mockReturnValueOnce(save.promise);
 
@@ -838,7 +841,9 @@ describe('renaming a chat', () => {
 
         expect(screen.getByText('Chat A')).toBeInTheDocument();
         expect(screen.queryByText('Renamed A')).not.toBeInTheDocument();
-        expect(alerted).toHaveBeenCalledTimes(1);
+        expect(await screen.findByRole('status')).toHaveTextContent(
+            'Could not save the change. The chat was left as it was.'
+        );
     });
 
     it('renames without calling the server when signed out', async () => {
@@ -851,8 +856,6 @@ describe('renaming a chat', () => {
             messages: [message('user', 'a local question', 1)],
         }]));
         localStorage.setItem('activeChatId', 'offline-chat');
-        const alerted = vi.spyOn(window, 'alert').mockImplementation(() => { });
-
         render(<App />);
         await screen.findByText('a local question');
 
@@ -864,13 +867,12 @@ describe('renaming a chat', () => {
 
         expect(screen.getByText('Renamed offline')).toBeInTheDocument();
         expect(api.saveChatToServer).not.toHaveBeenCalled();
-        expect(alerted).not.toHaveBeenCalled();
+        expect(screen.queryByRole('status')).not.toBeInTheDocument();
     });
 });
 
 describe('saving chat settings', () => {
     it('puts the model back and warns when the server refuses the save', async () => {
-        const alerted = vi.spyOn(window, 'alert').mockImplementation(() => { });
         const save = deferred<boolean>();
         api.saveChatToServer.mockReturnValueOnce(save.promise);
 
@@ -886,12 +888,13 @@ describe('saving chat settings', () => {
         });
 
         expect(document.querySelector('[class*="modelSelected"]')).toHaveTextContent('gemini-3.5-flash');
-        expect(alerted).toHaveBeenCalledTimes(1);
+        expect(await screen.findByRole('status')).toHaveTextContent(
+            'Could not save the change. The chat was left as it was.'
+        );
     });
 
     it('puts back the dropdown model when the chat had none of its own', async () => {
         localStorage.removeItem('model');
-        const alerted = vi.spyOn(window, 'alert').mockImplementation(() => { });
         const save = deferred<boolean>();
         api.saveChatToServer.mockReturnValueOnce(save.promise);
         api.loadChatsFromServer.mockResolvedValue([
@@ -912,11 +915,12 @@ describe('saving chat settings', () => {
         });
 
         expect(document.querySelector('[class*="modelSelected"]')).toHaveTextContent('gemini-3.5-flash');
-        expect(alerted).toHaveBeenCalledTimes(1);
+        expect(await screen.findByRole('status')).toHaveTextContent(
+            'Could not save the change. The chat was left as it was.'
+        );
     });
 
     it('puts the notes switch back and warns when the server refuses the save', async () => {
-        const alerted = vi.spyOn(window, 'alert').mockImplementation(() => { });
         const save = deferred<boolean>();
         api.saveChatToServer.mockReturnValueOnce(save.promise);
 
@@ -932,11 +936,12 @@ describe('saving chat settings', () => {
         });
 
         expect(notesSwitch).toHaveAttribute('aria-checked', 'false');
-        expect(alerted).toHaveBeenCalledTimes(1);
+        expect(await screen.findByRole('status')).toHaveTextContent(
+            'Could not save the change. The chat was left as it was.'
+        );
     });
 
     it('puts the system prompt switch back and warns when the server refuses the save', async () => {
-        const alerted = vi.spyOn(window, 'alert').mockImplementation(() => { });
         const save = deferred<boolean>();
         api.saveChatToServer.mockReturnValueOnce(save.promise);
 
@@ -952,11 +957,12 @@ describe('saving chat settings', () => {
         });
 
         expect(promptSwitch).toHaveAttribute('aria-checked', 'true');
-        expect(alerted).toHaveBeenCalledTimes(1);
+        expect(await screen.findByRole('status')).toHaveTextContent(
+            'Could not save the change. The chat was left as it was.'
+        );
     });
 
     it('keeps a later reasoning change when the earlier model save fails', async () => {
-        const alerted = vi.spyOn(window, 'alert').mockImplementation(() => { });
         const modelSave = deferred<boolean>();
         const reasoningSave = deferred<boolean>();
         api.saveChatToServer
@@ -983,11 +989,12 @@ describe('saving chat settings', () => {
         });
 
         expect(screen.getByText('high')).toBeInTheDocument();
-        expect(alerted).toHaveBeenCalledTimes(1);
+        expect(await screen.findByRole('status')).toHaveTextContent(
+            'Could not save the change. The chat was left as it was.'
+        );
     });
 
     it('puts the reasoning level back and warns when the server refuses the save', async () => {
-        const alerted = vi.spyOn(window, 'alert').mockImplementation(() => { });
         const save = deferred<boolean>();
         api.saveChatToServer.mockReturnValueOnce(save.promise);
 
@@ -1003,7 +1010,9 @@ describe('saving chat settings', () => {
 
         expect(screen.getByText('medium')).toBeInTheDocument();
         expect(screen.queryByText('high')).not.toBeInTheDocument();
-        expect(alerted).toHaveBeenCalledTimes(1);
+        expect(await screen.findByRole('status')).toHaveTextContent(
+            'Could not save the change. The chat was left as it was.'
+        );
     });
 });
 
