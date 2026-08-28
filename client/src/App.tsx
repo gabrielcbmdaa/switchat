@@ -1371,6 +1371,7 @@ export default function App() {
                   onAuthSuccess={handleAuthSuccess}
                   onLogoutAction={resetSessionToDefault}
                   onOpenTerms={openLegal}
+                  onNotice={showNotice}
                 />
               )}
               {activeLeftPanel === 'chats' && (

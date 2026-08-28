@@ -19,9 +19,10 @@ interface ConfigViewProps {
     onAuthSuccess: () => void;
     onLogoutAction: () => void;
     onOpenTerms: () => void;
+    onNotice: (message: string) => void;
 }
 
-export default function ConfigView({ isAuthenticated, onAuthSuccess, onLogoutAction, onOpenTerms }: ConfigViewProps) {
+export default function ConfigView({ isAuthenticated, onAuthSuccess, onLogoutAction, onOpenTerms, onNotice }: ConfigViewProps) {
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
     const [showTermsConsent, setShowTermsConsent] = useState(false);
@@ -136,7 +137,7 @@ export default function ConfigView({ isAuthenticated, onAuthSuccess, onLogoutAct
             onAuthSuccess();
         } catch (err: unknown) {
             const errorMessage = err instanceof Error ? err.message : String(err);
-            alert("Error: " + errorMessage);
+            onNotice("Error: " + errorMessage);
         }
     };
 
@@ -168,10 +169,10 @@ export default function ConfigView({ isAuthenticated, onAuthSuccess, onLogoutAct
             setCurrentEmail(email);
             setNewEmailValue('');
             setEmailCurrentPassword('');
-            alert('Email updated successfully');
+            onNotice('Email updated successfully');
         } catch (err: unknown) {
             const errorMessage = err instanceof Error ? err.message : String(err);
-            alert('Error: ' + errorMessage);
+            onNotice('Error: ' + errorMessage);
         }
     };
 
@@ -181,10 +182,10 @@ export default function ConfigView({ isAuthenticated, onAuthSuccess, onLogoutAct
             await updatePassword(newPasswordValue, passwordCurrentPassword);
             setNewPasswordValue('');
             setPasswordCurrentPassword('');
-            alert('Password updated successfully');
+            onNotice('Password updated successfully');
         } catch (err: unknown) {
             const errorMessage = err instanceof Error ? err.message : String(err);
-            alert('Error: ' + errorMessage);
+            onNotice('Error: ' + errorMessage);
         }
     };
 
@@ -207,7 +208,7 @@ export default function ConfigView({ isAuthenticated, onAuthSuccess, onLogoutAct
         }
 
         if (!deletePassword) {
-            alert('Please enter your current password');
+            onNotice('Please enter your current password');
             setConfirmingDelete(false);
             return;
         }
@@ -221,7 +222,7 @@ export default function ConfigView({ isAuthenticated, onAuthSuccess, onLogoutAct
             onLogoutAction();
         } catch (err: unknown) {
             const errorMessage = err instanceof Error ? err.message : String(err);
-            alert('Error: ' + errorMessage);
+            onNotice('Error: ' + errorMessage);
             setConfirmingDelete(false);
             setIsDeleting(false);
         }
