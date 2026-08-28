@@ -1351,6 +1351,9 @@ export default function App() {
       {/* 1. Inyectamos los símbolos en el DOM */}
       <SvgIcons />
       <SelectionToolbar onReply={handleReplyWithSelection} onSendToNotes={handleSendToNotes} />
+      {notice ? (
+        <div className="app-notice" role="status" aria-live="polite">{notice}</div>
+      ) : null}
       <div className="app-container" id='app-container'>
         {(activeLeftPanel !== null || activeRightPanel !== null) && (
           <div
@@ -1421,7 +1424,6 @@ export default function App() {
               isRightSidebarOpen={activeRightPanel !== null}
               onToggleLeftSidebar={toggleLeftPanel}
               onToggleRightSidebar={toggleRightPanel}
-              notice={notice}
             />
           )}
         </main>

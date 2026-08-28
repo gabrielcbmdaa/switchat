@@ -28,6 +28,29 @@ body {
   touch-action: manipulation;
 }
 
+/* Above the mobile drawers (z-index 100) and the backdrop (90). Width leaves the
+   30px column-toggle buttons at the sides of the center column clickable. */
+.app-notice {
+  position: fixed;
+  top: 14px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 110;
+  width: calc(100% - 88px);
+  max-width: 720px;
+  box-sizing: border-box;
+  background-color: #191919;
+  border: 1px solid #858585;
+  border-radius: 20px;
+  padding: 10px 16px;
+  color: #858585;
+  font-size: 14px;
+  font-family: 'Space Grotesk', sans-serif;
+  line-height: 1.5;
+  text-align: center;
+  pointer-events: none;
+}
+
 .app-container {
   display: flex;
   width: 100%;
