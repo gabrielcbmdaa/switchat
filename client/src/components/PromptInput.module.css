@@ -1,43 +1,24 @@
-.promptStack {
+.promptInputContainer {
     position: absolute;
     bottom: 0px;
     left: 50%;
     transform: translateX(-50%);
     width: calc(100% - 32px);
     display: flex;
-    flex-direction: column;
-    gap: 8px;
+    align-items: center;
+    background-color: #191919;
+    border: 1px solid #858585;
+    border-radius: 20px;
+    padding: 0px 8px 0px 16px;
 }
 
 /* Centered variant: the composer leaves the dock and flows with the empty view */
-.promptStackCentered {
+.promptInputCentered {
     position: static;
     transform: none;
     width: 100%;
     max-width: 720px;
     margin: 0 auto;
-}
-
-.notice {
-    background-color: #191919;
-    border: 1px solid #858585;
-    border-radius: 20px;
-    padding: 10px 16px;
-    color: #858585;
-    font-size: 14px;
-    font-family: 'Space Grotesk', sans-serif;
-    line-height: 1.5;
-    text-align: center;
-}
-
-.promptInputContainer {
-    display: flex;
-    align-items: center;
-    width: 100%;
-    background-color: #191919;
-    border: 1px solid #858585;
-    border-radius: 20px;
-    padding: 0px 8px 0px 16px;
 }
 
 .promptTextarea {
@@ -89,12 +70,9 @@
 }
 
 @media (max-width: 767px) {
-    .promptStack {
+    .promptInputContainer {
         width: calc(100% - 16px);
         bottom: 0px;
-    }
-
-    .promptInputContainer {
         padding: 0px 6px 0px 12px;
     }
 

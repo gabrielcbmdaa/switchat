@@ -26,7 +26,6 @@ interface MessageViewProps {
     isRightSidebarOpen?: boolean;
     onToggleLeftSidebar?: () => void;
     onToggleRightSidebar?: () => void;
-    notice?: string | null;
 }
 
 export default function MessageView({
@@ -50,7 +49,6 @@ export default function MessageView({
     isRightSidebarOpen = false,
     onToggleLeftSidebar,
     onToggleRightSidebar,
-    notice = null,
 }: MessageViewProps) {
     const [visibleCount, setVisibleCount] = useState(6);
     const [promptHeight, setPromptHeight] = useState(58); // Altura inicial estimada del prompt
@@ -177,7 +175,6 @@ export default function MessageView({
             onStopGeneration={onStopGeneration}
             onHeightChange={handlePromptHeightChange}
             variant={showEmptyState ? 'centered' : 'docked'}
-            notice={notice}
         />
     );
 

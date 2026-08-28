@@ -10,7 +10,6 @@ interface PromptInputProps {
     onHeightChange?: (height: number) => void;
     // 'docked' is pinned to the bottom of the chat; 'centered' flows in the empty view
     variant?: 'docked' | 'centered';
-    notice?: string | null;
 }
 
 export default function PromptInput({
@@ -21,7 +20,6 @@ export default function PromptInput({
     onStopGeneration,
     onHeightChange,
     variant = 'docked',
-    notice = null,
 }: PromptInputProps) {
     const textareaRef = useRef<HTMLTextAreaElement>(null);
     const containerRef = useRef<HTMLDivElement>(null);
@@ -57,7 +55,7 @@ export default function PromptInput({
 
         // Limpieza: dejamos de observar cuando el componente se desmonte
         return () => observer.disconnect();
-    }, [reportHeight, onHeightChange, notice]);
+    }, [reportHeight, onHeightChange]);
 
     // Escuchar el evento global "focusPrompt" disparado al responder a una selección
     useEffect(() => {
@@ -89,34 +87,27 @@ export default function PromptInput({
     return (
         <div
             ref={containerRef}
-            className={`${styles.promptStack} ${variant === 'centered' ? styles.promptStackCentered : ''}`}
+            className={`${styles.promptInputContainer} ${variant === 'centered' ? styles.promptInputCentered : ''}`}
         >
-            {notice ? (
-                <div className={styles.notice} role="status" aria-live="polite">
-                    {notice}
-                </div>
-            ) : null}
-            <div className={styles.promptInputContainer}>
-                <textarea
-                    ref={textareaRef}
-                    value={draft}
-                    onChange={(e) => onDraftChange(e.target.value)}
-                    placeholder="Write a message..."
-                    className={styles.promptTextarea}
-                    onKeyDown={handleKeyDown}
-                    rows={1}
-                />
-                <button
-                    className={styles.sendButton}
-                    onClick={isGenerating ? onStopGeneration : onSendMessage}
-                    title={isGenerating ? 'Stop generating' : 'Send message'}
-                    type="button"
-                >
-                    <svg width="20" height="20">
-                        <use xlinkHref={isGenerating ? '#icon-stop' : '#icon-send'} />
-                    </svg>
-                </button>
-            </div>
+            <textarea
+                ref={textareaRef}
+                value={draft}
+                onChange={(e) => onDraftChange(e.target.value)}
+                placeholder="Write a message..."
+                className={styles.promptTextarea}
+                onKeyDown={handleKeyDown}
+                rows={1}
+            />
+            <button
+                className={styles.sendButton}
+                onClick={isGenerating ? onStopGeneration : onSendMessage}
+                title={isGenerating ? 'Stop generating' : 'Send message'}
+                type="button"
+            >
+                <svg width="20" height="20">
+                    <use xlinkHref={isGenerating ? '#icon-stop' : '#icon-send'} />
+                </svg>
+            </button>
         </div>
     );
 }
