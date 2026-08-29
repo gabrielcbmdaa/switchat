@@ -68,6 +68,9 @@ export default function App() {
   // persisted: reopening the app always lands on the conversation.
   const [isLegalOpen, setIsLegalOpen] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
+  // Bumps on every showNotice so the timer bar remounts even when the sentence
+  // is the same — React would otherwise keep the half-spent CSS animation.
+  const [noticeToken, setNoticeToken] = useState(0);
   // Dos hechos distintos sobre el mismo chat, que antes compartían mapa: hasMoreMap dice
   // si quedan mensajes MÁS ANTIGUOS detrás del cursor, y loadedChatIds si ya le hemos
   // pedido su primera página al servidor. Juntarlos los hacía indistinguibles justo en el
@@ -401,6 +404,7 @@ export default function App() {
   function showNotice(message: string) {
     if (noticeTimerRef.current) clearTimeout(noticeTimerRef.current);
     setNotice(message);
+    setNoticeToken((n) => n + 1);
     noticeTimerRef.current = setTimeout(() => {
       noticeTimerRef.current = null;
       setNotice(null);
@@ -1372,6 +1376,12 @@ export default function App() {
               <use xlinkHref="#icon-x" />
             </svg>
           </button>
+          <div
+            key={noticeToken}
+            className="app-notice-timer"
+            data-notice-token={noticeToken}
+            style={{ animationDuration: `${TEMPORARY_MESSAGE_MS}ms` }}
+          />
         </div>
       ) : null}
       <div className="app-container" id='app-container'>

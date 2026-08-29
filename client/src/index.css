@@ -41,6 +41,7 @@ body {
   width: calc(100% - 88px);
   max-width: 720px;
   box-sizing: border-box;
+  overflow: hidden;
   background-color: #191919;
   border: 1px solid #858585;
   border-radius: 20px;
@@ -77,6 +78,25 @@ body {
 .app-notice-dismiss:hover {
   background-color: #858585;
   color: #191919;
+}
+
+.app-notice-timer {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 3px;
+  background-color: #858585;
+  transform-origin: left center;
+  animation-name: app-notice-timer;
+  animation-timing-function: linear;
+  animation-fill-mode: forwards;
+  pointer-events: none;
+}
+
+@keyframes app-notice-timer {
+  from { transform: scaleX(1); }
+  to { transform: scaleX(0); }
 }
 
 .app-container {
