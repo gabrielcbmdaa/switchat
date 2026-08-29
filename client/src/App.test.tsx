@@ -832,6 +832,68 @@ describe('pinning a chat', () => {
 
         expect(screen.queryByRole('status')).not.toBeInTheDocument();
     });
+
+    it('clears the notice when Dismiss notice is pressed', async () => {
+        vi.useFakeTimers({ shouldAdvanceTime: true });
+        const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+        const save = deferred<boolean>();
+        api.saveChatToServer.mockReturnValueOnce(save.promise);
+
+        render(<App />);
+        await screen.findByText('A question 1');
+
+        await user.click(screen.getAllByLabelText('Pin chat')[0]);
+
+        await act(async () => {
+            save.resolve(false);
+        });
+
+        expect(screen.getByRole('status')).toHaveTextContent(
+            'Could not save the change. The chat was left as it was.'
+        );
+
+        await user.click(screen.getByRole('button', { name: 'Dismiss notice' }));
+
+        expect(screen.queryByRole('status')).not.toBeInTheDocument();
+    });
+
+    it('does not let a dismissed notice timer clear a later one', async () => {
+        vi.useFakeTimers({ shouldAdvanceTime: true });
+        const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+        const first = deferred<boolean>();
+        const second = deferred<boolean>();
+        api.saveChatToServer
+            .mockReturnValueOnce(first.promise)
+            .mockReturnValueOnce(second.promise);
+
+        render(<App />);
+        await screen.findByText('A question 1');
+
+        await user.click(screen.getAllByLabelText('Pin chat')[0]);
+        await act(async () => {
+            first.resolve(false);
+        });
+        expect(screen.getByRole('status')).toBeInTheDocument();
+
+        await act(async () => { vi.advanceTimersByTime(2000); });
+        await user.click(screen.getByRole('button', { name: 'Dismiss notice' }));
+
+        await user.click(screen.getAllByLabelText('Pin chat')[0]);
+        await act(async () => {
+            second.resolve(false);
+        });
+        expect(screen.getByRole('status')).toHaveTextContent(
+            'Could not save the change. The chat was left as it was.'
+        );
+
+        // The first notice's five seconds elapse here. If dismiss left that timer
+        // running, it would take this second notice down with it.
+        await act(async () => { vi.advanceTimersByTime(3000); });
+
+        expect(screen.getByRole('status')).toHaveTextContent(
+            'Could not save the change. The chat was left as it was.'
+        );
+    });
 });
 
 describe('renaming a chat', () => {
