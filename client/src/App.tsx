@@ -407,6 +407,14 @@ export default function App() {
     }, TEMPORARY_MESSAGE_MS);
   }
 
+  // A leftover timer would still fire after a later notice replaced this one, and
+  // would take that new notice down with it.
+  function dismissNotice() {
+    if (noticeTimerRef.current) clearTimeout(noticeTimerRef.current);
+    noticeTimerRef.current = null;
+    setNotice(null);
+  }
+
   // Retira un mensaje temporal pasados unos segundos. Guarda el mensaje exacto que puso y
   // solo lo quita si sigue siendo el último: durante esos segundos el usuario ha podido
   // reintentar, borrar o recibir otra respuesta, y entonces la conversación ya es otra y
@@ -1352,7 +1360,19 @@ export default function App() {
       <SvgIcons />
       <SelectionToolbar onReply={handleReplyWithSelection} onSendToNotes={handleSendToNotes} />
       {notice ? (
-        <div className="app-notice" role="status" aria-live="polite">{notice}</div>
+        <div className="app-notice" role="status" aria-live="polite">
+          <span className="app-notice-text">{notice}</span>
+          <button
+            type="button"
+            className="app-notice-dismiss"
+            aria-label="Dismiss notice"
+            onClick={dismissNotice}
+          >
+            <svg width="14" height="14" aria-hidden="true">
+              <use xlinkHref="#icon-x" />
+            </svg>
+          </button>
+        </div>
       ) : null}
       <div className="app-container" id='app-container'>
         {(activeLeftPanel !== null || activeRightPanel !== null) && (
