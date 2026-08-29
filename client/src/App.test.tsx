@@ -914,6 +914,7 @@ describe('pinning a chat', () => {
 
         const firstToken = document.querySelector('.app-notice-timer')?.getAttribute('data-notice-token');
         expect(firstToken).toBeTruthy();
+        const firstStatus = screen.getByRole('status');
 
         await act(async () => { vi.advanceTimersByTime(2000); });
 
@@ -924,6 +925,7 @@ describe('pinning a chat', () => {
 
         const secondToken = document.querySelector('.app-notice-timer')?.getAttribute('data-notice-token');
         expect(Number(secondToken)).toBeGreaterThan(Number(firstToken));
+        expect(screen.getByRole('status')).not.toBe(firstStatus);
     });
 });
 

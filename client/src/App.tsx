@@ -68,8 +68,8 @@ export default function App() {
   // persisted: reopening the app always lands on the conversation.
   const [isLegalOpen, setIsLegalOpen] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
-  // Bumps on every showNotice so the timer bar remounts even when the sentence
-  // is the same — React would otherwise keep the half-spent CSS animation.
+  // Bumps on every showNotice so the pill remounts even when the sentence is
+  // the same: the timer bar starts over, and the live region speaks again.
   const [noticeToken, setNoticeToken] = useState(0);
   // Dos hechos distintos sobre el mismo chat, que antes compartían mapa: hasMoreMap dice
   // si quedan mensajes MÁS ANTIGUOS detrás del cursor, y loadedChatIds si ya le hemos
@@ -1364,7 +1364,7 @@ export default function App() {
       <SvgIcons />
       <SelectionToolbar onReply={handleReplyWithSelection} onSendToNotes={handleSendToNotes} />
       {notice ? (
-        <div className="app-notice" role="status" aria-live="polite">
+        <div key={noticeToken} className="app-notice" role="status" aria-live="polite">
           <span className="app-notice-text">{notice}</span>
           <button
             type="button"
@@ -1377,7 +1377,6 @@ export default function App() {
             </svg>
           </button>
           <div
-            key={noticeToken}
             className="app-notice-timer"
             data-notice-token={noticeToken}
             style={{ animationDuration: `${TEMPORARY_MESSAGE_MS}ms` }}
