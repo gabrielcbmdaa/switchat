@@ -80,6 +80,15 @@ body {
   color: #191919;
 }
 
+.app-notice-dismiss:focus-visible {
+  outline: 1px solid #858585;
+  outline-offset: -2px;
+}
+
+.app-notice-dismiss:hover:focus-visible {
+  outline-color: #191919;
+}
+
 .app-notice-timer {
   position: absolute;
   left: 0;
