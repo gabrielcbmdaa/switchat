@@ -926,6 +926,14 @@ describe('pinning a chat', () => {
         const secondToken = document.querySelector('.app-notice-timer')?.getAttribute('data-notice-token');
         expect(Number(secondToken)).toBeGreaterThan(Number(firstToken));
         expect(screen.getByRole('status')).not.toBe(firstStatus);
+
+        // Two seconds of the first five already elapsed. If showNotice did not
+        // clear that timer, the pill would vanish after these three seconds.
+        await act(async () => { vi.advanceTimersByTime(3000); });
+        expect(screen.getByRole('status')).toBeInTheDocument();
+
+        await act(async () => { vi.advanceTimersByTime(2000); });
+        expect(screen.queryByRole('status')).not.toBeInTheDocument();
     });
 });
 
