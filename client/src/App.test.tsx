@@ -894,6 +894,37 @@ describe('pinning a chat', () => {
             'Could not save the change. The chat was left as it was.'
         );
     });
+
+    it('restarts the notice timer bar when the same sentence is shown again', async () => {
+        vi.useFakeTimers({ shouldAdvanceTime: true });
+        const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+        const first = deferred<boolean>();
+        const second = deferred<boolean>();
+        api.saveChatToServer
+            .mockReturnValueOnce(first.promise)
+            .mockReturnValueOnce(second.promise);
+
+        render(<App />);
+        await screen.findByText('A question 1');
+
+        await user.click(screen.getAllByLabelText('Pin chat')[0]);
+        await act(async () => {
+            first.resolve(false);
+        });
+
+        const firstToken = document.querySelector('.app-notice-timer')?.getAttribute('data-notice-token');
+        expect(firstToken).toBeTruthy();
+
+        await act(async () => { vi.advanceTimersByTime(2000); });
+
+        await user.click(screen.getAllByLabelText('Pin chat')[0]);
+        await act(async () => {
+            second.resolve(false);
+        });
+
+        const secondToken = document.querySelector('.app-notice-timer')?.getAttribute('data-notice-token');
+        expect(Number(secondToken)).toBeGreaterThan(Number(firstToken));
+    });
 });
 
 describe('renaming a chat', () => {
