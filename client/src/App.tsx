@@ -3,6 +3,8 @@ import type { Chat, Message } from './types';
 import { loadLocalChats, saveToLocalDisk, getTutorialChat } from './utils/storage';
 import { loadChatsFromServer, fetchChatResponse, saveMessageToServer, updateMessageOnServer, generateChatTitle, saveChatToServer, syncChatDraftToServer, deleteChatFromServer, deleteMessageFromServer, fetchChatMessagesFromServer, checkSession, logoutFromServer } from './services/api';
 import { SvgIcons } from './components/SvgIcons';
+import AppNotice from './components/AppNotice';
+import { useNotice } from './components/useNotice';
 import { initResizer } from './utils/resizer';
 import Toolbar from './components/Toolbar';
 import ChatView from './views/ChatView';
@@ -67,10 +69,7 @@ export default function App() {
   // so it takes over the center instead of living in the right panel. It is not
   // persisted: reopening the app always lands on the conversation.
   const [isLegalOpen, setIsLegalOpen] = useState(false);
-  const [notice, setNotice] = useState<string | null>(null);
-  // Bumps on every showNotice so the pill remounts even when the sentence is
-  // the same: the timer bar starts over, and the live region speaks again.
-  const [noticeToken, setNoticeToken] = useState(0);
+  const { notice, noticeToken, showNotice, dismissNotice } = useNotice();
   // Dos hechos distintos sobre el mismo chat, que antes compartían mapa: hasMoreMap dice
   // si quedan mensajes MÁS ANTIGUOS detrás del cursor, y loadedChatIds si ya le hemos
   // pedido su primera página al servidor. Juntarlos los hacía indistinguibles justo en el
@@ -104,7 +103,6 @@ export default function App() {
   // Los temporizadores de los mensajes temporales, para poder cancelarlos al desmontar:
   // un setTimeout que sobrevive al componente escribiría estado en un árbol que ya no está.
   const temporaryMessageTimersRef = useRef<Set<number>>(new Set());
-  const noticeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const currentChatRef = useRef(currentChat);
   const isAuthenticatedRef = useRef(isAuthenticated);
   // Espejo del estado para los callbacks que resuelven después de un await
@@ -401,24 +399,6 @@ export default function App() {
       : updatedChats);
   }
 
-  function showNotice(message: string) {
-    if (noticeTimerRef.current) clearTimeout(noticeTimerRef.current);
-    setNotice(message);
-    setNoticeToken((n) => n + 1);
-    noticeTimerRef.current = setTimeout(() => {
-      noticeTimerRef.current = null;
-      setNotice(null);
-    }, TEMPORARY_MESSAGE_MS);
-  }
-
-  // A leftover timer would still fire after a later notice replaced this one, and
-  // would take that new notice down with it.
-  function dismissNotice() {
-    if (noticeTimerRef.current) clearTimeout(noticeTimerRef.current);
-    noticeTimerRef.current = null;
-    setNotice(null);
-  }
-
   // Retira un mensaje temporal pasados unos segundos. Guarda el mensaje exacto que puso y
   // solo lo quita si sigue siendo el último: durante esos segundos el usuario ha podido
   // reintentar, borrar o recibir otra respuesta, y entonces la conversación ya es otra y
@@ -579,7 +559,6 @@ export default function App() {
     return () => {
       timers.forEach((timer) => window.clearTimeout(timer));
       timers.clear();
-      if (noticeTimerRef.current) clearTimeout(noticeTimerRef.current);
     };
   }, []);
 
@@ -1363,26 +1342,7 @@ export default function App() {
       {/* 1. Inyectamos los símbolos en el DOM */}
       <SvgIcons />
       <SelectionToolbar onReply={handleReplyWithSelection} onSendToNotes={handleSendToNotes} />
-      {notice ? (
-        <div key={noticeToken} className="app-notice" role="status" aria-live="polite">
-          <span className="app-notice-text">{notice}</span>
-          <button
-            type="button"
-            className="app-notice-dismiss"
-            aria-label="Dismiss notice"
-            onClick={dismissNotice}
-          >
-            <svg width="14" height="14" aria-hidden="true">
-              <use xlinkHref="#icon-x" />
-            </svg>
-          </button>
-          <div
-            className="app-notice-timer"
-            data-notice-token={noticeToken}
-            style={{ animationDuration: `${TEMPORARY_MESSAGE_MS}ms` }}
-          />
-        </div>
-      ) : null}
+      <AppNotice notice={notice} noticeToken={noticeToken} onDismiss={dismissNotice} />
       <div className="app-container" id='app-container'>
         {(activeLeftPanel !== null || activeRightPanel !== null) && (
           <div
