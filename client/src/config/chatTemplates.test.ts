@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { buildChatFromTemplate, type ChatTemplate } from './chatTemplates';
+import { buildChatFromTemplate, getChatTemplate, type ChatTemplate } from './chatTemplates';
 
 // A made-up template on purpose: these tests are about the builder, and asserting on the
 // real registry would make them fail every time somebody rewords the tutorial.
@@ -62,5 +62,23 @@ describe('buildChatFromTemplate', () => {
         buildChatFromTemplate(template, 'gemini-3.5-flash');
 
         expect(template.messages[0].createdAt).toBeUndefined();
+    });
+});
+
+// The builder tests above run on a fixture on purpose. These do look at the real registry,
+// but only at the switches a template has to get right — never at its wording.
+describe('the English tutor template', () => {
+    it('arrives with its notebook switched on and one greeting', () => {
+        const tutor = getChatTemplate('english-tutor');
+
+        expect(tutor).toBeDefined();
+        // Notes default to off, and off tells the model the notebook is private. A template
+        // built around a notebook has to say otherwise out loud.
+        expect(tutor?.notesEnabled).toBe(true);
+        expect(tutor?.notes).toContain('My level');
+        expect(tutor?.systemPromptEnabled).toBe(true);
+        expect(tutor?.systemPrompt).toBeTruthy();
+        // Exactly one: enough that the empty view does not greet you again inside the chat.
+        expect(tutor?.messages).toHaveLength(1);
     });
 });

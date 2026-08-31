@@ -149,3 +149,11 @@ describe('templates in the empty chat view', () => {
         expect(screen.queryByRole('group', { name: 'Start from a template' })).not.toBeInTheDocument();
     });
 });
+
+describe('the English tutor template in the empty chat view', () => {
+    it('sits next to the welcome tutorial', () => {
+        renderEmptyChat(() => { });
+
+        expect(screen.getByRole('button', { name: 'English Tutor' })).toBeInTheDocument();
+    });
+});
