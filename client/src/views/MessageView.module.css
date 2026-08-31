@@ -66,7 +66,8 @@
 }
 
 .emptyStateSubtitle {
-    margin: 6px 0 24px 0;
+    /* The 24px gap down to the composer now belongs to the template row below. */
+    margin: 6px 0 16px 0;
     font-family: 'Space Grotesk', sans-serif;
     font-size: 14px;
     color: #858585;

@@ -3,6 +3,8 @@ import styles from './MessageView.module.css'
 import MessageBubble from '../components/MessageBubble';
 import PromptInput from '../components/PromptInput';
 import DefaultButton from '../components/DefaultButton';
+import TemplatePicker from '../components/TemplatePicker';
+import { CHAT_TEMPLATES } from '../config/chatTemplates';
 import type { Message } from '../types';
 
 interface MessageViewProps {
@@ -26,6 +28,7 @@ interface MessageViewProps {
     isRightSidebarOpen?: boolean;
     onToggleLeftSidebar?: () => void;
     onToggleRightSidebar?: () => void;
+    onUseTemplate?: (templateId: string) => void;
 }
 
 export default function MessageView({
@@ -49,6 +52,7 @@ export default function MessageView({
     isRightSidebarOpen = false,
     onToggleLeftSidebar,
     onToggleRightSidebar,
+    onUseTemplate,
 }: MessageViewProps) {
     const [visibleCount, setVisibleCount] = useState(6);
     const [promptHeight, setPromptHeight] = useState(58); // Altura inicial estimada del prompt
@@ -202,6 +206,7 @@ export default function MessageView({
                 <div className={styles.emptyStateContainer}>
                     <h1 className={styles.emptyStateTitle}>Switchat</h1>
                     <p className={styles.emptyStateSubtitle}>What are you thinking about?</p>
+                    <TemplatePicker templates={CHAT_TEMPLATES} onSelect={onUseTemplate || (() => { })} />
                     {promptInput}
                 </div>
             ) : (

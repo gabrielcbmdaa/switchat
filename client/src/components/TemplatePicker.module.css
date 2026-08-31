@@ -1,0 +1,41 @@
+/* The row of starting points between the greeting and the composer of an empty chat.
+   It carries the gap the subtitle used to own, so the empty view keeps its height. */
+.templatePicker {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 8px;
+    width: 100%;
+    max-width: 720px;
+    margin: 0 auto 24px auto;
+}
+
+.templateButton {
+    font-family: 'Space Grotesk', sans-serif;
+    font-size: 13px;
+    font-weight: 500;
+    line-height: 1;
+    padding: 9px 16px;
+    background-color: transparent;
+    color: #858585;
+    border: 1px solid #858585;
+    border-radius: 20px;
+    cursor: pointer;
+    transition: background-color 0.3s ease, color 0.3s ease, transform 0.15s ease;
+}
+
+.templateButton:hover {
+    background-color: #858585;
+    color: #191919;
+}
+
+.templateButton:active {
+    transform: scale(0.93);
+}
+
+@media (max-width: 767px) {
+    .templateButton {
+        font-size: 12px;
+        padding: 8px 14px;
+    }
+}

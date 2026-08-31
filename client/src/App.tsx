@@ -18,6 +18,7 @@ import SelectionToolbar from './components/SelectionToolbar';
 import { isMobileViewport, fitsBothPanels, loadPanelView, savePanelView, loadPanelOpen, savePanelOpen, loadActiveChatId, saveActiveChatId } from './utils/uiPreferences';
 import { syncApiKeysWithServer } from './utils/apiKeys';
 import { matchPanelShortcut } from './utils/keyboardShortcuts';
+import { getChatTemplate, buildChatFromTemplate } from './config/chatTemplates';
 import type { LeftPanelView, RightPanelView } from './utils/uiPreferences';
 import { isNotesEnabled } from './utils/notesContext';
 import { sortChatList } from './utils/chatOrder';
@@ -36,6 +37,10 @@ const TEMPORARY_MESSAGE_MS = 5000;
 // two showing different text until the next reload.
 const EDIT_NOT_SAVED = 'Could not save the edit. The message was left as it was.';
 const CHAT_NOT_SAVED = 'Could not save the change. The chat was left as it was.';
+
+// A template chat is only worth showing once the server has it: it is born whole, with its
+// messages, and painting one the server rejected would leave a chat that dies on reload.
+const TEMPLATE_NOT_CREATED = 'Could not create the chat. Check your connection and try again.';
 
 function snapshotManagedFields(chat: Chat): Partial<Chat> {
   // The fields this helper owns. Draft and notes text travel on a different timer;
@@ -634,6 +639,38 @@ export default function App() {
     setIsLegalOpen(false); // Same as picking one: the center goes back to the conversation
     startDraftChat();
     showLeftPanel('chats');
+  }
+
+  // Nace ya hecho: a diferencia del borrador, un chat de plantilla trae mensajes desde el
+  // principio, así que se materializa en el momento y no espera al primer envío.
+  async function handleUseTemplate(templateId: string) {
+    const template = getChatTemplate(templateId);
+    if (!template) return;
+
+    flushDraftSyncToServer(syncableChat);
+    setIsLegalOpen(false); // Igual que elegir un chat: el centro vuelve a la conversación
+
+    const chat = buildChatFromTemplate(template, defaultModel);
+
+    if (isAuthenticatedRef.current) {
+      // Los mensajes VIAJAN en esta llamada: syncChat solo los siembra si el chat no tiene
+      // ninguno, así que esta es la única oportunidad de que lleguen al servidor.
+      const saved = await saveChatToServer(chat, { allowCreate: true });
+      if (!saved) {
+        showNotice(TEMPLATE_NOT_CREATED);
+        return;
+      }
+      lastAckedRef.current[chat.id] = snapshotManagedFields(chat);
+    }
+
+    // La lista viva por referencia, no la del render: entre el clic y la respuesta del
+    // servidor el usuario ha podido crear, borrar o recibir respuesta en otro chat.
+    const updatedChats = [...chatListRef.current, chat];
+    chatListRef.current = updatedChats;
+    setChatList(updatedChats);
+    setDraftChat(null);
+    setActiveChatId(chat.id);
+    persistIfOffline(updatedChats);
   }
 
   function handleSelectChat(clickedChatId: string) {
@@ -1413,6 +1450,7 @@ export default function App() {
               isRightSidebarOpen={activeRightPanel !== null}
               onToggleLeftSidebar={toggleLeftPanel}
               onToggleRightSidebar={toggleRightPanel}
+              onUseTemplate={handleUseTemplate}
             />
           )}
         </main>
