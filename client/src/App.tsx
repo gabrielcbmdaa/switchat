@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import type { Chat, Message } from './types';
-import { loadLocalChats, saveToLocalDisk, getTutorialChat } from './utils/storage';
+import { loadLocalChats, saveToLocalDisk } from './utils/storage';
 import { loadChatsFromServer, fetchChatResponse, saveMessageToServer, updateMessageOnServer, generateChatTitle, saveChatToServer, syncChatDraftToServer, deleteChatFromServer, deleteMessageFromServer, fetchChatMessagesFromServer, checkSession, logoutFromServer } from './services/api';
 import { SvgIcons } from './components/SvgIcons';
 import AppNotice from './components/AppNotice';
@@ -419,23 +419,6 @@ export default function App() {
     temporaryMessageTimersRef.current.add(timer);
   }
 
-  async function materializeOnlineWelcomeChat(userId: string): Promise<Chat> {
-    const template = getTutorialChat()[0];
-    // Id estable por usuario: recargas / Strict Mode hacen upsert del mismo chat, no duplicados.
-    const baseTime = Date.now() - template.messages.length * 1000;
-    const welcome: Chat = {
-      ...template,
-      id: `welcome-${userId}`,
-      messages: template.messages.map((msg, index) => ({
-        ...msg,
-        createdAt: new Date(baseTime + index * 1000).toISOString(),
-      })),
-    };
-    // Nace aquí: es uno de los dos únicos sitios que pueden crear un chat en el servidor.
-    await saveChatToServer(welcome, { allowCreate: true });
-    return welcome;
-  }
-
   useEffect(() => {
     if (activeLeftPanel !== null) {
       return initResizer('left');
@@ -469,7 +452,7 @@ export default function App() {
           // solo recarga la página nunca pasa por el login, y se quedaría sin sincronizar.
           syncApiKeysWithServer();
 
-          let serverChats = await loadChatsFromServer();
+          const serverChats = await loadChatsFromServer();
           if (cancelled) return;
 
           if (serverChats && serverChats.length > 0) {
@@ -485,27 +468,11 @@ export default function App() {
             return;
           }
 
-          // Sesión activa pero sin chats: materializar welcome real (id estable por userId).
-          if (!session.userId) {
-            console.error('Active session without userId; cannot materialize the welcome chat.');
-            return;
-          }
-          // Re-check por carrera (Strict Mode / doble mount) antes de crear.
-          serverChats = await loadChatsFromServer();
-          if (cancelled) return;
-          if (serverChats && serverChats.length > 0) {
-            const chats = migrateRetiredModels(serverChats);
-            rememberAckedChats(chats);
-            setChatList(chats);
-            setActiveChatId(sortChatList(serverChats)[0].id);
-            return;
-          }
-
-          const welcome = await materializeOnlineWelcomeChat(session.userId);
-          if (cancelled) return;
-          rememberAckedChats([welcome]);
-          setChatList([welcome]);
-          setActiveChatId(welcome.id);
+          // Sesión activa pero sin chats: la vista de chat nuevo, donde están las plantillas.
+          // Nada se crea solo; el usuario elige por dónde empezar.
+          const draft = createDraftChat();
+          setDraftChat(draft);
+          setActiveChatId(draft.id);
           return;
         }
 
@@ -516,18 +483,13 @@ export default function App() {
 
       if (cancelled) return;
 
-      // Offline: usar chats locales; si vacíos, tutorial + persistir.
-      let initialChats = localChats;
-      let initialActiveId = localActiveId;
-      if (initialChats.length === 0) {
-        initialChats = getTutorialChat();
-        initialActiveId = 'tutorial-welcome';
-        saveToLocalDisk(initialChats);
-      }
+      // Offline: usar los chats locales tal cual. Si no hay ninguno se cae al borrador de
+      // abajo, que es la vista vacía con las plantillas.
+      const initialChats = localChats;
 
       setChatList(migrateRetiredModels(initialChats));
-      if (initialActiveId && initialChats.some((chat) => chat.id === initialActiveId)) {
-        setActiveChatId(initialActiveId);
+      if (localActiveId && initialChats.some((chat) => chat.id === localActiveId)) {
+        setActiveChatId(localActiveId);
       } else {
         // Sin chat activo válido (p. ej. se cerró la app en la vista de chat nuevo)
         const draft = createDraftChat();
@@ -824,16 +786,8 @@ export default function App() {
         setChatList(chats);
         setActiveChatId(sortChatList(serverChats)[0].id);
       } else {
-        // Cuenta nueva: welcome real en servidor (id estable). No pisar chats locales.
-        const session = await checkSession();
-        if (!session.userId) {
-          console.error('Active session without userId; cannot materialize the welcome chat.');
-          return;
-        }
-        const welcome = await materializeOnlineWelcomeChat(session.userId);
-        rememberAckedChats([welcome]);
-        setChatList([welcome]);
-        setActiveChatId(welcome.id);
+        // Cuenta nueva: la vista de chat nuevo con las plantillas. No pisar chats locales.
+        startDraftChat([]);
       }
     } catch (error) {
       console.error("Error loading the chats from the server:", error);
@@ -849,20 +803,21 @@ export default function App() {
     lastAckedRef.current = {};
     saveChainRef.current = {};
 
-    // Restaurar chats offline intactos; solo persistir tutorial si no había ninguno.
-    let localChats = loadLocalChats() || [];
+    // Restaurar los chats offline intactos. Sin ninguno se cae a la vista de chat nuevo,
+    // que es donde están las plantillas.
+    const localChats = loadLocalChats() || [];
     let localActiveId = loadActiveChatId() || '';
-    if (localChats.length === 0) {
-      localChats = getTutorialChat();
-      localActiveId = 'tutorial-welcome';
-      saveToLocalDisk(localChats);
-    } else if (!localChats.some((chat) => chat.id === localActiveId)) {
+    if (localChats.length > 0 && !localChats.some((chat) => chat.id === localActiveId)) {
       localActiveId = sortChatList(localChats)[0].id;
     }
 
     setChatList(migrateRetiredModels(localChats));
-    setActiveChatId(localActiveId);
-    setDraftChat(null);
+    if (localChats.length > 0) {
+      setActiveChatId(localActiveId);
+      setDraftChat(null);
+    } else {
+      startDraftChat(localChats);
+    }
     setHasMoreMap({});
     setLoadedChatIds({});
     showLeftPanel('chats');

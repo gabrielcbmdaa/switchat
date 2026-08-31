@@ -1281,3 +1281,65 @@ describe('notices from Account', () => {
         expect(screen.getByPlaceholderText('Write a message...')).toBeInTheDocument();
     });
 });
+
+describe('starting a chat from a template', () => {
+    const WELCOME_PILL = '🚀 Welcome & Tutorial';
+
+    it('leaves a first-time visitor with an empty view instead of a chat nobody asked for', async () => {
+        api.checkSession.mockResolvedValue({ authenticated: false });
+
+        render(<App />);
+        // Let initializeApp run to its end: writing the tutorial to the disk used to happen
+        // right here, so asserting before this flush would pass for the wrong reason. And
+        // the assertions below re-query on purpose — activeChatId changes when it settles,
+        // and MessageView is keyed by it, so any node held from the first paint is detached.
+        await act(async () => { });
+
+        expect(screen.getByText('What are you thinking about?')).toBeInTheDocument();
+        expect(screen.getByRole('button', { name: WELCOME_PILL })).toBeInTheDocument();
+        // Nothing was written, so no chat was born on its own. The pill is the only way in.
+        expect(localStorage.getItem('chatList')).toBeNull();
+    });
+
+    it('writes the whole template to the disk with no account', async () => {
+        api.checkSession.mockResolvedValue({ authenticated: false });
+        render(<App />);
+        await screen.findByText('What are you thinking about?');
+
+        await userEvent.click(screen.getByRole('button', { name: WELCOME_PILL }));
+
+        const stored = JSON.parse(localStorage.getItem('chatList') ?? '[]');
+        expect(stored).toHaveLength(1);
+        expect(stored[0].title).toBe(WELCOME_PILL);
+        expect(stored[0].messages).toHaveLength(5);
+        expect(api.saveChatToServer).not.toHaveBeenCalled();
+    });
+
+    it('sends the messages along when the chat is created on the server', async () => {
+        api.loadChatsFromServer.mockResolvedValue([]);
+        render(<App />);
+        await screen.findByText('What are you thinking about?');
+
+        await userEvent.click(screen.getByRole('button', { name: WELCOME_PILL }));
+
+        const [chat, options] = api.saveChatToServer.mock.calls.at(-1) ?? [];
+        // syncChat only seeds messages on a chat that has none: this call is the one chance.
+        expect(options).toEqual({ allowCreate: true });
+        expect(chat.messages).toHaveLength(5);
+        // Online the chat list belongs to Mongo, never to the disk of this browser.
+        expect(localStorage.getItem('chatList')).toBeNull();
+    });
+
+    it('creates nothing and says so when the server refuses the chat', async () => {
+        api.loadChatsFromServer.mockResolvedValue([]);
+        api.saveChatToServer.mockResolvedValue(false);
+        render(<App />);
+        await screen.findByText('What are you thinking about?');
+
+        await userEvent.click(screen.getByRole('button', { name: WELCOME_PILL }));
+
+        expect(await screen.findByRole('status')).toHaveTextContent('Could not create the chat.');
+        // Still on the empty view: a chat the server rejected would vanish on the next reload.
+        expect(screen.getByText('What are you thinking about?')).toBeInTheDocument();
+    });
+});

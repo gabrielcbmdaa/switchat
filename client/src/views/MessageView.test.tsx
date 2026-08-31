@@ -104,3 +104,48 @@ describe('the editor follows the message, not the seat', () => {
         expect(onSaveMessage).toHaveBeenCalledWith(2, 'pregunta corregida');
     });
 });
+
+// An empty chat: the greeting, the template row and the centered composer. Signed out on
+// purpose, so nothing waits on a server round trip to decide the view is really empty.
+function renderEmptyChat(onUseTemplate: (templateId: string) => void) {
+    return render(
+        <MessageView
+            messages={[]}
+            chatId="chat-nuevo"
+            isNewChat
+            hasMoreMap={{}}
+            loadedChatIds={{}}
+            onLoadMore={() => { }}
+            onDeleteMessage={() => { }}
+            onRetryMessage={() => { }}
+            token={null}
+            draft=""
+            onDraftChange={() => { }}
+            onSendMessage={() => { }}
+            onUseTemplate={onUseTemplate}
+        />
+    );
+}
+
+describe('templates in the empty chat view', () => {
+    it('offers the welcome tutorial as a starting point', () => {
+        renderEmptyChat(() => { });
+
+        expect(screen.getByRole('button', { name: '🚀 Welcome & Tutorial' })).toBeInTheDocument();
+    });
+
+    it('reports the template that was picked', async () => {
+        const onUseTemplate = vi.fn();
+        renderEmptyChat(onUseTemplate);
+
+        await userEvent.click(screen.getByRole('button', { name: '🚀 Welcome & Tutorial' }));
+
+        expect(onUseTemplate).toHaveBeenCalledWith('welcome');
+    });
+
+    it('keeps them out of a chat that already has messages', () => {
+        renderMessageView(() => { });
+
+        expect(screen.queryByRole('group', { name: 'Start from a template' })).not.toBeInTheDocument();
+    });
+});
