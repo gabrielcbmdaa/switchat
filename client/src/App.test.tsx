@@ -3,6 +3,7 @@ import userEvent from '@testing-library/user-event';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import type { Message } from './types';
 import App from './App';
+import { getChatTemplate } from './config/chatTemplates';
 
 // The whole server boundary lives in services/api, so mocking that one module is enough to
 // run the app offline of everything: App.tsx imports even fetchChatResponse from here.
@@ -1328,6 +1329,33 @@ describe('starting a chat from a template', () => {
         expect(chat.messages).toHaveLength(5);
         // Online the chat list belongs to Mongo, never to the disk of this browser.
         expect(localStorage.getItem('chatList')).toBeNull();
+    });
+
+    it('takes the message ids back from the server, so deleting one reaches it', async () => {
+        // The greeting is built in the browser but seeded into Mongo by syncChat, so its
+        // _id is born on the server and nowhere else. Keeping the local copy leaves the
+        // chat holding messages with no _id, and handleDeleteMessage skips the server call
+        // for those: the message goes off the screen and comes straight back on the next
+        // read. Same wording on purpose — the id is the only thing that differs.
+        const greeting = getChatTemplate('english-tutor')!.messages[0];
+        api.loadChatsFromServer.mockResolvedValue([]);
+        api.fetchChatMessagesFromServer.mockResolvedValue([{
+            ...greeting,
+            _id: 'seeded-greeting',
+            createdAt: new Date(Date.UTC(2026, 0, 1, 12, 0)).toISOString(),
+        }]);
+        render(<App />);
+        await screen.findByText('What are you thinking about?');
+
+        await userEvent.click(screen.getByRole('button', { name: 'English Tutor' }));
+
+        // The tutor arrives with exactly one message, so there is exactly one of these.
+        await userEvent.click(await screen.findByTitle('Delete message'));
+
+        expect(api.deleteMessageFromServer).toHaveBeenCalledWith(
+            expect.stringMatching(/^chat-/),
+            'seeded-greeting',
+        );
     });
 
     it('creates nothing and says so when the server refuses the chat', async () => {

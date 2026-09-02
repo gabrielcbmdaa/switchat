@@ -612,7 +612,7 @@ export default function App() {
     flushDraftSyncToServer(syncableChat);
     setIsLegalOpen(false); // Igual que elegir un chat: el centro vuelve a la conversación
 
-    const chat = buildChatFromTemplate(template, defaultModel);
+    let chat = buildChatFromTemplate(template, defaultModel);
 
     if (isAuthenticatedRef.current) {
       // Los mensajes VIAJAN en esta llamada: syncChat solo los siembra si el chat no tiene
@@ -623,6 +623,20 @@ export default function App() {
         return;
       }
       lastAckedRef.current[chat.id] = snapshotManagedFields(chat);
+
+      // And read them straight back, because the copies built here have no _id: Mongo hands
+      // one out as syncChat seeds them, and every later edit and delete travels on it.
+      // Keeping the local copies leaves a chat whose messages cannot be deleted — the call
+      // to the server is skipped for a message with no id, so it returns on the next read.
+      // A failed read is not worth losing the chat over: the local copies say the same
+      // thing, and opening the chat after a reload fills the ids in.
+      const seeded = await fetchChatMessagesFromServer(chat.id, 6);
+      if (seeded) {
+        chat = { ...chat, messages: seeded };
+        setLoadedChatIds((prev) => ({ ...prev, [chat.id]: true }));
+        // Short page: the server has nothing older than what it just sent.
+        if (seeded.length < 6) setHasMoreMap((prev) => ({ ...prev, [chat.id]: false }));
+      }
     }
 
     // La lista viva por referencia, no la del render: entre el clic y la respuesta del
