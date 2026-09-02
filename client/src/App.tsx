@@ -786,8 +786,15 @@ export default function App() {
         setChatList(chats);
         setActiveChatId(sortChatList(serverChats)[0].id);
       } else {
-        // Cuenta nueva: la vista de chat nuevo con las plantillas. No pisar chats locales.
-        startDraftChat([]);
+        // A new account: the new-chat view, where the templates live. Built by hand instead
+        // of through startDraftChat, which also writes the chat list to the disk — and the
+        // list this branch would hand it is empty, while the disk holds the chats of the
+        // signed-out mode. That write only ever looked harmless because persistIfOffline
+        // reads a ref an effect sets one render later: win that race and the offline chats
+        // are gone, because signing out reads the emptied list straight back.
+        const draft = createDraftChat();
+        setDraftChat(draft);
+        setActiveChatId(draft.id);
       }
     } catch (error) {
       console.error("Error loading the chats from the server:", error);

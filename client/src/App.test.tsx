@@ -1343,3 +1343,33 @@ describe('starting a chat from a template', () => {
         expect(screen.getByText('What are you thinking about?')).toBeInTheDocument();
     });
 });
+
+describe('signing in from a browser that already has offline chats', () => {
+    it('leaves those chats on the disk when the account has none of its own', async () => {
+        // The account is empty, so the app lands on the new-chat view with the templates.
+        // The chats of this browser are a different story: they belong to the signed-out
+        // mode, nobody asked to throw them away, and once the disk is empty they are gone
+        // for good — signing out reads that same empty list back.
+        api.checkSession.mockResolvedValue({ authenticated: false });
+        api.loginOrRegister.mockResolvedValue({});
+        api.loadChatsFromServer.mockResolvedValue([]);
+        localStorage.setItem('chatList', JSON.stringify([{
+            id: 'offline-chat',
+            title: 'Offline chat',
+            draft: '',
+            model: 'gemini-3.5-flash',
+            messages: [message('user', 'a local question', 1)],
+        }]));
+        localStorage.setItem('activeChatId', 'offline-chat');
+
+        render(<App />);
+        await screen.findByText('a local question');
+
+        await userEvent.click(screen.getByTitle('Account'));
+        await userEvent.type(screen.getByPlaceholderText('Your email'), 'user@example.com');
+        await userEvent.type(screen.getByPlaceholderText('Password'), 'a-password');
+        await userEvent.click(screen.getByRole('button', { name: 'Sign In' }));
+
+        expect(JSON.parse(localStorage.getItem('chatList') ?? '[]')).toHaveLength(1);
+    });
+});
