@@ -316,7 +316,7 @@ export default function App() {
       const intended = applyLiveChatFields(chat.id, expectedFields);
       if (!intended) return;
 
-      const ok = await saveChatToServer({ ...intended, messages: [] });
+      const ok = await saveChatToServer({ ...intended, messages: [] }) === 'saved';
       if (ok) {
         lastAckedRef.current[chat.id] = snapshotManagedFields(intended);
         return;
@@ -628,7 +628,15 @@ export default function App() {
         // Los mensajes VIAJAN en esta llamada: syncChat solo los siembra si el chat no tiene
         // ninguno, así que esta es la única oportunidad de que lleguen al servidor.
         const saved = await saveChatToServer(chat, { allowCreate: true });
-        if (!saved) {
+        if (saved === 'session-expired') {
+          // Nothing to put back: the chat never reached the server, and resetSessionToDefault
+          // swaps the whole list for the offline chats anyway. Saying "check your connection"
+          // here sent people to look at their wifi while the fix was to log in again.
+          resetSessionToDefault();
+          showNotice('Session expired. Please log in again.');
+          return;
+        }
+        if (saved !== 'saved') {
           showNotice(TEMPLATE_NOT_CREATED);
           return;
         }

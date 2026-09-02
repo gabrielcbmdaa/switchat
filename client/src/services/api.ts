@@ -181,6 +181,11 @@ export async function fetchChatMessagesFromServer(chatId: string, limit: number 
   }
 }
 
+// How a chat save ended. An expired session and a dead network used to arrive here as the
+// same plain false, so the screen could only guess — it always blamed the connection, and
+// left the app sitting inside a session that no longer exists.
+export type ChatSaveResult = 'saved' | 'failed' | 'session-expired';
+
 // allowCreate distingue las dos cosas que esta ruta sabe hacer. Crear un chat pasa solo en
 // dos sitios (el de bienvenida y el primer envío); las demás llamadas actualizan uno que ya
 // existe, y pedir que NO puedan crear es lo que impide que una petición lenta que llega
@@ -188,16 +193,18 @@ export async function fetchChatMessagesFromServer(chatId: string, limit: number 
 export async function saveChatToServer(
   updatedChat: Chat,
   { allowCreate = false }: { allowCreate?: boolean } = {}
-): Promise<boolean> {
+): Promise<ChatSaveResult> {
   try {
     const response = await apiFetch('/chats', {
       method: 'POST',
       body: JSON.stringify({ ...updatedChat, allowCreate }),
     });
-    return response.ok;
+    // The cookie is gone or no longer valid. Not a failed save: a failed session.
+    if (response.status === 401) return 'session-expired';
+    return response.ok ? 'saved' : 'failed';
   } catch (error) {
     console.error('❌ Error [saveChatToServer]:', error);
-    return false;
+    return 'failed';
   }
 }
 

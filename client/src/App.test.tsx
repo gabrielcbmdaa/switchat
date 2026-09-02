@@ -4,6 +4,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import type { Message } from './types';
 import App from './App';
 import { getChatTemplate } from './config/chatTemplates';
+import type { ChatSaveResult } from './services/api';
 
 // The whole server boundary lives in services/api, so mocking that one module is enough to
 // run the app offline of everything: App.tsx imports even fetchChatResponse from here.
@@ -80,7 +81,7 @@ beforeEach(() => {
     );
     api.saveMessageToServer.mockResolvedValue('saved-id');
     api.updateMessageOnServer.mockResolvedValue(undefined);
-    api.saveChatToServer.mockResolvedValue(true);
+    api.saveChatToServer.mockResolvedValue('saved');
     api.syncChatDraftToServer.mockResolvedValue(true);
     api.generateChatTitle.mockResolvedValue('');
     api.fetchApiKeysFromServer.mockResolvedValue(null);
@@ -689,7 +690,7 @@ describe('pinning a chat', () => {
     });
 
     it('puts the pin back and warns when the server refuses the save', async () => {
-        const save = deferred<boolean>();
+        const save = deferred<ChatSaveResult>();
         api.saveChatToServer.mockReturnValueOnce(save.promise);
 
         render(<App />);
@@ -699,7 +700,7 @@ describe('pinning a chat', () => {
         expect(screen.getByLabelText('Unpin chat')).toBeInTheDocument();
 
         await act(async () => {
-            save.resolve(false);
+            save.resolve('failed');
         });
 
         expect(screen.queryByLabelText('Unpin chat')).not.toBeInTheDocument();
@@ -709,7 +710,7 @@ describe('pinning a chat', () => {
     });
 
     it('keeps a draft typed before the pin when the save fails', async () => {
-        const save = deferred<boolean>();
+        const save = deferred<ChatSaveResult>();
         api.saveChatToServer.mockReturnValueOnce(save.promise);
 
         render(<App />);
@@ -720,7 +721,7 @@ describe('pinning a chat', () => {
         expect(screen.getByLabelText('Unpin chat')).toBeInTheDocument();
 
         await act(async () => {
-            save.resolve(false);
+            save.resolve('failed');
         });
 
         expect(screen.getByPlaceholderText('Write a message...')).toHaveValue('half a thought');
@@ -733,7 +734,7 @@ describe('pinning a chat', () => {
     it('reschedules the draft sync when the pin save fails', async () => {
         vi.useFakeTimers({ shouldAdvanceTime: true });
         const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
-        const save = deferred<boolean>();
+        const save = deferred<ChatSaveResult>();
         api.saveChatToServer.mockReturnValueOnce(save.promise);
 
         render(<App />);
@@ -743,7 +744,7 @@ describe('pinning a chat', () => {
         await user.click(screen.getAllByLabelText('Pin chat')[0]);
 
         await act(async () => {
-            save.resolve(false);
+            save.resolve('failed');
         });
 
         expect(screen.getByPlaceholderText('Write a message...')).toHaveValue('half a thought');
@@ -762,8 +763,8 @@ describe('pinning a chat', () => {
     });
 
     it('does not leave a pin on screen when pin and unpin both fail', async () => {
-        const pinSave = deferred<boolean>();
-        const unpinSave = deferred<boolean>();
+        const pinSave = deferred<ChatSaveResult>();
+        const unpinSave = deferred<ChatSaveResult>();
         api.saveChatToServer
             .mockReturnValueOnce(pinSave.promise)
             .mockReturnValueOnce(unpinSave.promise);
@@ -778,10 +779,10 @@ describe('pinning a chat', () => {
         expect(screen.queryByLabelText('Unpin chat')).not.toBeInTheDocument();
 
         await act(async () => {
-            pinSave.resolve(false);
+            pinSave.resolve('failed');
         });
         await act(async () => {
-            unpinSave.resolve(false);
+            unpinSave.resolve('failed');
         });
 
         expect(screen.queryByLabelText('Unpin chat')).not.toBeInTheDocument();
@@ -813,7 +814,7 @@ describe('pinning a chat', () => {
     it('clears the notice after five seconds when the server refuses the pin', async () => {
         vi.useFakeTimers({ shouldAdvanceTime: true });
         const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
-        const save = deferred<boolean>();
+        const save = deferred<ChatSaveResult>();
         api.saveChatToServer.mockReturnValueOnce(save.promise);
 
         render(<App />);
@@ -822,7 +823,7 @@ describe('pinning a chat', () => {
         await user.click(screen.getAllByLabelText('Pin chat')[0]);
 
         await act(async () => {
-            save.resolve(false);
+            save.resolve('failed');
         });
 
         expect(screen.getByRole('status')).toHaveTextContent(
@@ -837,7 +838,7 @@ describe('pinning a chat', () => {
     it('clears the notice when Dismiss notice is pressed', async () => {
         vi.useFakeTimers({ shouldAdvanceTime: true });
         const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
-        const save = deferred<boolean>();
+        const save = deferred<ChatSaveResult>();
         api.saveChatToServer.mockReturnValueOnce(save.promise);
 
         render(<App />);
@@ -846,7 +847,7 @@ describe('pinning a chat', () => {
         await user.click(screen.getAllByLabelText('Pin chat')[0]);
 
         await act(async () => {
-            save.resolve(false);
+            save.resolve('failed');
         });
 
         expect(screen.getByRole('status')).toHaveTextContent(
@@ -861,8 +862,8 @@ describe('pinning a chat', () => {
     it('does not let a dismissed notice timer clear a later one', async () => {
         vi.useFakeTimers({ shouldAdvanceTime: true });
         const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
-        const first = deferred<boolean>();
-        const second = deferred<boolean>();
+        const first = deferred<ChatSaveResult>();
+        const second = deferred<ChatSaveResult>();
         api.saveChatToServer
             .mockReturnValueOnce(first.promise)
             .mockReturnValueOnce(second.promise);
@@ -872,7 +873,7 @@ describe('pinning a chat', () => {
 
         await user.click(screen.getAllByLabelText('Pin chat')[0]);
         await act(async () => {
-            first.resolve(false);
+            first.resolve('failed');
         });
         expect(screen.getByRole('status')).toBeInTheDocument();
 
@@ -881,7 +882,7 @@ describe('pinning a chat', () => {
 
         await user.click(screen.getAllByLabelText('Pin chat')[0]);
         await act(async () => {
-            second.resolve(false);
+            second.resolve('failed');
         });
         expect(screen.getByRole('status')).toHaveTextContent(
             'Could not save the change. The chat was left as it was.'
@@ -899,8 +900,8 @@ describe('pinning a chat', () => {
     it('restarts the notice timer bar when the same sentence is shown again', async () => {
         vi.useFakeTimers({ shouldAdvanceTime: true });
         const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
-        const first = deferred<boolean>();
-        const second = deferred<boolean>();
+        const first = deferred<ChatSaveResult>();
+        const second = deferred<ChatSaveResult>();
         api.saveChatToServer
             .mockReturnValueOnce(first.promise)
             .mockReturnValueOnce(second.promise);
@@ -910,7 +911,7 @@ describe('pinning a chat', () => {
 
         await user.click(screen.getAllByLabelText('Pin chat')[0]);
         await act(async () => {
-            first.resolve(false);
+            first.resolve('failed');
         });
 
         const firstToken = document.querySelector('.app-notice-timer')?.getAttribute('data-notice-token');
@@ -921,7 +922,7 @@ describe('pinning a chat', () => {
 
         await user.click(screen.getAllByLabelText('Pin chat')[0]);
         await act(async () => {
-            second.resolve(false);
+            second.resolve('failed');
         });
 
         const secondToken = document.querySelector('.app-notice-timer')?.getAttribute('data-notice-token');
@@ -964,7 +965,7 @@ describe('renaming a chat', () => {
     });
 
     it('puts the title back and warns when the server refuses the save', async () => {
-        const save = deferred<boolean>();
+        const save = deferred<ChatSaveResult>();
         api.saveChatToServer.mockReturnValueOnce(save.promise);
 
         render(<App />);
@@ -980,7 +981,7 @@ describe('renaming a chat', () => {
         expect(screen.getByText('Renamed A')).toBeInTheDocument();
 
         await act(async () => {
-            save.resolve(false);
+            save.resolve('failed');
         });
 
         expect(screen.getByText('Chat A')).toBeInTheDocument();
@@ -1017,7 +1018,7 @@ describe('renaming a chat', () => {
 
 describe('saving chat settings', () => {
     it('puts the model back and warns when the server refuses the save', async () => {
-        const save = deferred<boolean>();
+        const save = deferred<ChatSaveResult>();
         api.saveChatToServer.mockReturnValueOnce(save.promise);
 
         render(<App />);
@@ -1028,7 +1029,7 @@ describe('saving chat settings', () => {
         expect(api.saveChatToServer.mock.calls.at(-1)?.[0].messages).toEqual([]);
 
         await act(async () => {
-            save.resolve(false);
+            save.resolve('failed');
         });
 
         expect(document.querySelector('[class*="modelSelected"]')).toHaveTextContent('gemini-3.5-flash');
@@ -1039,7 +1040,7 @@ describe('saving chat settings', () => {
 
     it('puts back the dropdown model when the chat had none of its own', async () => {
         localStorage.removeItem('model');
-        const save = deferred<boolean>();
+        const save = deferred<ChatSaveResult>();
         api.saveChatToServer.mockReturnValueOnce(save.promise);
         api.loadChatsFromServer.mockResolvedValue([
             { id: 'chat-a', title: 'Chat A', draft: '', messages: [], model: '' },
@@ -1055,7 +1056,7 @@ describe('saving chat settings', () => {
         expect(document.querySelector('[class*="modelSelected"]')).toHaveTextContent('claude-fable-5');
 
         await act(async () => {
-            save.resolve(false);
+            save.resolve('failed');
         });
 
         expect(document.querySelector('[class*="modelSelected"]')).toHaveTextContent('gemini-3.5-flash');
@@ -1065,7 +1066,7 @@ describe('saving chat settings', () => {
     });
 
     it('puts the notes switch back and warns when the server refuses the save', async () => {
-        const save = deferred<boolean>();
+        const save = deferred<ChatSaveResult>();
         api.saveChatToServer.mockReturnValueOnce(save.promise);
 
         render(<App />);
@@ -1076,7 +1077,7 @@ describe('saving chat settings', () => {
         expect(notesSwitch).toHaveAttribute('aria-checked', 'true');
 
         await act(async () => {
-            save.resolve(false);
+            save.resolve('failed');
         });
 
         expect(notesSwitch).toHaveAttribute('aria-checked', 'false');
@@ -1086,7 +1087,7 @@ describe('saving chat settings', () => {
     });
 
     it('puts the system prompt switch back and warns when the server refuses the save', async () => {
-        const save = deferred<boolean>();
+        const save = deferred<ChatSaveResult>();
         api.saveChatToServer.mockReturnValueOnce(save.promise);
 
         render(<App />);
@@ -1097,7 +1098,7 @@ describe('saving chat settings', () => {
         expect(promptSwitch).toHaveAttribute('aria-checked', 'false');
 
         await act(async () => {
-            save.resolve(false);
+            save.resolve('failed');
         });
 
         expect(promptSwitch).toHaveAttribute('aria-checked', 'true');
@@ -1107,8 +1108,8 @@ describe('saving chat settings', () => {
     });
 
     it('keeps a later reasoning change when the earlier model save fails', async () => {
-        const modelSave = deferred<boolean>();
-        const reasoningSave = deferred<boolean>();
+        const modelSave = deferred<ChatSaveResult>();
+        const reasoningSave = deferred<ChatSaveResult>();
         api.saveChatToServer
             .mockReturnValueOnce(modelSave.promise)
             .mockReturnValueOnce(reasoningSave.promise);
@@ -1123,13 +1124,13 @@ describe('saving chat settings', () => {
         expect(screen.getByText('high')).toBeInTheDocument();
 
         await act(async () => {
-            modelSave.resolve(false);
+            modelSave.resolve('failed');
         });
 
         expect(document.querySelector('[class*="modelSelected"]')).toHaveTextContent('gemini-3.5-flash');
 
         await act(async () => {
-            reasoningSave.resolve(true);
+            reasoningSave.resolve('saved');
         });
 
         expect(screen.getByText('high')).toBeInTheDocument();
@@ -1139,7 +1140,7 @@ describe('saving chat settings', () => {
     });
 
     it('puts the reasoning level back and warns when the server refuses the save', async () => {
-        const save = deferred<boolean>();
+        const save = deferred<ChatSaveResult>();
         api.saveChatToServer.mockReturnValueOnce(save.promise);
 
         render(<App />);
@@ -1149,7 +1150,7 @@ describe('saving chat settings', () => {
         expect(screen.getByText('high')).toBeInTheDocument();
 
         await act(async () => {
-            save.resolve(false);
+            save.resolve('failed');
         });
 
         expect(screen.getByText('medium')).toBeInTheDocument();
@@ -1363,7 +1364,7 @@ describe('starting a chat from a template', () => {
         // double click lands entirely inside that window. Every build gets an id of its
         // own, which is what a template used twice needs — and what stops the second click
         // from landing on top of the first: two identical conversations instead of one.
-        const saved = deferred<boolean>();
+        const saved = deferred<ChatSaveResult>();
         api.loadChatsFromServer.mockResolvedValue([]);
         api.saveChatToServer.mockReturnValue(saved.promise);
         render(<App />);
@@ -1376,12 +1377,28 @@ describe('starting a chat from a template', () => {
         expect(api.saveChatToServer).toHaveBeenCalledTimes(1);
 
         // Let the first one finish, so the test does not end on a promise nobody settled.
-        await act(async () => { saved.resolve(true); });
+        await act(async () => { saved.resolve('saved'); });
+    });
+
+    it('says the session expired, and does not blame the connection for it', async () => {
+        // A 401 and a dead network both left saveChatToServer answering the same thing, so
+        // the pill blamed the connection either way and the app stayed in a session that no
+        // longer exists: every later click failed the same way, with the same wrong reason.
+        api.loadChatsFromServer.mockResolvedValue([]);
+        api.saveChatToServer.mockResolvedValue('session-expired');
+        render(<App />);
+        await screen.findByText('What are you thinking about?');
+
+        await userEvent.click(screen.getByRole('button', { name: 'English Tutor' }));
+
+        expect(await screen.findByRole('status')).toHaveTextContent('Session expired');
+        // And back to the signed-out mode, the way every other expiry in the app ends.
+        expect(api.logoutFromServer).toHaveBeenCalled();
     });
 
     it('creates nothing and says so when the server refuses the chat', async () => {
         api.loadChatsFromServer.mockResolvedValue([]);
-        api.saveChatToServer.mockResolvedValue(false);
+        api.saveChatToServer.mockResolvedValue('failed');
         render(<App />);
         await screen.findByText('What are you thinking about?');
 
