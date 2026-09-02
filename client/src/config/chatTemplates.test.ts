@@ -86,7 +86,7 @@ describe('buildChatFromTemplate', () => {
 // The builder tests above run on a fixture on purpose. These do look at the real registry,
 // but only at the switches a template has to get right — never at its wording.
 describe('the English tutor template', () => {
-    it('arrives with its notebook switched on and one greeting', () => {
+    it('arrives with its notebook switched on and a greeting of its own', () => {
         const tutor = getChatTemplate('english-tutor');
 
         expect(tutor).toBeDefined();
@@ -96,7 +96,30 @@ describe('the English tutor template', () => {
         expect(tutor?.notes).toContain('My level');
         expect(tutor?.systemPromptEnabled).toBe(true);
         expect(tutor?.systemPrompt).toBeTruthy();
-        // Exactly one: enough that the empty view does not greet you again inside the chat.
-        expect(tutor?.messages).toHaveLength(1);
+        // Two: the example of a correction, and the one that asks the first real question.
+        expect(tutor?.messages).toHaveLength(2);
+    });
+
+    it('ships a notebook with nothing in it that reads like an answer', () => {
+        const tutor = getChatTemplate('english-tutor');
+
+        // The notebook travels to the model inside <user_notes> from the very first message,
+        // and the system prompt tells it to match the level it finds there. An example left
+        // in the page — "(A1 / A2 / B1 / B2 / C1 — fill this in)" — is read as that level.
+        // Headings and empty bullets say what each section is for without answering it.
+        const answered = (tutor?.notes ?? '')
+            .split('\n')
+            .filter((line) => line.trim() && !line.startsWith('#') && line.trim() !== '-');
+
+        expect(answered).toEqual([]);
+    });
+
+    it('speaks only for itself, never for the person reading', () => {
+        const tutor = getChatTemplate('english-tutor');
+
+        // A role: 'user' message here would be words put in the mouth of somebody who never
+        // wrote them — stored as theirs, and read by the model as the level to aim at. The
+        // sample correction is shown INSIDE the tutor's own message for exactly that reason.
+        expect(tutor?.messages.every((message) => message.role === 'model')).toBe(true);
     });
 });

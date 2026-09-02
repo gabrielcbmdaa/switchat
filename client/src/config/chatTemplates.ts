@@ -46,13 +46,24 @@ export const CHAT_TEMPLATES: ChatTemplate[] = [
         // Notes default to off, and off tells the model the notebook is private to this
         // machine. This template is built around the notebook, so it has to say otherwise.
         notesEnabled: true,
-        notes: "## My level\n(A1 / A2 / B1 / B2 / C1 — fill this in)\n\n## What I want to practise\n(conversation, writing, job interviews...)\n\n## Mistakes I keep making\n- \n\n## Words I want to remember\n- \n",
+        // Headings only. Anything written under them is read as the reader's own answer:
+        // the notebook reaches the model inside <user_notes> from the first message, and
+        // an example level sitting there is the level it aims at.
+        notes: "## My level\n\n## What I want to practise\n\n## Mistakes I keep making\n- \n\n## Words I want to remember\n- \n",
         systemPromptEnabled: true,
         systemPrompt: "You are my English tutor. I speak Spanish and I am learning English.\n\n- Reply in English. Use Spanish only to unblock me when I am truly stuck, and keep it to one line.\n- Correct my mistakes: quote what I wrote, give the natural version, and add one short line saying why.\n- Correct at most three things per message, the ones that matter most. Let the small ones go.\n- Always end with a question, so the conversation keeps moving.\n- Read my notebook before answering: it holds my level, what I want to practise and the mistakes I repeat. Match that level. If the notebook is empty, start around A2 and adjust from what I write.\n- When I make the same mistake twice, tell me to write it down in my notebook.",
+        // Shown, not described: the sample correction lives inside the tutor's own message
+        // instead of being staged as a conversation that already happened. A role: 'user'
+        // message would store words the reader never wrote, and reach the model as the level
+        // to aim at — the same mistake the notebook placeholders make, several turns wide.
         messages: [
             {
                 role: "model",
-                parts: [{ text: "Hi! I'm your English tutor. Write to me in English — mistakes and all — and I will correct you and keep the conversation going.\n\nTwo things before we start:\n\n1. Open **Notes** on the right and fill in your level and what you want to practise. I read that notebook before every reply, so the more it says, the better I can aim.\n2. When I correct the same mistake twice, add it under **Mistakes I keep making**. That is what turns this into progress over weeks instead of a nice chat.\n\nSo — tell me about your day. What did you do today?" }]
+                parts: [{ text: "Hi! I'm your English tutor. Write to me in English — mistakes and all — and I will correct you and keep the conversation going.\n\nHere is what that looks like. You write:\n\n*Yesterday I go to the park with my brother.*\n\nAnd I answer:\n\n❌ Yesterday I **go** → ✅ Yesterday I **went**\n*Yesterday* asks for a past tense, and *go* is irregular.\n\nSounds fun! Who is older, you or your brother?\n\nThree corrections per message at most — the ones that matter — and always a question at the end, so the conversation never stops." }]
+            },
+            {
+                role: "model",
+                parts: [{ text: "One thing before we start: open **Notes** on the right and write down your level and what you want to practise. I read that notebook before every reply, so the more it says, the better I can aim. And when I correct the same mistake twice, add it under **Mistakes I keep making** — that is what turns this into progress over weeks instead of a nice chat.\n\nSo, tell me about your day. What did you do today?" }]
             }
         ],
     },
