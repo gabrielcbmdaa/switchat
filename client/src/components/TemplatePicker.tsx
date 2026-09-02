@@ -22,7 +22,7 @@ export default function TemplatePicker({ templates, onSelect }: TemplatePickerPr
                     className={styles.templateButton}
                     onClick={() => onSelect(template.id)}
                 >
-                    {template.label}
+                    {template.label ?? template.title}
                 </button>
             ))}
         </div>

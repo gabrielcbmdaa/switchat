@@ -2,7 +2,9 @@ import type { Chat, Message } from '../types';
 
 export interface ChatTemplate {
     id: string;
-    label: string;
+    // Only for a template whose pill needs to read shorter than its chat title. Left out,
+    // the pill takes the title — one name instead of two copies that can drift apart.
+    label?: string;
     title: string;
     systemPrompt?: string;
     systemPromptEnabled?: boolean;
@@ -14,7 +16,6 @@ export interface ChatTemplate {
 export const CHAT_TEMPLATES: ChatTemplate[] = [
     {
         id: 'welcome',
-        label: '🚀 Welcome & Tutorial',
         title: '🚀 Welcome & Tutorial',
         messages: [
             {
@@ -41,7 +42,6 @@ export const CHAT_TEMPLATES: ChatTemplate[] = [
     },
     {
         id: 'english-tutor',
-        label: 'English Tutor',
         title: 'English Tutor',
         // Notes default to off, and off tells the model the notebook is private to this
         // machine. This template is built around the notebook, so it has to say otherwise.
