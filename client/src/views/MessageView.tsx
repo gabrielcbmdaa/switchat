@@ -206,7 +206,10 @@ export default function MessageView({
                 <div className={styles.emptyStateContainer}>
                     <h1 className={styles.emptyStateTitle}>Switchat</h1>
                     <p className={styles.emptyStateSubtitle}>What are you thinking about?</p>
-                    <TemplatePicker templates={CHAT_TEMPLATES} onSelect={onUseTemplate || (() => { })} />
+                    {/* Only the new-chat view offers a starting point. A conversation that
+                        exists and merely has no messages left is still that conversation:
+                        a template started from inside it would build a second one. */}
+                    {isNewChat && <TemplatePicker templates={CHAT_TEMPLATES} onSelect={onUseTemplate || (() => { })} />}
                     {promptInput}
                 </div>
             ) : (

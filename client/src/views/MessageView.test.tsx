@@ -107,12 +107,12 @@ describe('the editor follows the message, not the seat', () => {
 
 // An empty chat: the greeting, the template row and the centered composer. Signed out on
 // purpose, so nothing waits on a server round trip to decide the view is really empty.
-function renderEmptyChat(onUseTemplate: (templateId: string) => void) {
+function renderEmptyChat(onUseTemplate: (templateId: string) => void, isNewChat = true) {
     return render(
         <MessageView
             messages={[]}
             chatId="chat-nuevo"
-            isNewChat
+            isNewChat={isNewChat}
             hasMoreMap={{}}
             loadedChatIds={{}}
             onLoadMore={() => { }}
@@ -141,6 +141,15 @@ describe('templates in the empty chat view', () => {
         await userEvent.click(screen.getByRole('button', { name: '🚀 Welcome & Tutorial' }));
 
         expect(onUseTemplate).toHaveBeenCalledWith('welcome');
+    });
+
+    it('keeps them out of a conversation that exists but happens to be empty', () => {
+        // Only the new-chat view offers a starting point. A real chat left with no messages
+        // is still that chat: starting a template from inside it builds a SECOND one and
+        // leaves this one sitting in the list with nothing in it.
+        renderEmptyChat(() => { }, false);
+
+        expect(screen.queryByRole('group', { name: 'Start from a template' })).not.toBeInTheDocument();
     });
 
     it('keeps them out of a chat that already has messages', () => {

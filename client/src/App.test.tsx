@@ -1396,6 +1396,34 @@ describe('starting a chat from a template', () => {
         expect(api.logoutFromServer).toHaveBeenCalled();
     });
 
+    it('carries what you had already typed into the chat the pill opens', async () => {
+        // The draft chat it was typed in is dropped on the spot. Dropping half a sentence
+        // with it is the kind of loss nobody notices until it is their sentence.
+        api.loadChatsFromServer.mockResolvedValue([]);
+        render(<App />);
+        await screen.findByText('What are you thinking about?');
+
+        await userEvent.type(screen.getByPlaceholderText('Write a message...'), 'how do i say madrugar');
+        await userEvent.click(screen.getByRole('button', { name: 'English Tutor' }));
+
+        expect(await screen.findByDisplayValue('how do i say madrugar')).toBeInTheDocument();
+    });
+
+    it('brings the left panel back to the chats, the way New Chat does', async () => {
+        // Signed out, so Account shows the login form and there is something to leave.
+        api.checkSession.mockResolvedValue({ authenticated: false });
+        render(<App />);
+        await screen.findByText('What are you thinking about?');
+
+        await userEvent.click(screen.getByTitle('Account'));
+        expect(screen.getByPlaceholderText('Your email')).toBeInTheDocument();
+
+        await userEvent.click(screen.getByRole('button', { name: 'English Tutor' }));
+
+        // A chat was born and nobody is looking at it: the panel stayed on Account.
+        expect(screen.queryByPlaceholderText('Your email')).not.toBeInTheDocument();
+    });
+
     it('creates nothing and says so when the server refuses the chat', async () => {
         api.loadChatsFromServer.mockResolvedValue([]);
         api.saveChatToServer.mockResolvedValue('failed');

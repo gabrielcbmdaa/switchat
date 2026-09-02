@@ -620,7 +620,10 @@ export default function App() {
     flushDraftSyncToServer(syncableChat);
     setIsLegalOpen(false); // Igual que elegir un chat: el centro vuelve a la conversación
 
-    let chat = buildChatFromTemplate(template, defaultModel);
+    // Whatever was already typed follows you in. The draft chat holding it is dropped a few
+    // lines below, and half a written question is not something to drop without a word.
+    const typed = isDraftChat ? currentChat?.draft ?? '' : '';
+    let chat = { ...buildChatFromTemplate(template, defaultModel), draft: typed };
 
     if (isAuthenticatedRef.current) {
       creatingTemplateRef.current = true;
@@ -670,6 +673,9 @@ export default function App() {
     setDraftChat(null);
     setActiveChatId(chat.id);
     persistIfOffline(updatedChats);
+    // Same landing as handleNewChat: a chat was just born and the panel has to be showing
+    // the list it was born into, not whatever view happened to be open when you clicked.
+    showLeftPanel('chats');
   }
 
   function handleSelectChat(clickedChatId: string) {
