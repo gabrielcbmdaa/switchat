@@ -1358,6 +1358,27 @@ describe('starting a chat from a template', () => {
         );
     });
 
+    it('builds one chat when the pill is clicked twice before the server answers', async () => {
+        // The pill answers after a round trip and says nothing meanwhile, so an impatient
+        // double click lands entirely inside that window. Every build gets an id of its
+        // own, which is what a template used twice needs — and what stops the second click
+        // from landing on top of the first: two identical conversations instead of one.
+        const saved = deferred<boolean>();
+        api.loadChatsFromServer.mockResolvedValue([]);
+        api.saveChatToServer.mockReturnValue(saved.promise);
+        render(<App />);
+        await screen.findByText('What are you thinking about?');
+
+        const pill = screen.getByRole('button', { name: 'English Tutor' });
+        await userEvent.click(pill);
+        await userEvent.click(pill);
+
+        expect(api.saveChatToServer).toHaveBeenCalledTimes(1);
+
+        // Let the first one finish, so the test does not end on a promise nobody settled.
+        await act(async () => { saved.resolve(true); });
+    });
+
     it('creates nothing and says so when the server refuses the chat', async () => {
         api.loadChatsFromServer.mockResolvedValue([]);
         api.saveChatToServer.mockResolvedValue(false);

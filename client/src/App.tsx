@@ -100,6 +100,9 @@ export default function App() {
   const abortControllersRef = useRef<Map<string, AbortController>>(new Map());
   // Chats cuya primera página está pedida y todavía no ha vuelto (ver el efecto de carga)
   const pendingFirstPageRef = useRef<Set<string>>(new Set());
+  // Whether a template chat is already on its way to the server. Same reason as the ref
+  // above and not state: it has to be visible in the tick it is set, before any re-render.
+  const creatingTemplateRef = useRef(false);
   const draftSyncTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   // De quién es el borrador que espera a sincronizarse. Sin esto, borrar un chat cualquiera
   // tendría que cancelar el temporizador a ciegas y se llevaría por delante el borrador de
@@ -606,6 +609,11 @@ export default function App() {
   // Nace ya hecho: a diferencia del borrador, un chat de plantilla trae mensajes desde el
   // principio, así que se materializa en el momento y no espera al primer envío.
   async function handleUseTemplate(templateId: string) {
+    // The pill takes a round trip to answer and says nothing meanwhile, so an impatient
+    // double click lands entirely inside that window. Every build carries an id of its own
+    // — which is what lets a template be used twice — so the second click does not land on
+    // top of the first: it leaves a second identical conversation.
+    if (creatingTemplateRef.current) return;
     const template = getChatTemplate(templateId);
     if (!template) return;
 
@@ -615,27 +623,34 @@ export default function App() {
     let chat = buildChatFromTemplate(template, defaultModel);
 
     if (isAuthenticatedRef.current) {
-      // Los mensajes VIAJAN en esta llamada: syncChat solo los siembra si el chat no tiene
-      // ninguno, así que esta es la única oportunidad de que lleguen al servidor.
-      const saved = await saveChatToServer(chat, { allowCreate: true });
-      if (!saved) {
-        showNotice(TEMPLATE_NOT_CREATED);
-        return;
-      }
-      lastAckedRef.current[chat.id] = snapshotManagedFields(chat);
+      creatingTemplateRef.current = true;
+      try {
+        // Los mensajes VIAJAN en esta llamada: syncChat solo los siembra si el chat no tiene
+        // ninguno, así que esta es la única oportunidad de que lleguen al servidor.
+        const saved = await saveChatToServer(chat, { allowCreate: true });
+        if (!saved) {
+          showNotice(TEMPLATE_NOT_CREATED);
+          return;
+        }
+        lastAckedRef.current[chat.id] = snapshotManagedFields(chat);
 
-      // And read them straight back, because the copies built here have no _id: Mongo hands
-      // one out as syncChat seeds them, and every later edit and delete travels on it.
-      // Keeping the local copies leaves a chat whose messages cannot be deleted — the call
-      // to the server is skipped for a message with no id, so it returns on the next read.
-      // A failed read is not worth losing the chat over: the local copies say the same
-      // thing, and opening the chat after a reload fills the ids in.
-      const seeded = await fetchChatMessagesFromServer(chat.id, 6);
-      if (seeded) {
-        chat = { ...chat, messages: seeded };
-        setLoadedChatIds((prev) => ({ ...prev, [chat.id]: true }));
-        // Short page: the server has nothing older than what it just sent.
-        if (seeded.length < 6) setHasMoreMap((prev) => ({ ...prev, [chat.id]: false }));
+        // And read them straight back, because the copies built here have no _id: Mongo hands
+        // one out as syncChat seeds them, and every later edit and delete travels on it.
+        // Keeping the local copies leaves a chat whose messages cannot be deleted — the call
+        // to the server is skipped for a message with no id, so it returns on the next read.
+        // A failed read is not worth losing the chat over: the local copies say the same
+        // thing, and opening the chat after a reload fills the ids in.
+        const seeded = await fetchChatMessagesFromServer(chat.id, 6);
+        if (seeded) {
+          chat = { ...chat, messages: seeded };
+          setLoadedChatIds((prev) => ({ ...prev, [chat.id]: true }));
+          // Short page: the server has nothing older than what it just sent.
+          if (seeded.length < 6) setHasMoreMap((prev) => ({ ...prev, [chat.id]: false }));
+        }
+      } finally {
+        // Released on the way out however it goes: a chat the server refused has to leave
+        // the pill working, or one failed click disables it for the rest of the session.
+        creatingTemplateRef.current = false;
       }
     }
 
