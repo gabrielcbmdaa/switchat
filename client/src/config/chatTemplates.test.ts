@@ -63,6 +63,24 @@ describe('buildChatFromTemplate', () => {
 
         expect(template.messages[0].createdAt).toBeUndefined();
     });
+
+    it('still hands out ids where crypto.randomUUID does not exist', () => {
+        // randomUUID lives only in a secure context: HTTPS or localhost. Open the dev
+        // server from another machine on the LAN, over plain http, and it is not there —
+        // the build died on a TypeError inside an async click handler nobody catches, so
+        // the pill silently did nothing. Shadowed here, deleted again on the way out.
+        Object.defineProperty(globalThis.crypto, 'randomUUID', { value: undefined, configurable: true });
+
+        try {
+            const first = buildChatFromTemplate(template, 'gemini-3.5-flash');
+            const second = buildChatFromTemplate(template, 'gemini-3.5-flash');
+
+            expect(first.id).toMatch(/^chat-.+/);
+            expect(first.id).not.toBe(second.id);
+        } finally {
+            delete (globalThis.crypto as { randomUUID?: unknown }).randomUUID;
+        }
+    });
 });
 
 // The builder tests above run on a fixture on purpose. These do look at the real registry,

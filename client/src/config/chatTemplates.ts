@@ -62,6 +62,15 @@ export function getChatTemplate(templateId: string): ChatTemplate | undefined {
     return CHAT_TEMPLATES.find((template) => template.id === templateId);
 }
 
+// randomUUID only exists in a secure context — HTTPS or localhost. Reach the dev server
+// from another machine on the LAN, over plain http, and it is not there at all: the call
+// used to die on a TypeError inside an async click handler nobody catches, so the pill just
+// did nothing, with no notice and no chat. The fallback is not a real UUID and does not need
+// to be: it only has to tell apart the chats built in one browser.
+function uniqueSuffix(): string {
+    return globalThis.crypto?.randomUUID?.() ?? `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+}
+
 // Turns a template into a brand new chat. The template itself is never modified: it is
 // module-level data shared by every build, so writing dates into it would leak the first
 // chat's timestamps into all the later ones.
@@ -74,7 +83,7 @@ export function buildChatFromTemplate(template: ChatTemplate, model: string): Ch
     return {
         // Not 'chat-' + Date.now() like createDraftChat: a template can be used twice, and
         // two builds inside the same millisecond would share an id that Mongo requires unique.
-        id: `chat-${crypto.randomUUID()}`,
+        id: `chat-${uniqueSuffix()}`,
         title: template.title,
         draft: '',
         createdAt: new Date().toISOString(),
