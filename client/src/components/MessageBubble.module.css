@@ -36,6 +36,27 @@
     margin-bottom: 0;
 }
 
+/* Quoting is one of the things a model does most — repeating your own sentence back before
+   correcting it, lifting a fragment out of a document — and until now a quote had no rule of
+   its own: it read exactly like the paragraph beside it. A 1px rule and the indent it buys,
+   in the same neutral the code blocks and the panels are drawn with. The text keeps its
+   color: the palette has one gray for prose, and a second one invented here would be a
+   third gray nothing else in the app uses. */
+.messageBubble blockquote {
+    margin: 0.5rem 0;
+    padding-left: 12px;
+    border-left: 1px solid #858585;
+    /* The bubble keeps newlines (pre-wrap), and marked leaves one on each side of the
+       paragraph inside a quote. Painted, those two are blank lines: the rule came out twice
+       as tall as the text it marks. Collapsed here, and handed back to the paragraph below
+       so a quote written on two lines still reads on two lines. */
+    white-space: normal;
+}
+
+.messageBubble blockquote p {
+    white-space: pre-wrap;
+}
+
 .messageBubble pre {
     background-color: #191919;
     border: 1px solid #858585;
