@@ -28,8 +28,12 @@ describe('buildChatFromTemplate', () => {
     });
 
     it('dates the messages in order and in the past', () => {
-        const before = Date.now();
         const chat = buildChatFromTemplate(template, 'gemini-3.5-flash');
+        // Read AFTER the build, not before. The last message is stamped a second behind the
+        // clock the builder read, so it can never reach this one — while comparing against a
+        // reading taken beforehand was a race of its own: one slow second between those two
+        // lines and a perfectly correct build went red.
+        const after = Date.now();
 
         const stamps = chat.messages.map((message) => new Date(message.createdAt ?? '').getTime());
 
@@ -38,7 +42,7 @@ describe('buildChatFromTemplate', () => {
         // Sorted by date is how they are read back, so equal stamps would shuffle the reading order.
         expect(stamps[0]).toBeLessThan(stamps[1]);
         expect(stamps[1]).toBeLessThan(stamps[2]);
-        expect(stamps[2]).toBeLessThanOrEqual(before);
+        expect(stamps[2]).toBeLessThanOrEqual(after - 1000);
     });
 
     it('carries the notes and the system prompt onto the chat', () => {
