@@ -1017,6 +1017,26 @@ describe('renaming a chat', () => {
 });
 
 describe('saving chat settings', () => {
+    it('reports an expired session on a field save instead of blaming the save', async () => {
+        // Same 401 the template pill already tells apart. Here it used to arrive as a plain
+        // failure: the field was reverted, the notice blamed the save, and the app stayed
+        // inside a session that no longer exists, so the next click failed the same way.
+        const save = deferred<ChatSaveResult>();
+        api.saveChatToServer.mockReturnValueOnce(save.promise);
+
+        render(<App />);
+        await screen.findByText('A question 1');
+
+        await userEvent.click(screen.getByText('claude-fable-5'));
+
+        await act(async () => {
+            save.resolve('session-expired');
+        });
+
+        expect(await screen.findByRole('status')).toHaveTextContent('Session expired');
+        expect(api.logoutFromServer).toHaveBeenCalled();
+    });
+
     it('puts the model back and warns when the server refuses the save', async () => {
         const save = deferred<ChatSaveResult>();
         api.saveChatToServer.mockReturnValueOnce(save.promise);

@@ -316,9 +316,17 @@ export default function App() {
       const intended = applyLiveChatFields(chat.id, expectedFields);
       if (!intended) return;
 
-      const ok = await saveChatToServer({ ...intended, messages: [] }) === 'saved';
-      if (ok) {
+      const result = await saveChatToServer({ ...intended, messages: [] });
+      if (result === 'saved') {
         lastAckedRef.current[chat.id] = snapshotManagedFields(intended);
+        return;
+      }
+      if (result === 'session-expired') {
+        // Nothing worth restoring: resetSessionToDefault swaps the whole list for the offline
+        // chats and this one is not among them. Reverting a field on a chat that is leaving
+        // the screen only buys a notice blaming a save that was never the problem.
+        resetSessionToDefault();
+        showNotice('Session expired. Please log in again.');
         return;
       }
 
