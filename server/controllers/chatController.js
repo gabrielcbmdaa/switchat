@@ -23,7 +23,7 @@ function isBlankContent(content) {
 exports.createMessage = async (req, res) => {
     try {
         const { chatId } = req.params;
-        const { sender, content, model, reasoningLevel } = req.body;
+        const { sender, content, model, reasoningLevel, stopped } = req.body;
 
         // Guardia de forma. Una pestaña abierta antes del despliegue sigue mandando el body
         // viejo (sin `sender`) y esperando un `text` de vuelta: sin este 400 recibiría un 201,
@@ -54,7 +54,8 @@ exports.createMessage = async (req, res) => {
             sender,
             content,
             ...(model ? { model } : {}),
-            ...(reasoningLevel ? { reasoningLevel } : {})
+            ...(reasoningLevel ? { reasoningLevel } : {}),
+            ...(stopped ? { stopped: true } : {})
         });
         await message.save();
 
@@ -128,7 +129,8 @@ exports.getMessages = async (req, res) => {
             parts: [{ text: msg.content }],
             createdAt: msg.createdAt,
             model: msg.model,
-            reasoningLevel: msg.reasoningLevel
+            reasoningLevel: msg.reasoningLevel,
+            stopped: msg.stopped
         })).reverse();
 
         res.json(formattedMessages);
@@ -190,7 +192,8 @@ exports.syncChat = async (req, res) => {
                             content: text,
                             createdAt,
                             ...(msg.model ? { model: msg.model } : {}),
-                            ...(msg.reasoningLevel ? { reasoningLevel: msg.reasoningLevel } : {})
+                            ...(msg.reasoningLevel ? { reasoningLevel: msg.reasoningLevel } : {}),
+                            ...(msg.stopped ? { stopped: true } : {})
                         };
                     })
                     .filter(Boolean);

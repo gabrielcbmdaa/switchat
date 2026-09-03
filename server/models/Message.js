@@ -24,6 +24,12 @@ const MessageSchema = new mongoose.Schema({
         // the slider, and without a copy here every past answer would relabel itself.
         type: String
     },
+    stopped: {
+        // True only on an answer the user cut with Stop. Absent means the model finished:
+        // every message stored before this field exists without it, and false is never
+        // written, same as model and reasoningLevel above.
+        type: Boolean
+    },
     createdAt: {
         type: Date,
         default: Date.now // Set by the server when the caller does not provide one

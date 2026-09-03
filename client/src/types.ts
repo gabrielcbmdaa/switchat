@@ -13,6 +13,9 @@ export interface Message {
   // el slider después no reescribe lo ya respondido. Ausente en los mensajes anteriores
   // a este campo y en los del usuario, igual que model.
   reasoningLevel?: string;
+  // True only on an answer the user cut with Stop. Absent means the model finished, which
+  // is how every message stored before this field reads; false is never written.
+  stopped?: boolean;
 }
 
 export interface Chat {
