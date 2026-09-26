@@ -1,6 +1,6 @@
 import { render, screen, fireEvent } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, afterEach } from 'vitest';
 import MessageView from './MessageView';
 import type { Message } from '../types';
 
@@ -15,23 +15,38 @@ const messages: Message[] = [
 
 // MessageView pide muchas props y solo tres importan aquí: el resto son los mínimos
 // para que monte. onLoadMore es la que el test observa.
-function renderMessageView(onLoadMore: () => void) {
+function renderMessageView(
+    onLoadMore: () => void,
+    overrides: Partial<{ messages: Message[]; hasMoreMap: Record<string, boolean>; token: string | null }> = {},
+) {
     return render(
         <MessageView
-            messages={messages}
+            messages={overrides.messages ?? messages}
             chatId="chat-a"
-            hasMoreMap={{}}
+            hasMoreMap={overrides.hasMoreMap ?? {}}
             loadedChatIds={{ 'chat-a': true }}
             onLoadMore={onLoadMore}
             onDeleteMessage={() => { }}
             onRetryMessage={() => { }}
-            token="un-token"
+            token={overrides.token === undefined ? 'un-token' : overrides.token}
             draft=""
             onDraftChange={() => { }}
             onSendMessage={() => { }}
         />
     );
 }
+
+// jsdom never lays a box out, so the real "does this page overflow?" answer is
+// whatever the test writes here. A spy on the prototype is the only way the
+// check can see it during the first paint.
+function fakePageSize(scrollHeight: number, clientHeight: number) {
+    vi.spyOn(HTMLElement.prototype, 'scrollHeight', 'get').mockReturnValue(scrollHeight);
+    vi.spyOn(HTMLElement.prototype, 'clientHeight', 'get').mockReturnValue(clientHeight);
+}
+
+afterEach(() => {
+    vi.restoreAllMocks();
+});
 
 describe('cargar mensajes antiguos', () => {
     it('ya no ofrece un botón: el scroll es el único gesto', () => {
@@ -52,6 +67,64 @@ describe('cargar mensajes antiguos', () => {
         fireEvent.scroll(scroller);
 
         expect(onLoadMore).toHaveBeenCalledTimes(1);
+    });
+
+    it('asks for the next page when the messages fit and nothing can scroll', () => {
+        fakePageSize(100, 400);
+        const onLoadMore = vi.fn();
+        renderMessageView(onLoadMore);
+
+        const scroller = screen
+            .getByText('pregunta vieja')
+            .closest('[class*="messageViewContainer"]') as HTMLElement;
+        expect(scroller.clientHeight).toBe(400);
+        expect(scroller.scrollHeight).toBe(100);
+        expect(onLoadMore).toHaveBeenCalledTimes(1);
+    });
+
+    it('does not ask on mount when the messages already overflow', () => {
+        fakePageSize(800, 400);
+        const onLoadMore = vi.fn();
+        renderMessageView(onLoadMore);
+
+        expect(onLoadMore).not.toHaveBeenCalled();
+    });
+
+    it('does not ask when the server already said there is nothing older', () => {
+        fakePageSize(100, 400);
+        const onLoadMore = vi.fn();
+        renderMessageView(onLoadMore, { hasMoreMap: { 'chat-a': false } });
+
+        expect(onLoadMore).not.toHaveBeenCalled();
+    });
+
+    it('asks again when the page that just arrived still fits', () => {
+        fakePageSize(100, 400);
+        const onLoadMore = vi.fn();
+        const { rerender } = renderMessageView(onLoadMore);
+        expect(onLoadMore).toHaveBeenCalledTimes(1);
+
+        rerender(
+            <MessageView
+                messages={[
+                    message('user', 'más vieja'),
+                    message('model', 'respuesta más vieja'),
+                    ...messages,
+                ]}
+                chatId="chat-a"
+                hasMoreMap={{}}
+                loadedChatIds={{ 'chat-a': true }}
+                onLoadMore={onLoadMore}
+                onDeleteMessage={() => { }}
+                onRetryMessage={() => { }}
+                token="un-token"
+                draft=""
+                onDraftChange={() => { }}
+                onSendMessage={() => { }}
+            />
+        );
+
+        expect(onLoadMore).toHaveBeenCalledTimes(2);
     });
 });
 

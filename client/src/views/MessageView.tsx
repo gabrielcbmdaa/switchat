@@ -96,10 +96,10 @@ export default function MessageView({
             isLoadingMoreRef.current = true;
         }
         if (token) {
-            // Online: pedimos al servidor
+            // Online: ask the server for the page behind the cursor.
             onLoadMore();
         } else {
-            // Offline: incrementamos localmente
+            // Offline: the next page is already in memory.
             setVisibleCount(prev => Math.min(prev + 6, messages.length));
         }
     };
@@ -121,12 +121,12 @@ export default function MessageView({
         const prev = prevMessagesRef.current;
         const isSameChat = prev.length > 0 && prev[0] === messages[0];
         if (isLoadingMoreRef.current) {
-            // Si estábamos cargando más mensajes, ajustamos el scroll para que no salte
+            // Older messages were prepended. Keep the viewport on the same line.
             const diff = container.scrollHeight - prevScrollHeightRef.current;
             container.scrollTop = prevScrollTopRef.current + diff;
             isLoadingMoreRef.current = false;
         } else {
-            // Si es un chat nuevo o ha llegado un mensaje nuevo al final, hacemos scroll al final
+            // A new chat, or a new message at the bottom, follows the end.
             const hasNewMessage = messages.length > prev.length;
             const behavior = (hasScrolledRef.current && isSameChat && hasNewMessage) ? 'smooth' : 'auto';
             if (!isSameChat || hasNewMessage) {
@@ -142,7 +142,23 @@ export default function MessageView({
         }
         hasScrolledRef.current = true;
         prevMessagesRef.current = messages;
-    }, [visibleMessages, chatId, messages]);
+
+        // The scrollbar is the only gesture that asks for older messages, and it
+        // only exists once the text overflows. A page of short messages never
+        // overflows, so the history behind it would stay unreachable. Ask while
+        // the page still fits. clientHeight 0 means layout has not happened yet.
+        if (
+            hasMoreMessages &&
+            container.clientHeight > 0 &&
+            container.scrollHeight <= container.clientHeight
+        ) {
+            loadMore();
+        }
+        // loadMore stays out of the dependency list on purpose: the parent builds
+        // a new onLoadMore on every render, so listing it would ask again for the
+        // same page whenever the screen re-renders and the text still fits.
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [visibleMessages, chatId, messages, hasMoreMessages]);
 
     // Callback que recibe la altura del PromptInput cada vez que cambia
     const handlePromptHeightChange = useCallback((height: number) => {
