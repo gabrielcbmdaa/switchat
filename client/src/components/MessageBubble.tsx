@@ -49,8 +49,24 @@ const markdown = new Marked({
     },
 });
 
-function renderModelHtml(text: string): string {
-    const html = markdown.parse(text) as string;
+// The same renderer without the copy button, for a bubble that is still being written. While
+// streaming this HTML is rebuilt on every batch: a <button> here would be destroyed and
+// recreated ~12 times a second, and the "copied" class plus its 2 second timer would end up
+// pointing at a node no longer in the document.
+const streamingMarkdown = new Marked({
+    renderer: {
+        code({ text, lang, escaped }) {
+            const language = (lang ?? '').trim().split(/\s+/)[0];
+            const languageClass = language ? ` class="language-${escapeHtml(language)}"` : '';
+            const trimmed = text.replace(/\n$/, '');
+            const code = escaped ? trimmed : escapeHtml(trimmed);
+            return `<div class="${styles.codeBlock}"><pre><code${languageClass}>${code}\n</code></pre></div>\n`;
+        },
+    },
+});
+
+function renderModelHtml(text: string, withCopyButton: boolean): string {
+    const html = (withCopyButton ? markdown : streamingMarkdown).parse(text) as string;
     return html.replace(/<a /g, '<a target="_blank" rel="noopener noreferrer" ');
 }
 
@@ -71,7 +87,7 @@ export default function MessageBubble({ msg, isUser, onDelete, onRetry, onSave, 
     const [draft, setDraft] = useState('');
     const textareaRef = useRef<HTMLTextAreaElement>(null);
     const rawText = msg.parts[0]?.text || '';
-    const htmlContent = { __html: isUser ? rawText : renderModelHtml(rawText) };
+    const htmlContent = { __html: isUser ? rawText : renderModelHtml(rawText, !msg.isTemporary) };
     const canEdit = Boolean(isUser && onSave && !msg.isTemporary);
 
     // The pencil is already off while this chat generates. An editor left open would still
