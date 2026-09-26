@@ -69,6 +69,25 @@ async function throwProviderError(
     throw new ProviderError(message, response.status, provider, modelLowerCase);
 }
 
+/**
+ * Cuts a Server-Sent Events buffer into complete events and hands back the tail.
+ *
+ * A network read does not respect event boundaries: it can deliver one event and half of
+ * the next one. Parsing whatever arrived would blow up on the half JSON and lose the rest
+ * of the answer, so the caller keeps `rest` and prepends it to the next read.
+ *
+ * Exported only so it can be tested on its own; nothing outside this module uses it.
+ */
+export function splitSseEvents(buffer: string): { events: string[]; rest: string } {
+    // Normalised first: a server may separate events with \r\n\r\n, and splitting on \n\n
+    // alone would leave a stray \r glued to every event.
+    const parts = buffer.replace(/\r\n/g, '\n').split('\n\n');
+    // The last piece is whatever came after the final separator: either empty, or the
+    // beginning of an event still travelling.
+    const rest = parts.pop() ?? '';
+    return { events: parts, rest };
+}
+
 // Interfaces internas para Google Gemini
 interface GeminiPart {
     text?: string;

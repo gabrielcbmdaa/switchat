@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { fetchFromProvider } from './providers';
+import { fetchFromProvider, splitSseEvents } from './providers';
 import type { Message } from '../types';
 
 const history: Message[] = [{ role: 'user', parts: [{ text: 'hello' }] }];
@@ -226,5 +226,30 @@ describe('prompt cache marks on Anthropic and OpenAI', () => {
         const body = await sentBody(history);
 
         expect(body.prompt_cache_key).toBeUndefined();
+    });
+});
+
+describe('splitSseEvents — the buffer that survives a split read', () => {
+    it('returns the complete events and keeps the tail', () => {
+        const { events, rest } = splitSseEvents('data: {"a":1}\n\ndata: {"b":2}\n\ndata: {"c"');
+
+        expect(events).toEqual(['data: {"a":1}', 'data: {"b":2}']);
+        expect(rest).toBe('data: {"c"');
+    });
+
+    it('reconstructs an event that arrived cut in half', () => {
+        const first = splitSseEvents('data: {"text":"hol');
+        expect(first.events).toEqual([]);
+
+        const second = splitSseEvents(`${first.rest}a"}\n\n`);
+        expect(second.events).toEqual(['data: {"text":"hola"}']);
+        expect(second.rest).toBe('');
+    });
+
+    it('treats CRLF separators like LF ones', () => {
+        const { events, rest } = splitSseEvents('data: {"a":1}\r\n\r\ndata: {"b":2}\r\n\r\n');
+
+        expect(events).toEqual(['data: {"a":1}', 'data: {"b":2}']);
+        expect(rest).toBe('');
     });
 });
