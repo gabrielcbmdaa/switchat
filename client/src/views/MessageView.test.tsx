@@ -1,4 +1,4 @@
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen, fireEvent, act } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import MessageView from './MessageView';
@@ -12,6 +12,19 @@ const messages: Message[] = [
     message('user', 'pregunta vieja'),
     message('model', 'respuesta vieja'),
 ];
+
+const baseProps = {
+    chatId: 'chat-a',
+    hasMoreMap: {},
+    loadedChatIds: { 'chat-a': true },
+    onLoadMore: () => { },
+    onDeleteMessage: () => { },
+    onRetryMessage: () => { },
+    token: 'un-token',
+    draft: '',
+    onDraftChange: () => { },
+    onSendMessage: () => { },
+};
 
 // MessageView pide muchas props y solo tres importan aquí: el resto son los mínimos
 // para que monte. onLoadMore es la que el test observa.
@@ -237,5 +250,32 @@ describe('the English tutor template in the empty chat view', () => {
         renderEmptyChat(() => { });
 
         expect(screen.getByRole('button', { name: 'English Tutor' })).toBeInTheDocument();
+    });
+});
+
+describe('following the text while it is written', () => {
+    it('scrolls when the last message grew without a new message arriving', () => {
+        const scrollTo = vi.fn();
+        Element.prototype.scrollTo = scrollTo;
+        vi.useFakeTimers();
+
+        const before: Message[] = [
+            { role: 'user', parts: [{ text: 'la pregunta' }] },
+            { role: 'model', parts: [{ text: 'Hola' }], isTemporary: true },
+        ];
+        const after: Message[] = [
+            before[0],
+            { role: 'model', parts: [{ text: 'Hola qué tal' }], isTemporary: true },
+        ];
+
+        const { rerender } = render(<MessageView {...baseProps} messages={before} />);
+        act(() => { vi.runAllTimers(); });
+        scrollTo.mockClear();
+
+        rerender(<MessageView {...baseProps} messages={after} />);
+        act(() => { vi.runAllTimers(); });
+
+        expect(scrollTo).toHaveBeenCalled();
+        vi.useRealTimers();
     });
 });

@@ -126,10 +126,30 @@ export default function MessageView({
             container.scrollTop = prevScrollTopRef.current + diff;
             isLoadingMoreRef.current = false;
         } else {
-            // A new chat, or a new message at the bottom, follows the end.
             const hasNewMessage = messages.length > prev.length;
-            const behavior = (hasScrolledRef.current && isSameChat && hasNewMessage) ? 'smooth' : 'auto';
-            if (!isSameChat || hasNewMessage) {
+            // The answer being written does not add a message: the last one grows inside, so
+            // its length is the only thing that moves. Without this the view stays where it
+            // was and the text grows below the fold.
+            const lastText = messages[messages.length - 1]?.parts[0]?.text ?? '';
+            const prevLastText = prev.length === messages.length
+                ? prev[prev.length - 1]?.parts[0]?.text ?? ''
+                : '';
+            const lastMessageGrew = isSameChat && !hasNewMessage && lastText.length > prevLastText.length;
+
+            // Only if the user was already near the bottom: someone who scrolled up to reread
+            // something should not be dragged down. Same 200 px threshold the prompt resizer
+            // uses below.
+            const scrollContainer = containerRef.current;
+            const isNearBottom = !scrollContainer
+                || scrollContainer.scrollHeight - scrollContainer.scrollTop - scrollContainer.clientHeight <= 200;
+
+            // 'auto' while it is being written: a smooth scroll lasts longer than the 80 ms
+            // batch, so at ~12 batches per second each animation would cancel the previous one.
+            const behavior = lastMessageGrew
+                ? 'auto'
+                : ((hasScrolledRef.current && isSameChat && hasNewMessage) ? 'smooth' : 'auto');
+
+            if (!isSameChat || hasNewMessage || (lastMessageGrew && isNearBottom)) {
                 setTimeout(() => {
                     if (containerRef.current) {
                         containerRef.current.scrollTo({
