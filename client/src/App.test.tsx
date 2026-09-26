@@ -4,6 +4,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import type { Message } from './types';
 import App from './App';
 import { getChatTemplate } from './config/chatTemplates';
+import { DEFAULT_MODEL } from './utils/modelPreferences';
 import type { ChatSaveResult } from './services/api';
 
 // The whole server boundary lives in services/api, so mocking that one module is enough to
@@ -1070,7 +1071,7 @@ describe('saving chat settings', () => {
         render(<App />);
         await screen.findByText('A question 1');
 
-        expect(document.querySelector('[class*="modelSelected"]')).toHaveTextContent('gemini-3.5-flash');
+        expect(document.querySelector('[class*="modelSelected"]')).toHaveTextContent(DEFAULT_MODEL);
 
         await userEvent.click(screen.getByText('claude-fable-5'));
         expect(document.querySelector('[class*="modelSelected"]')).toHaveTextContent('claude-fable-5');
@@ -1079,7 +1080,7 @@ describe('saving chat settings', () => {
             save.resolve('failed');
         });
 
-        expect(document.querySelector('[class*="modelSelected"]')).toHaveTextContent('gemini-3.5-flash');
+        expect(document.querySelector('[class*="modelSelected"]')).toHaveTextContent(DEFAULT_MODEL);
         expect(await screen.findByRole('status')).toHaveTextContent(
             'Could not save the change. The chat was left as it was.'
         );

@@ -23,6 +23,25 @@ function renderSettings(overrides: {
     );
 }
 
+describe('Model list', () => {
+    it('shows the current model ids', () => {
+        renderSettings();
+
+        for (const id of [
+            'gemini-3.8-flash',
+            'gemini-3.7-flash',
+            'claude-fable-5-1',
+            'claude-opus-5-5',
+            'claude-opus-5',
+            'gpt-6-astra',
+            'gpt-6-sol',
+            'gpt-6-luna',
+        ]) {
+            expect(screen.getByText(id)).toBeInTheDocument();
+        }
+    });
+});
+
 describe('Notes switch', () => {
     it('sits between System Prompt and Reasoning and starts off', () => {
         renderSettings();

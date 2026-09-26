@@ -78,7 +78,7 @@ describe('sendToAnthropic — thinking shape per model', () => {
     });
 
     it('never sends budget_tokens on those models: it is a 400 there', async () => {
-        for (const model of ['claude-sonnet-5', 'claude-opus-4-8', 'claude-fable-5']) {
+        for (const model of ['claude-sonnet-5', 'claude-opus-4-8', 'claude-opus-5', 'claude-fable-5', 'claude-fable-5-1', 'claude-opus-5-5']) {
             const body = await sentBody(model, 'high');
 
             expect(JSON.stringify(body)).not.toContain('budget_tokens');
@@ -92,17 +92,21 @@ describe('sendToAnthropic — thinking shape per model', () => {
     });
 
     it("turns thinking off with type 'disabled', not by omitting the field", async () => {
-        const body = await sentBody('claude-opus-4-8', 'off');
+        for (const model of ['claude-opus-4-8', 'claude-opus-5']) {
+            const body = await sentBody(model, 'off');
 
-        expect(body.thinking).toEqual({ type: 'disabled' });
-        expect(body.output_config).toBeUndefined();
+            expect(body.thinking).toEqual({ type: 'disabled' });
+            expect(body.output_config).toBeUndefined();
+        }
     });
 
     it('omits thinking entirely on a model whose thinking cannot be turned off', async () => {
-        const body = await sentBody('claude-fable-5', 'high');
+        for (const model of ['claude-fable-5', 'claude-fable-5-1', 'claude-opus-5-5']) {
+            const body = await sentBody(model, 'high');
 
-        expect(body.thinking).toBeUndefined();
-        expect(body.output_config).toEqual({ effort: 'high' });
+            expect(body.thinking).toBeUndefined();
+            expect(body.output_config).toEqual({ effort: 'high' });
+        }
     });
 
     it("falls back to the lowest effort when such a model is asked for 'off'", async () => {
@@ -124,6 +128,29 @@ describe('sendToAnthropic — thinking shape per model', () => {
 
         expect(body.thinking).toBeUndefined();
         expect(body.output_config).toBeUndefined();
+    });
+});
+
+describe('Gemini 3.8 and 3.7 thinking level', () => {
+    it("sends LOW when the slider is off, because 'minimal' is rejected on these models", async () => {
+        localStorage.setItem('geminiApiKey', 'test-key');
+        const fetchMock = vi.fn().mockResolvedValue({
+            ok: true,
+            json: async () => ({
+                candidates: [{ content: { parts: [{ text: 'hi' }] } }],
+            }),
+        });
+        vi.stubGlobal('fetch', fetchMock);
+
+        for (const model of ['gemini-3.8-flash', 'gemini-3.7-flash']) {
+            await fetchFromProvider(model, history, 'off');
+            const [, init] = fetchMock.mock.calls[fetchMock.mock.calls.length - 1];
+            const body = JSON.parse(init.body) as {
+                generationConfig: { thinkingConfig: { thinkingLevel: string } };
+            };
+
+            expect(body.generationConfig.thinkingConfig.thinkingLevel).toBe('LOW');
+        }
     });
 });
 

@@ -1,6 +1,6 @@
 // ============================================================
-// Registro estático de modelos y sus capacidades de thinking.
-// Fuente: https://ai.google.dev/gemini-api/docs/thinking
+// Static registry of models and their thinking capabilities.
+// Gemini levels: https://ai.google.dev/gemini-api/docs/generate-content/thinking
 // ============================================================
 
 /**
@@ -39,6 +39,20 @@ export interface ModelConfig {
  */
 export const MODEL_REGISTRY: Record<string, ModelConfig> = {
     // ── Google Gemini 3.x ──────────────────────────────────
+    // `minimal` is a 400 on 3.8 and 3.7. The slider's "off" becomes the first
+    // level listed here, so that first level has to be one the API accepts.
+    'gemini-3.8-flash': {
+        thinkingLevels: ['low', 'medium', 'high'],
+        defaultThinking: 'medium',
+        provider: 'google',
+        thinkingBudgets: {},
+    },
+    'gemini-3.7-flash': {
+        thinkingLevels: ['low', 'medium', 'high'],
+        defaultThinking: 'medium',
+        provider: 'google',
+        thinkingBudgets: {},
+    },
     'gemini-3.6-flash': {
         thinkingLevels: ['minimal', 'low', 'medium', 'high'],
         defaultThinking: 'medium',
@@ -71,6 +85,30 @@ export const MODEL_REGISTRY: Record<string, ModelConfig> = {
     },
 
     // ── Anthropic Claude ─────────────────────────────────────
+    // Current lineup. Thinking cannot be turned off, same request shape as claude-fable-5.
+    'claude-fable-5-1': {
+        thinkingLevels: ['minimal', 'low', 'medium', 'high'],
+        defaultThinking: 'high',
+        provider: 'anthropic',
+        thinkingBudgets: {},
+        thinkingApi: 'always-on',
+    },
+    'claude-opus-5-5': {
+        thinkingLevels: ['minimal', 'low', 'medium', 'high'],
+        defaultThinking: 'medium',
+        provider: 'anthropic',
+        thinkingBudgets: {},
+        thinkingApi: 'always-on',
+    },
+    // Unlike 5.5, this one still accepts thinking turned off. The slider stops at
+    // high, which is the highest effort where "off" is still a valid request.
+    'claude-opus-5': {
+        thinkingLevels: ['minimal', 'low', 'medium', 'high'],
+        defaultThinking: 'high',
+        provider: 'anthropic',
+        thinkingBudgets: {},
+        thinkingApi: 'effort',
+    },
     'claude-fable-5': {
         thinkingLevels: ['minimal', 'low', 'medium', 'high'],
         defaultThinking: 'high',
@@ -108,6 +146,26 @@ export const MODEL_REGISTRY: Record<string, ModelConfig> = {
         },
     },
     // ── OpenAI GPT & Reasoning ──────────────────────────────
+    // Astra rejects `none`. Sol and Luna document `medium` as the API default;
+    // Astra's page does not name one, so it starts on the same level.
+    'gpt-6-astra': {
+        thinkingLevels: ['low', 'medium', 'high', 'xhigh', 'max'],
+        defaultThinking: 'medium',
+        provider: 'openai',
+        thinkingBudgets: {},
+    },
+    'gpt-6-sol': {
+        thinkingLevels: ['none', 'low', 'medium', 'high', 'xhigh', 'max'],
+        defaultThinking: 'medium',
+        provider: 'openai',
+        thinkingBudgets: {},
+    },
+    'gpt-6-luna': {
+        thinkingLevels: ['none', 'low', 'medium', 'high', 'xhigh', 'max'],
+        defaultThinking: 'medium',
+        provider: 'openai',
+        thinkingBudgets: {},
+    },
     'gpt-5.6-sol': {
         thinkingLevels: ['minimal', 'low', 'medium', 'high', 'xhigh'],
         defaultThinking: 'high',

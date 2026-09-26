@@ -1,8 +1,8 @@
 import { getModelConfig, isRetiredModel } from '../config/models.config';
 import type { Chat } from '../types';
 
-// Modelo con el que arranca la app cuando no hay ninguna preferencia guardada.
-export const DEFAULT_MODEL = 'gemini-3.5-flash';
+// Model a new chat starts on when nothing is saved yet.
+export const DEFAULT_MODEL = 'gemini-3.8-flash';
 
 // El nivel que apaga el thinking. No sale del registro de modelos: lo añadimos
 // nosotros al principio de la escala para que el slider siempre pueda bajar a cero.
