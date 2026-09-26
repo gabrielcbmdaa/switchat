@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { fetchChatResponse } from './api';
 import { fetchFromProvider, splitSseEvents } from './providers';
 import type { Message } from '../types';
 
@@ -226,6 +227,171 @@ describe('prompt cache marks on Anthropic and OpenAI', () => {
         const body = await sentBody(history);
 
         expect(body.prompt_cache_key).toBeUndefined();
+    });
+});
+
+/**
+ * Stubs fetch with a streaming Gemini answer. `reads` are the byte slices the network
+ * hands over, on purpose not aligned with the events: that misalignment is the bug the
+ * buffer exists for.
+ */
+function stubGoogleStream(reads: string[]) {
+    const encoder = new TextEncoder();
+    let index = 0;
+
+    const fetchMock = vi.fn().mockResolvedValue({
+        ok: true,
+        body: {
+            getReader: () => ({
+                read: async () =>
+                    index < reads.length
+                        ? { done: false, value: encoder.encode(reads[index++]) }
+                        : { done: true, value: undefined },
+            }),
+        },
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    return fetchMock;
+}
+
+function sseEvent(payload: unknown): string {
+    return `data: ${JSON.stringify(payload)}\n\n`;
+}
+
+function geminiChunk(parts: { text?: string; thought?: boolean }[]) {
+    return { candidates: [{ content: { parts } }] };
+}
+
+describe('sendToGoogle — streaming', () => {
+    beforeEach(() => {
+        localStorage.setItem('geminiApiKey', 'test-key');
+    });
+
+    it('uses the plain endpoint when nobody asks for chunks', async () => {
+        const fetchMock = vi.fn().mockResolvedValue({
+            ok: true,
+            json: async () => ({ candidates: [{ content: { parts: [{ text: 'un titulo' }] } }] }),
+        });
+        vi.stubGlobal('fetch', fetchMock);
+
+        await fetchFromProvider('gemini-3.5-flash', history, 'off');
+
+        const [url] = fetchMock.mock.calls[0];
+        expect(url).toContain(':generateContent');
+        expect(url).not.toContain('streamGenerateContent');
+    });
+
+    it('uses the streaming endpoint when a chunk callback is given', async () => {
+        const fetchMock = stubGoogleStream([sseEvent(geminiChunk([{ text: 'hola' }]))]);
+
+        await fetchFromProvider('gemini-3.5-flash', history, 'low', undefined, () => {});
+
+        const [url] = fetchMock.mock.calls[0];
+        expect(url).toContain(':streamGenerateContent');
+        expect(url).toContain('alt=sse');
+    });
+
+    it('reports the accumulated text, not the loose chunk, and returns the whole answer', async () => {
+        stubGoogleStream([
+            sseEvent(geminiChunk([{ text: 'Hola' }])),
+            sseEvent(geminiChunk([{ text: ' qué' }])),
+            sseEvent(geminiChunk([{ text: ' tal' }])),
+        ]);
+
+        const seen: string[] = [];
+        const { text } = await fetchFromProvider('gemini-3.5-flash', history, 'low', undefined, (soFar) => {
+            seen.push(soFar);
+        });
+
+        expect(seen).toEqual(['Hola', 'Hola qué', 'Hola qué tal']);
+        expect(text).toBe('Hola qué tal');
+    });
+
+    it('never reports the reasoning parts while streaming', async () => {
+        stubGoogleStream([
+            sseEvent(geminiChunk([{ text: 'estoy pensando', thought: true }])),
+            sseEvent(geminiChunk([{ text: 'la respuesta' }])),
+        ]);
+
+        const seen: string[] = [];
+        const { text } = await fetchFromProvider('gemini-3.5-flash', history, 'low', undefined, (soFar) => {
+            seen.push(soFar);
+        });
+
+        expect(seen).toEqual(['la respuesta']);
+        expect(text).toBe('la respuesta');
+    });
+
+    it('rebuilds an event split across two reads', async () => {
+        const whole = sseEvent(geminiChunk([{ text: 'entera' }]));
+        stubGoogleStream([whole.slice(0, 12), whole.slice(12)]);
+
+        const { text } = await fetchFromProvider('gemini-3.5-flash', history, 'low', undefined, () => {});
+
+        expect(text).toBe('entera');
+    });
+
+    it('still gives the friendly message when the request fails before any chunk', async () => {
+        vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
+            ok: false,
+            status: 401,
+            text: async () => '{"error":{"message":"bad key"}}',
+        }));
+
+        await expect(
+            fetchFromProvider('gemini-3.5-flash', history, 'low', undefined, () => {})
+        ).rejects.toThrow(/Invalid or expired API Key/);
+    });
+});
+
+describe('fetchChatResponse — onChunk reaches fetchFromProvider', () => {
+    beforeEach(() => {
+        localStorage.setItem('geminiApiKey', 'test-key');
+    });
+
+    it('uses the streaming endpoint when the caller passes onChunk', async () => {
+        const reads = [sseEvent(geminiChunk([{ text: 'hola' }]))];
+        const encoder = new TextEncoder();
+        let index = 0;
+
+        const fetchMock = vi.fn().mockImplementation((input: RequestInfo | URL) => {
+            const url = String(input);
+            if (url.includes(':streamGenerateContent')) {
+                return Promise.resolve({
+                    ok: true,
+                    body: {
+                        getReader: () => ({
+                            read: async () =>
+                                index < reads.length
+                                    ? { done: false, value: encoder.encode(reads[index++]) }
+                                    : { done: true, value: undefined },
+                        }),
+                    },
+                });
+            }
+            return Promise.resolve({
+                ok: true,
+                json: async () => ({
+                    candidates: [{ content: { parts: [{ text: 'hola' }] } }],
+                }),
+            });
+        });
+        vi.stubGlobal('fetch', fetchMock);
+
+        await fetchChatResponse(
+            history,
+            'gemini-3.5-flash',
+            'low',
+            undefined,
+            undefined,
+            undefined,
+            undefined,
+            () => {}
+        );
+
+        const [url] = fetchMock.mock.calls[0];
+        expect(url).toContain(':streamGenerateContent');
     });
 });
 

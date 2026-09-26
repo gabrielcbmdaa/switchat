@@ -372,7 +372,10 @@ export async function fetchChatResponse(
   systemPrompt?: string,
   signal?: AbortSignal,
   notesText?: string,
-  notesEnabled?: boolean
+  notesEnabled?: boolean,
+  // Optional and last, so every existing call site stays untouched. Only the caller that
+  // paints a bubble passes it; generateChatTitle does not, and keeps the plain endpoint.
+  onChunk?: (textSoFar: string) => void
 ): Promise<{ text: string }> {
   const historyWithContext = composeProviderHistory(
     messagesHistory,
@@ -381,5 +384,5 @@ export async function fetchChatResponse(
     notesEnabled
   );
 
-  return await fetchFromProvider(model, historyWithContext, reasoningLevel, signal);
+  return await fetchFromProvider(model, historyWithContext, reasoningLevel, signal, onChunk);
 }

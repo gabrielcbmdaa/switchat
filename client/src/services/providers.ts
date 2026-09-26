@@ -113,6 +113,70 @@ interface ChatCompletionRequest {
     prompt_cache_key?: string;
 }
 
+export type ChunkListener = (textSoFar: string) => void;
+
+/**
+ * The visible text of one Gemini payload: the parts marked `thought` are the model's
+ * reasoning and never belong in the bubble.
+ *
+ * No fallback here on purpose. The non-streaming path falls back to every part when the
+ * filter leaves nothing, which is safe once, at the end. Doing that per chunk would print
+ * the reasoning out loud, because a chunk carrying only thought parts is a normal thing to
+ * receive.
+ */
+function geminiVisibleText(parts: GeminiPart[]): string {
+    return parts
+        .filter((part) => !part.thought && part.text)
+        .map((part) => part.text)
+        .join('');
+}
+
+/**
+ * Reads the SSE body, reports the accumulated text as it grows, and returns the whole
+ * answer so the caller keeps the same `{ text }` contract as the non-streaming path.
+ *
+ * JSON.parse is deliberately not wrapped in a try/catch: with splitSseEvents holding the
+ * tail back, every payload that reaches it is complete, and swallowing an error here would
+ * hide exactly the bug the buffer exists to prevent.
+ */
+async function readGeminiStream(response: Response, onChunk: ChunkListener): Promise<string> {
+    const reader = response.body?.getReader();
+    if (!reader) {
+        throw new Error('The Google API did not return a readable response.');
+    }
+
+    const decoder = new TextDecoder();
+    let buffer = '';
+    let text = '';
+
+    for (;;) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        buffer += decoder.decode(value, { stream: true });
+        const { events, rest } = splitSseEvents(buffer);
+        buffer = rest;
+
+        for (const event of events) {
+            const dataLine = event.split('\n').find((line) => line.startsWith('data:'));
+            if (!dataLine) continue;
+
+            const payload = dataLine.slice('data:'.length).trim();
+            if (!payload) continue;
+
+            const parsed = JSON.parse(payload);
+            const parts: GeminiPart[] = parsed.candidates?.[0]?.content?.parts ?? [];
+            const visible = geminiVisibleText(parts);
+            if (!visible) continue;
+
+            text += visible;
+            onChunk(text);
+        }
+    }
+
+    return text;
+}
+
 /**
  * Cliente nativo para Google Gemini REST API.
  */
@@ -120,7 +184,8 @@ async function sendToGoogle(
     modelLowerCase: string,
     messagesHistory: Message[],
     reasoningLevel: string,
-    signal?: AbortSignal
+    signal?: AbortSignal,
+    onChunk?: ChunkListener
 ): Promise<ProviderResponse> {
     const apiKey = localStorage.getItem('geminiApiKey') || '';
     if (!apiKey) {
@@ -171,7 +236,10 @@ async function sendToGoogle(
         ...(Object.keys(generationConfig).length > 0 ? { generationConfig } : {})
     };
 
-    const googleApiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${modelLowerCase}:generateContent?key=${apiKey}`;
+    // Same body, same thinking config: the only thing streaming changes is the endpoint and
+    // how the answer is read.
+    const googleMethod = onChunk ? 'streamGenerateContent?alt=sse&' : 'generateContent?';
+    const googleApiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${modelLowerCase}:${googleMethod}key=${apiKey}`;
 
     const response = await fetch(googleApiUrl, {
         method: 'POST',
@@ -184,6 +252,10 @@ async function sendToGoogle(
         await throwProviderError(response, 'google', modelLowerCase);
     }
 
+    if (onChunk) {
+        return { text: await readGeminiStream(response, onChunk) };
+    }
+
     const data = await response.json();
     const candidate = data.candidates?.[0];
     if (!candidate || !candidate.content || !candidate.content.parts) {
@@ -191,11 +263,7 @@ async function sendToGoogle(
     }
 
     const parts: GeminiPart[] = candidate.content.parts;
-    // Filtrar trazas de pensamiento ('thought: true') y devolver texto final
-    const textContent = parts
-        .filter((part: GeminiPart) => !part.thought && part.text)
-        .map((part: GeminiPart) => part.text)
-        .join('');
+    const textContent = geminiVisibleText(parts);
 
     return { text: textContent || parts.map((part: GeminiPart) => part.text || '').join('') };
 }
@@ -444,7 +512,8 @@ export async function fetchFromProvider(
     model: string,
     messagesHistory: Message[],
     reasoningLevel: string,
-    signal?: AbortSignal
+    signal?: AbortSignal,
+    onChunk?: ChunkListener
 ): Promise<ProviderResponse> {
     const modelLowerCase = model.toLowerCase();
     const config = getModelConfig(model);
@@ -452,7 +521,7 @@ export async function fetchFromProvider(
 
     switch (provider) {
         case 'google':
-            return await sendToGoogle(modelLowerCase, messagesHistory, reasoningLevel, signal);
+            return await sendToGoogle(modelLowerCase, messagesHistory, reasoningLevel, signal, onChunk);
         case 'anthropic':
             return await sendToAnthropic(modelLowerCase, messagesHistory, reasoningLevel, signal);
         case 'openai':
