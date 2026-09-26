@@ -1488,3 +1488,60 @@ describe('signing in from a browser that already has offline chats', () => {
         expect(JSON.parse(localStorage.getItem('chatList') ?? '[]')).toHaveLength(1);
     });
 });
+
+describe('the answer being written on screen', () => {
+    it('paints the accumulated text in place of Thinking..., in batches', async () => {
+        vi.useFakeTimers({ shouldAdvanceTime: true });
+        const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+
+        let report: ((textSoFar: string) => void) | undefined;
+        const answer = deferred<{ text: string }>();
+        api.fetchChatResponse.mockImplementation((...args: unknown[]) => {
+            report = args[7] as (textSoFar: string) => void;
+            return answer.promise;
+        });
+
+        render(<App />);
+        await screen.findByText('A question 1');
+
+        await user.type(screen.getByPlaceholderText('Write a message...'), 'una pregunta');
+        await user.click(screen.getByTitle('Send message'));
+        await screen.findByText('Thinking...');
+
+        // The first chunk must not paint until the 80 ms timer fires (immediate setState would
+        // replace Thinking... right away).
+        await act(async () => {
+            report?.('Hola');
+        });
+        expect(screen.getByText('Thinking...')).toBeInTheDocument();
+        expect(screen.queryByText('Hola')).toBeNull();
+
+        await act(async () => {
+            vi.advanceTimersByTime(80);
+        });
+        await screen.findByText('Hola');
+        expect(screen.queryByText('Thinking...')).toBeNull();
+
+        // Two chunks inside the same 80 ms window: the screen shows the second one, and
+        // never a bubble per chunk.
+        await act(async () => {
+            report?.('Hola qué');
+            report?.('Hola qué tal');
+        });
+        expect(screen.getByText('Hola')).toBeInTheDocument();
+        expect(screen.queryByText('Hola qué tal')).toBeNull();
+
+        await act(async () => {
+            vi.advanceTimersByTime(80);
+        });
+        expect(screen.queryByText('Thinking...')).toBeNull();
+        await screen.findByText('Hola qué tal');
+
+        await act(async () => {
+            answer.resolve({ text: 'Hola qué tal, la respuesta entera' });
+        });
+
+        await screen.findByText('Hola qué tal, la respuesta entera');
+        vi.useRealTimers();
+    });
+});

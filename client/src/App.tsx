@@ -97,6 +97,16 @@ export default function App() {
   // chats a la vez — lo que solo es seguro desde que cada respuesta escribe únicamente el
   // suyo (ver commitChatMessages).
   const [generatingChatIds, setGeneratingChatIds] = useState<string[]>([]);
+  // The text arriving from the model, per chat. Deliberately NOT inside chatList: writing
+  // there goes through commitChatMessages, which persists to localStorage, and at one batch
+  // every 80 ms a ten second answer would serialise the whole chat list ~125 times for a
+  // text that is not final yet. Per chat and not global for the same reason
+  // generatingChatIds is a list: two chats can be answering at once.
+  const [streamingTextByChat, setStreamingTextByChat] = useState<Record<string, string>>({});
+  // What the last chunk said, and the timer that will flush it. The buffer lives in a ref so
+  // a chunk does not cost a render; only the flush does.
+  const streamingBufferRef = useRef<Map<string, string>>(new Map());
+  const streamingTimerRef = useRef<Map<string, number>>(new Map());
   const abortControllersRef = useRef<Map<string, AbortController>>(new Map());
   // Chats cuya primera página está pedida y todavía no ha vuelto (ver el efecto de carga)
   const pendingFirstPageRef = useRef<Set<string>>(new Set());
@@ -428,6 +438,40 @@ export default function App() {
       commitChatMessages(chatId, chat.messages.slice(0, -1));
     }, TEMPORARY_MESSAGE_MS);
     temporaryMessageTimersRef.current.add(timer);
+  }
+
+  // 80 ms: below what the eye reads as a jump, and it caps repaints at ~12 per second no
+  // matter how the provider chops the answer. It matters because MessageBubble re-parses the
+  // whole accumulated markdown on every repaint, not just the new piece.
+  const STREAM_FLUSH_MS = 80;
+
+  function queueStreamingText(chatId: string, textSoFar: string) {
+    streamingBufferRef.current.set(chatId, textSoFar);
+    // A timer already running will pick up whatever the buffer holds when it fires, so a
+    // second chunk inside the same window costs nothing.
+    if (streamingTimerRef.current.has(chatId)) return;
+
+    const timer = window.setTimeout(() => {
+      streamingTimerRef.current.delete(chatId);
+      const pending = streamingBufferRef.current.get(chatId);
+      if (pending === undefined) return;
+      setStreamingTextByChat((prev) => ({ ...prev, [chatId]: pending }));
+    }, STREAM_FLUSH_MS);
+
+    streamingTimerRef.current.set(chatId, timer);
+  }
+
+  function clearStreamingText(chatId: string) {
+    const timer = streamingTimerRef.current.get(chatId);
+    if (timer !== undefined) window.clearTimeout(timer);
+    streamingTimerRef.current.delete(chatId);
+    streamingBufferRef.current.delete(chatId);
+    setStreamingTextByChat((prev) => {
+      if (!(chatId in prev)) return prev;
+      const next = { ...prev };
+      delete next[chatId];
+      return next;
+    });
   }
 
   useEffect(() => {
@@ -942,6 +986,9 @@ export default function App() {
     // tuyo, y es beforeRequest quien lo materializa en Mongo. Vive fuera para que el catch
     // pueda sellar el _id aunque la generación acabe fallando o abortada.
     let pendingUserMessageId: Promise<string | undefined> = Promise.resolve(undefined);
+    // The last accumulated text, kept here and not read from the ref: the abort branch needs
+    // it, and a local variable cannot be emptied by another chat's cleanup.
+    let streamedText = '';
 
     try {
       await options.beforeRequest?.();
@@ -965,7 +1012,11 @@ export default function App() {
         targetChat?.systemPromptEnabled === false ? undefined : targetChat?.systemPrompt,
         controller.signal,
         isNotesEnabled(targetChat?.notesEnabled) ? targetChat?.notes : undefined,
-        isNotesEnabled(targetChat?.notesEnabled)
+        isNotesEnabled(targetChat?.notesEnabled),
+        (textSoFar) => {
+          streamedText = textSoFar;
+          queueStreamingText(chatId, textSoFar);
+        }
       );
 
       // Si el prompt no llegó a guardarse, este await relanza y no persistimos la respuesta.
@@ -989,6 +1040,8 @@ export default function App() {
       options.onSuccess?.(response.text);
     } catch (error) {
       const err = error as Error;
+      // streamedText is filled by onChunk for the abort path; the catch block does not read it yet.
+      void streamedText;
 
       if (err.name === 'AbortError') {
         // Abortar deja la conversación tal y como se envió, sin respuesta. El botón se
@@ -1054,6 +1107,9 @@ export default function App() {
         abortControllersRef.current.delete(chatId);
         setGeneratingChatIds(prev => prev.filter(id => id !== chatId));
       }
+      // All three endings pass through here — answer, Stop and error — so the drip state is
+      // cleaned in one place instead of three.
+      clearStreamingText(chatId);
     }
   }
 
@@ -1387,6 +1443,17 @@ export default function App() {
     );
   }
 
+  // The drip is painted by replacing the text of the temporary bubble, so it stays
+  // isTemporary: no buttons and no timestamp until it is a real message.
+  const streamingText = streamingTextByChat[activeChatId];
+  const messagesToRender = streamingText
+    ? (currentChat?.messages || []).map((message, index, all) =>
+        index === all.length - 1 && message.isTemporary && message.role === 'model'
+          ? { ...message, parts: [{ text: streamingText }] }
+          : message
+      )
+    : currentChat?.messages || [];
+
   return (
     <>
       {/* 1. Inyectamos los símbolos en el DOM */}
@@ -1443,7 +1510,7 @@ export default function App() {
           ) : (
             <MessageView
               key={activeChatId}
-              messages={currentChat?.messages || []}
+              messages={messagesToRender}
               chatId={activeChatId}
               isNewChat={isDraftChat}
               hasMoreMap={hasMoreMap}
