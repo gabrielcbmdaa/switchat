@@ -278,4 +278,33 @@ describe('following the text while it is written', () => {
         expect(scrollTo).toHaveBeenCalled();
         vi.useRealTimers();
     });
+
+    it('does not jump to the end when the finished answer replaces the bubble and the reader scrolled up', () => {
+        const scrollTo = vi.fn();
+        Element.prototype.scrollTo = scrollTo;
+        vi.useFakeTimers();
+        // 1000 - 0 - 400 = 600 px from the bottom, past the 200 px "still following" line.
+        vi.spyOn(HTMLElement.prototype, 'scrollHeight', 'get').mockReturnValue(1000);
+        vi.spyOn(HTMLElement.prototype, 'clientHeight', 'get').mockReturnValue(400);
+
+        const user = { role: 'user' as const, parts: [{ text: 'la pregunta' }] };
+        const before: Message[] = [
+            user,
+            { role: 'model', parts: [{ text: 'Hola qué tal' }], isTemporary: true },
+        ];
+        const after: Message[] = [
+            { ...user },
+            { role: 'model', parts: [{ text: 'Hola qué tal' }] },
+        ];
+
+        const { rerender } = render(<MessageView {...baseProps} messages={before} />);
+        act(() => { vi.runAllTimers(); });
+        scrollTo.mockClear();
+
+        rerender(<MessageView {...baseProps} messages={after} />);
+        act(() => { vi.runAllTimers(); });
+
+        expect(scrollTo).not.toHaveBeenCalled();
+        vi.useRealTimers();
+    });
 });

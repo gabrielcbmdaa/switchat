@@ -60,6 +60,7 @@ export default function MessageView({
     const prevMessagesRef = useRef<Message[]>([]);
     const prevMessagesLengthRef = useRef(messages.length);
     const hasScrolledRef = useRef(false);
+    const prevChatIdRef = useRef(chatId);
 
     const prevScrollHeightRef = useRef<number>(0);
     const prevScrollTopRef = useRef<number>(0);
@@ -113,6 +114,12 @@ export default function MessageView({
         }
     };
     useEffect(() => {
+        // A finished answer replaces the temporary bubble with new objects, so the
+        // first message's identity changes without the reader having switched chats.
+        // Only a real chat change should force the view to the bottom.
+        const chatChanged = prevChatIdRef.current !== chatId;
+        prevChatIdRef.current = chatId;
+
         const container = containerRef.current;
         if (!container || messages.length === 0) {
             prevMessagesRef.current = messages;
@@ -149,7 +156,7 @@ export default function MessageView({
                 ? 'auto'
                 : ((hasScrolledRef.current && isSameChat && hasNewMessage) ? 'smooth' : 'auto');
 
-            if (!isSameChat || hasNewMessage || (lastMessageGrew && isNearBottom)) {
+            if (chatChanged || hasNewMessage || (lastMessageGrew && isNearBottom)) {
                 setTimeout(() => {
                     if (containerRef.current) {
                         containerRef.current.scrollTo({
