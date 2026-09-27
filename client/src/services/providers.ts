@@ -29,6 +29,32 @@ export class ProviderError extends Error {
 const MAX_RAW_ERROR_LENGTH = 300;
 
 /**
+ * The words a user sees for a provider's error status. Shared by the HTTP path and by the
+ * errors Google sends inside a stream that had already started, so both read the same.
+ */
+function friendlyProviderMessage(
+    status: number,
+    provider: string,
+    modelLowerCase: string,
+    detail: string
+): string {
+    const shortDetail = detail.length > MAX_RAW_ERROR_LENGTH
+        ? `${detail.slice(0, MAX_RAW_ERROR_LENGTH)}…`
+        : detail;
+
+    // Textos heredados del errorMap del servidor: son los que ya veían los usuarios online
+    const friendlyMessages: Record<number, string> = {
+        401: `🔑 Invalid or expired API Key for ${provider}. Check your configuration.`,
+        403: `🚫 Access denied by ${provider}. Your API Key does not have permissions to use the model "${modelLowerCase}".`,
+        404: `❓ The model "${modelLowerCase}" does not exist or is unavailable in ${provider}.`,
+        429: `⏳ Too many requests to ${provider}. You have reached the rate limit. Please wait a moment and try again.`,
+        503: `🔥 The model "${modelLowerCase}" is experiencing high demand right now. Try again in a few seconds or try another model.`,
+    };
+
+    return friendlyMessages[status] || `Error ${status} from ${provider}: ${shortDetail}`;
+}
+
+/**
  * Traduce una respuesta HTTP fallida de un proveedor a un error accionable.
  *
  * Lee el cuerpo como texto ANTES de intentar parsearlo: un 502 de un proxy responde
@@ -50,23 +76,12 @@ async function throwProviderError(
         // El cuerpo no era JSON (HTML de un proxy, respuesta vacía): nos quedamos con el texto crudo
     }
 
-    if (apiErrorMessage.length > MAX_RAW_ERROR_LENGTH) {
-        apiErrorMessage = `${apiErrorMessage.slice(0, MAX_RAW_ERROR_LENGTH)}…`;
-    }
-
-    // Textos heredados del errorMap del servidor: son los que ya veían los usuarios online
-    const friendlyMessages: Record<number, string> = {
-        401: `🔑 Invalid or expired API Key for ${provider}. Check your configuration.`,
-        403: `🚫 Access denied by ${provider}. Your API Key does not have permissions to use the model "${modelLowerCase}".`,
-        404: `❓ The model "${modelLowerCase}" does not exist or is unavailable in ${provider}.`,
-        429: `⏳ Too many requests to ${provider}. You have reached the rate limit. Please wait a moment and try again.`,
-        503: `🔥 The model "${modelLowerCase}" is experiencing high demand right now. Try again in a few seconds or try another model.`,
-    };
-
-    const message = friendlyMessages[response.status]
-        || `Error ${response.status} from ${provider}: ${apiErrorMessage}`;
-
-    throw new ProviderError(message, response.status, provider, modelLowerCase);
+    throw new ProviderError(
+        friendlyProviderMessage(response.status, provider, modelLowerCase, apiErrorMessage),
+        response.status,
+        provider,
+        modelLowerCase
+    );
 }
 
 /**
@@ -138,8 +153,17 @@ function geminiVisibleText(parts: GeminiPart[]): string {
  * JSON.parse is deliberately not wrapped in a try/catch: with splitSseEvents holding the
  * tail back, every payload that reaches it is complete, and swallowing an error here would
  * hide exactly the bug the buffer exists to prevent.
+ *
+ * The answer only counts once Google says it finished: its last event carries a
+ * finishReason. Measured on 2026-09-27, an overloaded gemini-3.6-flash closed streams
+ * mid-answer with no error and no finishReason, and six answers were saved as complete
+ * while cut mid-sentence. The plain endpoint turned that cut into an error; so does this.
  */
-async function readGeminiStream(response: Response, onChunk: ChunkListener): Promise<string> {
+async function readGeminiStream(
+    response: Response,
+    onChunk: ChunkListener,
+    modelLowerCase: string
+): Promise<string> {
     const reader = response.body?.getReader();
     if (!reader) {
         throw new Error('The Google API did not return a readable response.');
@@ -148,6 +172,40 @@ async function readGeminiStream(response: Response, onChunk: ChunkListener): Pro
     const decoder = new TextDecoder();
     let buffer = '';
     let text = '';
+    let finished = false;
+
+    const readEvent = (event: string) => {
+        const dataLine = event.split('\n').find((line) => line.startsWith('data:'));
+        if (!dataLine) return;
+
+        const payload = dataLine.slice('data:'.length).trim();
+        if (!payload) return;
+
+        const parsed = JSON.parse(payload);
+        // Google can give up after the answer has started. The status line already said
+        // 200, so the overload arrives as an event: same words as when it says so up front.
+        if (parsed.error) {
+            const status = Number(parsed.error.code) || 500;
+            throw new ProviderError(
+                friendlyProviderMessage(status, 'google', modelLowerCase, parsed.error.message || ''),
+                status,
+                'google',
+                modelLowerCase
+            );
+        }
+
+        const candidate = parsed.candidates?.[0];
+        // Any finishReason counts: STOP, MAX_TOKENS or SAFETY are Google ending the answer on
+        // purpose. Only its absence means the stream was cut.
+        if (candidate?.finishReason) finished = true;
+
+        const parts: GeminiPart[] = candidate?.content?.parts ?? [];
+        const visible = geminiVisibleText(parts);
+        if (!visible) return;
+
+        text += visible;
+        onChunk(text);
+    };
 
     for (;;) {
         const { done, value } = await reader.read();
@@ -156,22 +214,22 @@ async function readGeminiStream(response: Response, onChunk: ChunkListener): Pro
         buffer += decoder.decode(value, { stream: true });
         const { events, rest } = splitSseEvents(buffer);
         buffer = rest;
+        events.forEach(readEvent);
+    }
 
-        for (const event of events) {
-            const dataLine = event.split('\n').find((line) => line.startsWith('data:'));
-            if (!dataLine) continue;
+    // The body can end without the blank line that closes its last event: what is left is
+    // then a whole event. The final decode() only tells the decoder the body ended; a
+    // well-formed body leaves nothing in it.
+    buffer += decoder.decode();
+    if (buffer.trim()) readEvent(buffer.replace(/\r\n/g, '\n'));
 
-            const payload = dataLine.slice('data:'.length).trim();
-            if (!payload) continue;
-
-            const parsed = JSON.parse(payload);
-            const parts: GeminiPart[] = parsed.candidates?.[0]?.content?.parts ?? [];
-            const visible = geminiVisibleText(parts);
-            if (!visible) continue;
-
-            text += visible;
-            onChunk(text);
-        }
+    if (!finished) {
+        throw new ProviderError(
+            '✂️ The answer from google was cut off before it finished. Try again in a few seconds or try another model.',
+            502,
+            'google',
+            modelLowerCase
+        );
     }
 
     return text;
@@ -253,7 +311,7 @@ async function sendToGoogle(
     }
 
     if (onChunk) {
-        return { text: await readGeminiStream(response, onChunk) };
+        return { text: await readGeminiStream(response, onChunk, modelLowerCase) };
     }
 
     const data = await response.json();

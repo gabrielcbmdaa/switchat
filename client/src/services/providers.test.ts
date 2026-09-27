@@ -259,8 +259,8 @@ function sseEvent(payload: unknown): string {
     return `data: ${JSON.stringify(payload)}\n\n`;
 }
 
-function geminiChunk(parts: { text?: string; thought?: boolean }[]) {
-    return { candidates: [{ content: { parts } }] };
+function geminiChunk(parts: { text?: string; thought?: boolean }[], finishReason?: string) {
+    return { candidates: [{ content: { parts }, ...(finishReason ? { finishReason } : {}) }] };
 }
 
 describe('sendToGoogle — streaming', () => {
@@ -283,7 +283,7 @@ describe('sendToGoogle — streaming', () => {
     });
 
     it('uses the streaming endpoint when a chunk callback is given', async () => {
-        const fetchMock = stubGoogleStream([sseEvent(geminiChunk([{ text: 'hola' }]))]);
+        const fetchMock = stubGoogleStream([sseEvent(geminiChunk([{ text: 'hola' }], 'STOP'))]);
 
         await fetchFromProvider('gemini-3.5-flash', history, 'low', undefined, () => {});
 
@@ -296,7 +296,7 @@ describe('sendToGoogle — streaming', () => {
         stubGoogleStream([
             sseEvent(geminiChunk([{ text: 'Hola' }])),
             sseEvent(geminiChunk([{ text: ' qué' }])),
-            sseEvent(geminiChunk([{ text: ' tal' }])),
+            sseEvent(geminiChunk([{ text: ' tal' }], 'STOP')),
         ]);
 
         const seen: string[] = [];
@@ -311,7 +311,7 @@ describe('sendToGoogle — streaming', () => {
     it('never reports the reasoning parts while streaming', async () => {
         stubGoogleStream([
             sseEvent(geminiChunk([{ text: 'estoy pensando', thought: true }])),
-            sseEvent(geminiChunk([{ text: 'la respuesta' }])),
+            sseEvent(geminiChunk([{ text: 'la respuesta' }], 'STOP')),
         ]);
 
         const seen: string[] = [];
@@ -324,12 +324,90 @@ describe('sendToGoogle — streaming', () => {
     });
 
     it('rebuilds an event split across two reads', async () => {
-        const whole = sseEvent(geminiChunk([{ text: 'entera' }]));
+        const whole = sseEvent(geminiChunk([{ text: 'entera' }], 'STOP'));
         stubGoogleStream([whole.slice(0, 12), whole.slice(12)]);
 
         const { text } = await fetchFromProvider('gemini-3.5-flash', history, 'low', undefined, () => {});
 
         expect(text).toBe('entera');
+    });
+
+    // Measured on 2026-09-27: an overloaded gemini-3.6-flash closed the stream mid-answer,
+    // with no error and no finishReason, and the cut text was saved as a finished answer.
+    it('fails instead of answering when the stream ends before Google says it finished', async () => {
+        stubGoogleStream([sseEvent(geminiChunk([{ text: 'La medición del tiempo dio un giro' }]))]);
+
+        const seen: string[] = [];
+        await expect(
+            fetchFromProvider('gemini-3.5-flash', history, 'low', undefined, (soFar) => {
+                seen.push(soFar);
+            })
+        ).rejects.toThrow(/cut off before it finished/);
+        // The text had already been shown: failing is what keeps it from being saved.
+        expect(seen).toEqual(['La medición del tiempo dio un giro']);
+    });
+
+    it('turns an error that arrives inside the stream into the friendly message', async () => {
+        stubGoogleStream([
+            sseEvent(geminiChunk([{ text: 'Hola' }])),
+            sseEvent({ error: { code: 503, message: 'This model is currently experiencing high demand.', status: 'UNAVAILABLE' } }),
+        ]);
+
+        await expect(
+            fetchFromProvider('gemini-3.5-flash', history, 'low', undefined, () => {})
+        ).rejects.toThrow(/is experiencing high demand right now/);
+    });
+
+    it('reads a last event that is not followed by a blank line', async () => {
+        stubGoogleStream([
+            sseEvent(geminiChunk([{ text: 'casi ' }])),
+            `data: ${JSON.stringify(geminiChunk([{ text: 'entera' }], 'STOP'))}`,
+        ]);
+
+        const { text } = await fetchFromProvider('gemini-3.5-flash', history, 'low', undefined, () => {});
+
+        expect(text).toBe('casi entera');
+    });
+
+    // The shape captured from the real API on 2026-09-27: the finishing event carries
+    // finishReason and usage data, and no text at all.
+    it('accepts a finishing event that carries no text', async () => {
+        stubGoogleStream([
+            sseEvent(geminiChunk([{ text: 'respuesta' }])),
+            sseEvent(geminiChunk([], 'STOP')),
+        ]);
+
+        const { text } = await fetchFromProvider('gemini-3.5-flash', history, 'low', undefined, () => {});
+
+        expect(text).toBe('respuesta');
+    });
+
+    // Stop reaches the reader as an aborted read. It must leave as AbortError, which
+    // sendChatHistory keeps as a stopped answer; never as the "cut off" error, which would
+    // throw the text away.
+    it('lets a Stop mid-stream through as an AbortError, not as a cut', async () => {
+        const encoder = new TextEncoder();
+        let reads = 0;
+        vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
+            ok: true,
+            body: {
+                getReader: () => ({
+                    read: async () => {
+                        reads += 1;
+                        if (reads === 1) {
+                            return { done: false, value: encoder.encode(sseEvent(geminiChunk([{ text: 'a medias' }]))) };
+                        }
+                        const abort = new Error('The user aborted a request.');
+                        abort.name = 'AbortError';
+                        throw abort;
+                    },
+                }),
+            },
+        }));
+
+        await expect(
+            fetchFromProvider('gemini-3.5-flash', history, 'low', undefined, () => {})
+        ).rejects.toMatchObject({ name: 'AbortError' });
     });
 
     it('still gives the friendly message when the request fails before any chunk', async () => {
@@ -351,7 +429,7 @@ describe('fetchChatResponse — onChunk reaches fetchFromProvider', () => {
     });
 
     it('uses the streaming endpoint when the caller passes onChunk', async () => {
-        const reads = [sseEvent(geminiChunk([{ text: 'hola' }]))];
+        const reads = [sseEvent(geminiChunk([{ text: 'hola' }], 'STOP'))];
         const encoder = new TextEncoder();
         let index = 0;
 
