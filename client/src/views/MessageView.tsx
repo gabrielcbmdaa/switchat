@@ -134,9 +134,19 @@ export default function MessageView({
         const prevFirstVisible = prevFirstVisibleRef.current;
         const olderArrived = prevFirstVisible !== undefined && visibleMessages.indexOf(prevFirstVisible) > 0;
         if (olderArrived) {
-            // Everything moved down by exactly what was added on top: keep the reader's line.
-            const heightBefore = lastRenderedHeightRef.current || container.scrollHeight;
-            container.scrollTop += container.scrollHeight - heightBefore;
+            // The page landed above the message that used to open the list, so that message
+            // moved down by exactly what the page added. Read it from the page as it is now,
+            // not from a height saved at an earlier render: a panel opened or closed in between
+            // reflows the column with no render of ours, and a saved height then moved the
+            // reader by the difference (1911 px, measured on 2026-09-27). The children of the
+            // container are the bubbles, one per visible message, in order.
+            const oldFirst = container.children[visibleMessages.indexOf(prevFirstVisible!)] as HTMLElement | undefined;
+            const newFirst = container.children[0] as HTMLElement | undefined;
+            // No height-based fallback: it would be the stale formula this replaced. If the
+            // bubbles are not where they should be, leaving the scroll alone is the smaller error.
+            if (oldFirst && newFirst) {
+                container.scrollTop += oldFirst.offsetTop - newFirst.offsetTop;
+            }
             // Offline the page is in memory and arrives synchronously: this is its release.
             isLoadingMoreRef.current = false;
         } else {

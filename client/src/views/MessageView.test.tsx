@@ -180,6 +180,12 @@ describe('cargar mensajes antiguos', () => {
         let contentHeight = 1000;
         vi.spyOn(HTMLElement.prototype, 'scrollHeight', 'get').mockImplementation(() => contentHeight);
         vi.spyOn(HTMLElement.prototype, 'clientHeight', 'get').mockReturnValue(400);
+        // jsdom lays nothing out: say where each bubble's top sits. The first bubble starts
+        // 52 px down (the column's top padding in the real CSS); the old first message ends
+        // up 400 px below it, which is what the page added above it.
+        vi.spyOn(HTMLElement.prototype, 'offsetTop', 'get').mockImplementation(function (this: HTMLElement) {
+            return this.textContent?.includes('pregunta vieja') ? 452 : 52;
+        });
         const scrollTo = vi.fn();
         Element.prototype.scrollTo = scrollTo;
         vi.useFakeTimers();
@@ -195,6 +201,47 @@ describe('cargar mensajes antiguos', () => {
 
         // The page before arrives on top and adds 400 px above the reader.
         contentHeight = 1400;
+        rerender(
+            <MessageView
+                {...baseProps}
+                messages={[message('user', 'más vieja'), message('model', 'respuesta más vieja'), ...messages]}
+            />
+        );
+        act(() => { vi.runAllTimers(); });
+
+        expect(scroller.scrollTop).toBe(700);
+        expect(scrollTo).not.toHaveBeenCalled();
+        vi.useRealTimers();
+    });
+
+    // Measured on 2026-09-27: a panel switched between two renders reflowed the column, the
+    // height saved at the last render went stale, and the reader moved 1911 px when the older
+    // page arrived.
+    it('keeps the reader on the same line even if the column reflowed since the last render', () => {
+        let contentHeight = 1000;
+        vi.spyOn(HTMLElement.prototype, 'scrollHeight', 'get').mockImplementation(() => contentHeight);
+        vi.spyOn(HTMLElement.prototype, 'clientHeight', 'get').mockReturnValue(400);
+        // jsdom lays nothing out: say where each bubble's top sits. The first bubble starts
+        // 52 px down (the column's top padding in the real CSS); the old first message ends
+        // up 400 px below it, which is what the page added above it.
+        vi.spyOn(HTMLElement.prototype, 'offsetTop', 'get').mockImplementation(function (this: HTMLElement) {
+            return this.textContent?.includes('pregunta vieja') ? 452 : 52;
+        });
+        const scrollTo = vi.fn();
+        Element.prototype.scrollTo = scrollTo;
+        vi.useFakeTimers();
+
+        const { rerender } = renderMessageView(() => { });
+        act(() => { vi.runAllTimers(); });
+        const scroller = screen
+            .getByText('pregunta vieja')
+            .closest('[class*="messageViewContainer"]') as HTMLElement;
+        scroller.scrollTop = 300;
+        scrollTo.mockClear();
+
+        // A panel opened since the last render: the column reflowed, so the 1000 px saved
+        // then is stale. Now the older page arrives on top and adds 400 px above the reader.
+        contentHeight = 2400;
         rerender(
             <MessageView
                 {...baseProps}
