@@ -307,4 +307,73 @@ describe('following the text while it is written', () => {
         expect(scrollTo).not.toHaveBeenCalled();
         vi.useRealTimers();
     });
+
+    // Measured in the browser: with reasoning off Gemini sends few, large chunks, and one of
+    // 746 characters was ~308 px tall. Measuring the distance AFTER painting it counted the
+    // new text as distance the reader had travelled, so the view stopped following a reader
+    // who never touched the scrollbar.
+    it('keeps following a reader at the bottom when one batch is taller than the 200 px margin', () => {
+        const scrollTo = vi.fn();
+        Element.prototype.scrollTo = scrollTo;
+        vi.useFakeTimers();
+        let contentHeight = 1000;
+        vi.spyOn(HTMLElement.prototype, 'scrollHeight', 'get').mockImplementation(() => contentHeight);
+        vi.spyOn(HTMLElement.prototype, 'clientHeight', 'get').mockReturnValue(400);
+        // 1000 - 600 - 400 = 0 px: the reader is exactly at the bottom.
+        vi.spyOn(HTMLElement.prototype, 'scrollTop', 'get').mockReturnValue(600);
+
+        const user = { role: 'user' as const, parts: [{ text: 'la pregunta' }] };
+        const before: Message[] = [
+            user,
+            { role: 'model', parts: [{ text: 'Hola' }], isTemporary: true },
+        ];
+        const after: Message[] = [
+            user,
+            { role: 'model', parts: [{ text: 'Hola, y aquí llega de golpe un párrafo entero' }], isTemporary: true },
+        ];
+
+        const { rerender } = render(<MessageView {...baseProps} messages={before} />);
+        act(() => { vi.runAllTimers(); });
+        scrollTo.mockClear();
+
+        // One batch adds 500 px. Measured after painting it, the reader would look 500 px away.
+        contentHeight = 1500;
+        rerender(<MessageView {...baseProps} messages={after} />);
+        act(() => { vi.runAllTimers(); });
+
+        expect(scrollTo).toHaveBeenCalled();
+        vi.useRealTimers();
+    });
+
+    it('still leaves alone a reader who scrolled up while the answer grows', () => {
+        const scrollTo = vi.fn();
+        Element.prototype.scrollTo = scrollTo;
+        vi.useFakeTimers();
+        let contentHeight = 1000;
+        vi.spyOn(HTMLElement.prototype, 'scrollHeight', 'get').mockImplementation(() => contentHeight);
+        vi.spyOn(HTMLElement.prototype, 'clientHeight', 'get').mockReturnValue(400);
+        // 1000 - 0 - 400 = 600 px above the bottom before the batch arrives.
+        vi.spyOn(HTMLElement.prototype, 'scrollTop', 'get').mockReturnValue(0);
+
+        const user = { role: 'user' as const, parts: [{ text: 'la pregunta' }] };
+        const before: Message[] = [
+            user,
+            { role: 'model', parts: [{ text: 'Hola' }], isTemporary: true },
+        ];
+        const after: Message[] = [
+            user,
+            { role: 'model', parts: [{ text: 'Hola qué tal' }], isTemporary: true },
+        ];
+
+        const { rerender } = render(<MessageView {...baseProps} messages={before} />);
+        act(() => { vi.runAllTimers(); });
+        scrollTo.mockClear();
+
+        contentHeight = 1100;
+        rerender(<MessageView {...baseProps} messages={after} />);
+        act(() => { vi.runAllTimers(); });
+
+        expect(scrollTo).not.toHaveBeenCalled();
+        vi.useRealTimers();
+    });
 });

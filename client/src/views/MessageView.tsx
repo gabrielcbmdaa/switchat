@@ -61,6 +61,10 @@ export default function MessageView({
     const prevMessagesLengthRef = useRef(messages.length);
     const hasScrolledRef = useRef(false);
     const prevChatIdRef = useRef(chatId);
+    // How tall the content was the last time the scroll effect ran. "Is the reader near the
+    // bottom?" has to be asked about the page they were looking at, not the one that already
+    // has the new batch painted in: see the effect below.
+    const lastRenderedHeightRef = useRef<number>(0);
 
     const prevScrollHeightRef = useRef<number>(0);
     const prevScrollTopRef = useRef<number>(0);
@@ -146,9 +150,14 @@ export default function MessageView({
             // Only if the user was already near the bottom: someone who scrolled up to reread
             // something should not be dragged down. Same 200 px threshold the prompt resizer
             // uses below.
-            const scrollContainer = containerRef.current;
-            const isNearBottom = !scrollContainer
-                || scrollContainer.scrollHeight - scrollContainer.scrollTop - scrollContainer.clientHeight <= 200;
+            //
+            // Measured against the height BEFORE this batch. By the time this effect runs the
+            // new text is already in the DOM, so the current scrollHeight counts it as distance
+            // the reader travelled. With few, large chunks (one measured at ~308 px) a reader
+            // who never touched the scrollbar looked 300 px away and the view stopped following.
+            // New text only grows at the bottom, so scrollTop still says where they were.
+            const heightBefore = lastRenderedHeightRef.current || container.scrollHeight;
+            const isNearBottom = heightBefore - container.scrollTop - container.clientHeight <= 200;
 
             // 'auto' while it is being written: a smooth scroll lasts longer than the 80 ms
             // batch, so at ~12 batches per second each animation would cancel the previous one.
@@ -169,6 +178,7 @@ export default function MessageView({
         }
         hasScrolledRef.current = true;
         prevMessagesRef.current = messages;
+        lastRenderedHeightRef.current = container.scrollHeight;
 
         // The scrollbar is the only gesture that asks for older messages, and it
         // only exists once the text overflows. A page of short messages never
