@@ -13,7 +13,7 @@ interface MessageViewProps {
     isNewChat?: boolean;
     hasMoreMap: Record<string, boolean>;
     loadedChatIds: Record<string, boolean>;
-    onLoadMore: () => void;
+    onLoadMore: () => void | Promise<void>;
     onDeleteMessage: (messageIndex: number) => void;
     onRetryMessage: (messageIndex: number) => void;
     onSaveMessage?: (messageIndex: number, text: string) => void;
@@ -66,9 +66,10 @@ export default function MessageView({
     // has the new batch painted in: see the effect below.
     const lastRenderedHeightRef = useRef<number>(0);
 
-    const prevScrollHeightRef = useRef<number>(0);
-    const prevScrollTopRef = useRef<number>(0);
     const isLoadingMoreRef = useRef<boolean>(false);
+    // The first message on screen the last time the scroll effect ran. When it is still in
+    // the list but no longer first, older messages were added above it.
+    const prevFirstVisibleRef = useRef<Message | undefined>(undefined);
 
     // Incrementar visibleCount si llegan nuevos mensajes en el mismo chat (usuario escribe o responde Gemini)
     useEffect(() => {
@@ -94,15 +95,16 @@ export default function MessageView({
     // Función para solicitar más mensajes
     const loadMore = () => {
         if (!hasMoreMessages || isLoadingMoreRef.current) return;
-        const container = containerRef.current;
-        if (container) {
-            prevScrollHeightRef.current = container.scrollHeight;
-            prevScrollTopRef.current = container.scrollTop;
-            isLoadingMoreRef.current = true;
-        }
+        // Held while the request is out: without it every scroll event near the top, and
+        // every render while the page still fits, would ask again for the same page.
+        isLoadingMoreRef.current = true;
         if (token) {
-            // Online: ask the server for the page behind the cursor.
-            onLoadMore();
+            // Online: ask the server for the page behind the cursor. Released when the request
+            // settles, found or not, so a failed or empty page does not block the next try.
+            // Keeping the viewport no longer depends on this flag: see olderArrived below.
+            Promise.resolve(onLoadMore()).finally(() => {
+                isLoadingMoreRef.current = false;
+            });
         } else {
             // Offline: the next page is already in memory.
             setVisibleCount(prev => Math.min(prev + 6, messages.length));
@@ -127,14 +129,22 @@ export default function MessageView({
         const container = containerRef.current;
         if (!container || messages.length === 0) {
             prevMessagesRef.current = messages;
+            prevFirstVisibleRef.current = visibleMessages[0];
             return;
         }
         const prev = prevMessagesRef.current;
         const isSameChat = prev.length > 0 && prev[0] === messages[0];
-        if (isLoadingMoreRef.current) {
-            // Older messages were prepended. Keep the viewport on the same line.
-            const diff = container.scrollHeight - prevScrollHeightRef.current;
-            container.scrollTop = prevScrollTopRef.current + diff;
+        // Older messages were prepended when the message that used to open the list is still
+        // in it, just no longer first. Asked of the list itself, not of a flag set when the
+        // page was requested: while an answer is being written the next render is a
+        // streaming batch, not the page, and it used to consume that flag.
+        const prevFirstVisible = prevFirstVisibleRef.current;
+        const olderArrived = prevFirstVisible !== undefined && visibleMessages.indexOf(prevFirstVisible) > 0;
+        if (olderArrived) {
+            // Everything moved down by exactly what was added on top: keep the reader's line.
+            const heightBefore = lastRenderedHeightRef.current || container.scrollHeight;
+            container.scrollTop += container.scrollHeight - heightBefore;
+            // Offline the page is in memory and arrives synchronously: this is its release.
             isLoadingMoreRef.current = false;
         } else {
             const hasNewMessage = messages.length > prev.length;
@@ -178,6 +188,7 @@ export default function MessageView({
         }
         hasScrolledRef.current = true;
         prevMessagesRef.current = messages;
+        prevFirstVisibleRef.current = visibleMessages[0];
         lastRenderedHeightRef.current = container.scrollHeight;
 
         // The scrollbar is the only gesture that asks for older messages, and it

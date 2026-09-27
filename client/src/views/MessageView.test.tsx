@@ -58,6 +58,10 @@ function fakePageSize(scrollHeight: number, clientHeight: number) {
 }
 
 afterEach(() => {
+    // A test that switches to fake timers and then fails never reaches its own
+    // vi.useRealTimers(), and every later test that waits on real time hangs until the
+    // 5000 ms cap. Same pattern as AppNotice.test.tsx.
+    vi.useRealTimers();
     vi.restoreAllMocks();
 });
 
@@ -138,6 +142,82 @@ describe('cargar mensajes antiguos', () => {
         );
 
         expect(onLoadMore).toHaveBeenCalledTimes(2);
+    });
+
+    // While an answer is being written, the render after the request is a streaming batch,
+    // not the page. It used to consume the "request out" flag, skip following the answer
+    // and ask for the same page a second time.
+    it('does not ask again, and keeps following the answer, while the older page is on its way', () => {
+        fakePageSize(100, 400);
+        const scrollTo = vi.fn();
+        Element.prototype.scrollTo = scrollTo;
+        vi.useFakeTimers();
+        const onLoadMore = vi.fn(() => new Promise<void>(() => { }));
+        const user = message('user', 'la pregunta');
+
+        const { rerender } = renderMessageView(onLoadMore, {
+            messages: [user, { role: 'model', parts: [{ text: 'Hola' }], isTemporary: true }],
+        });
+        expect(onLoadMore).toHaveBeenCalledTimes(1);
+        act(() => { vi.runAllTimers(); });
+        scrollTo.mockClear();
+
+        rerender(
+            <MessageView
+                {...baseProps}
+                onLoadMore={onLoadMore}
+                messages={[user, { role: 'model', parts: [{ text: 'Hola qué tal' }], isTemporary: true }]}
+            />
+        );
+        act(() => { vi.runAllTimers(); });
+
+        expect(onLoadMore).toHaveBeenCalledTimes(1);
+        expect(scrollTo).toHaveBeenCalled();
+        vi.useRealTimers();
+    });
+
+    it('keeps the reader on the same line when older messages arrive on top', () => {
+        let contentHeight = 1000;
+        vi.spyOn(HTMLElement.prototype, 'scrollHeight', 'get').mockImplementation(() => contentHeight);
+        vi.spyOn(HTMLElement.prototype, 'clientHeight', 'get').mockReturnValue(400);
+        const scrollTo = vi.fn();
+        Element.prototype.scrollTo = scrollTo;
+        vi.useFakeTimers();
+
+        const { rerender } = renderMessageView(() => { });
+        act(() => { vi.runAllTimers(); });
+        const scroller = screen
+            .getByText('pregunta vieja')
+            .closest('[class*="messageViewContainer"]') as HTMLElement;
+        // jsdom stores scrollTop as a plain number: the reader is reading 300 px down.
+        scroller.scrollTop = 300;
+        scrollTo.mockClear();
+
+        // The page before arrives on top and adds 400 px above the reader.
+        contentHeight = 1400;
+        rerender(
+            <MessageView
+                {...baseProps}
+                messages={[message('user', 'más vieja'), message('model', 'respuesta más vieja'), ...messages]}
+            />
+        );
+        act(() => { vi.runAllTimers(); });
+
+        expect(scroller.scrollTop).toBe(700);
+        expect(scrollTo).not.toHaveBeenCalled();
+        vi.useRealTimers();
+    });
+
+    // Offline the page is already in memory: setVisibleCount shows it at once, and the only
+    // release of the guard is noticing that the list grew at the front. Missing that would
+    // show one extra page and never load the rest of the history.
+    it('keeps loading local history offline until it no longer fits', () => {
+        fakePageSize(100, 400);
+        const local = Array.from({ length: 20 }, (_, i) => message(i % 2 === 0 ? 'user' : 'model', `m${i}`));
+
+        renderMessageView(() => { }, { messages: local, token: null });
+
+        expect(screen.getByText('m0')).toBeInTheDocument();
     });
 });
 
