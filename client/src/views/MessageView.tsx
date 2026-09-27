@@ -216,6 +216,26 @@ export default function MessageView({
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [visibleMessages, chatId, messages, hasMoreMessages]);
 
+    // The saved height describes the page as the last render left it. When the column itself
+    // changes size (a panel opened or closed, the window resized) the text reflows with no
+    // render of ours and that height goes stale: a reader at the bottom then looks hundreds
+    // of pixels away, and the view stops following the answer.
+    //
+    // Observed as a border box on purpose. Window and panel changes resize it; a classic
+    // scrollbar appearing (the first batch that overflows) and the prompt's padding only
+    // change the content box. Those land in the same frame as a batch, before the scroll
+    // effect reads the saved height, and would save it with the batch already in: the bug of
+    // commit 3f63b39 again.
+    useEffect(() => {
+        const container = containerRef.current;
+        if (!container) return;
+        const observer = new ResizeObserver(() => {
+            lastRenderedHeightRef.current = container.scrollHeight;
+        });
+        observer.observe(container, { box: 'border-box' });
+        return () => observer.disconnect();
+    }, [showEmptyState]);
+
     // Callback que recibe la altura del PromptInput cada vez que cambia
     const handlePromptHeightChange = useCallback((height: number) => {
         // Antes de actualizar, verificamos si el usuario está cerca del fondo

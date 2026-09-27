@@ -57,11 +57,33 @@ function fakePageSize(scrollHeight: number, clientHeight: number) {
     vi.spyOn(HTMLElement.prototype, 'clientHeight', 'get').mockReturnValue(clientHeight);
 }
 
+// jsdom has no layout, so nothing ever resizes: keep the callback the view registers for its
+// own column, and the box it asked to observe, to fire and inspect them by hand.
+function captureColumnObserver() {
+    const captured: { callback?: () => void; box?: string } = {};
+    vi.stubGlobal('ResizeObserver', class {
+        private readonly callback: () => void;
+        constructor(callback: () => void) { this.callback = callback; }
+        observe(target: Element, options?: ResizeObserverOptions) {
+            if (String((target as HTMLElement).className).includes('messageViewContainer')) {
+                captured.callback = this.callback;
+                captured.box = options?.box;
+            }
+        }
+        unobserve() { }
+        disconnect() { }
+    });
+    return captured;
+}
+
 afterEach(() => {
     // A test that switches to fake timers and then fails never reaches its own
     // vi.useRealTimers(), and every later test that waits on real time hangs until the
     // 5000 ms cap. Same pattern as AppNotice.test.tsx.
     vi.useRealTimers();
+    // restoreAllMocks does not undo vi.stubGlobal: a test that replaced a global and failed
+    // would leave it replaced for the rest of the file.
+    vi.unstubAllGlobals();
     vi.restoreAllMocks();
 });
 
@@ -502,5 +524,67 @@ describe('following the text while it is written', () => {
 
         expect(scrollTo).not.toHaveBeenCalled();
         vi.useRealTimers();
+    });
+
+    it('keeps following after the window widens mid-answer', () => {
+        const column = captureColumnObserver();
+        const scrollTo = vi.fn();
+        Element.prototype.scrollTo = scrollTo;
+        vi.useFakeTimers();
+        let contentHeight = 1000;
+        vi.spyOn(HTMLElement.prototype, 'scrollHeight', 'get').mockImplementation(() => contentHeight);
+        vi.spyOn(HTMLElement.prototype, 'clientHeight', 'get').mockReturnValue(400);
+
+        const user = { role: 'user' as const, parts: [{ text: 'la pregunta' }] };
+        const { rerender } = render(
+            <MessageView {...baseProps} messages={[user, { role: 'model', parts: [{ text: 'Hola' }], isTemporary: true }]} />
+        );
+        act(() => { vi.runAllTimers(); });
+        const scroller = screen
+            .getByText('la pregunta')
+            .closest('[class*="messageViewContainer"]') as HTMLElement;
+        // The reader sits at the bottom: 1000 - 600 - 400 = 0.
+        scroller.scrollTop = 600;
+
+        // The window widens: the same text now measures 700 px and the browser clamps the
+        // scroll to the new bottom. The view does not render; only its column changed size.
+        contentHeight = 700;
+        scroller.scrollTop = 300;
+        act(() => { column.callback?.(); });
+        scrollTo.mockClear();
+
+        // A batch arrives: 300 px more text.
+        contentHeight = 1000;
+        rerender(
+            <MessageView {...baseProps} messages={[user, { role: 'model', parts: [{ text: 'Hola, y un párrafo entero más' }], isTemporary: true }]} />
+        );
+        act(() => { vi.runAllTimers(); });
+
+        expect(column.callback).toBeDefined();
+        expect(scrollTo).toHaveBeenCalled();
+        vi.useRealTimers();
+    });
+
+    // A classic scrollbar appearing, or the prompt's padding growing, changes only the
+    // content box, in the same frame as a batch and before the scroll effect: observing that
+    // box would save the height with the batch already in.
+    it('watches the border box of its column, which a scrollbar does not change', () => {
+        const column = captureColumnObserver();
+
+        render(<MessageView {...baseProps} messages={messages} />);
+
+        expect(column.box).toBe('border-box');
+    });
+
+    // A new chat has no column until its first message: the observer must attach then.
+    it('observes the column of a chat that started empty', () => {
+        const column = captureColumnObserver();
+
+        const { rerender } = render(<MessageView {...baseProps} messages={[]} isNewChat />);
+        expect(column.callback).toBeUndefined();
+
+        rerender(<MessageView {...baseProps} messages={[message('user', 'la primera')]} isNewChat />);
+
+        expect(column.callback).toBeDefined();
     });
 });
