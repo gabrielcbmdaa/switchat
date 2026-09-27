@@ -1545,3 +1545,203 @@ describe('the answer being written on screen', () => {
         vi.useRealTimers();
     });
 });
+
+describe('stopping the answer half written', () => {
+    it('keeps what was written and marks it as stopped', async () => {
+        vi.useFakeTimers({ shouldAdvanceTime: true });
+        const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+
+        let report: ((textSoFar: string) => void) | undefined;
+        api.fetchChatResponse.mockImplementation((...args: unknown[]) => {
+            report = args[7] as (textSoFar: string) => void;
+            const signal = args[4] as AbortSignal;
+            return new Promise((_resolve, reject) => {
+                signal.addEventListener('abort', () => {
+                    const error = new Error('Aborted');
+                    error.name = 'AbortError';
+                    reject(error);
+                });
+            });
+        });
+
+        render(<App />);
+        await screen.findByText('A question 1');
+
+        await user.type(screen.getByPlaceholderText('Write a message...'), 'una pregunta');
+        await user.click(screen.getByTitle('Send message'));
+        await screen.findByText('Thinking...');
+
+        await act(async () => {
+            report?.('Media respuesta');
+            vi.advanceTimersByTime(80);
+        });
+        await screen.findByText('Media respuesta');
+
+        await act(async () => {
+            await user.click(screen.getByTitle('Stop generating'));
+        });
+
+        await screen.findByText('Media respuesta');
+        expect(api.saveMessageToServer).toHaveBeenCalledWith(
+            expect.any(String),
+            expect.objectContaining({ sender: 'ai', content: 'Media respuesta', stopped: true })
+        );
+        vi.useRealTimers();
+    });
+
+    it('leaves the conversation as it was sent when nothing had arrived yet', async () => {
+        const user = userEvent.setup();
+
+        api.fetchChatResponse.mockImplementation((...args: unknown[]) => {
+            const signal = args[4] as AbortSignal;
+            return new Promise((_resolve, reject) => {
+                signal.addEventListener('abort', () => {
+                    const error = new Error('Aborted');
+                    error.name = 'AbortError';
+                    reject(error);
+                });
+            });
+        });
+
+        render(<App />);
+        await screen.findByText('A question 1');
+
+        await user.type(screen.getByPlaceholderText('Write a message...'), 'una pregunta');
+        await user.click(screen.getByTitle('Send message'));
+        await screen.findByText('Thinking...');
+
+        await act(async () => {
+            await user.click(screen.getByTitle('Stop generating'));
+        });
+
+        expect(screen.queryByText('Thinking...')).toBeNull();
+        expect(screen.getByText('una pregunta')).toBeInTheDocument();
+        expect(api.saveMessageToServer).not.toHaveBeenCalledWith(
+            expect.any(String),
+            expect.objectContaining({ sender: 'ai' })
+        );
+    });
+
+    it('seals the stopped partial answer without wiping a message sent right after', async () => {
+        vi.useFakeTimers({ shouldAdvanceTime: true });
+        const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+
+        let report: ((textSoFar: string) => void) | undefined;
+        const resolvers: Array<(value: { text: string }) => void> = [];
+        api.fetchChatResponse.mockImplementation((...args: unknown[]) => {
+            report = args[7] as (textSoFar: string) => void;
+            const signal = args[4] as AbortSignal;
+            return new Promise<{ text: string }>((resolve, reject) => {
+                resolvers.push(resolve);
+                signal.addEventListener('abort', () => {
+                    const err = new Error('The user aborted a request.');
+                    err.name = 'AbortError';
+                    reject(err);
+                });
+            });
+        });
+
+        const partialAiSave = deferred<string>();
+        api.saveMessageToServer
+            .mockResolvedValueOnce('user-id-1')
+            .mockReturnValueOnce(partialAiSave.promise)
+            .mockResolvedValue('id-2');
+
+        render(<App />);
+        await screen.findByText('A question 1');
+
+        await user.type(screen.getByPlaceholderText('Write a message...'), 'first prompt');
+        await user.click(screen.getByTitle('Send message'));
+        await screen.findByText('Thinking...');
+
+        await act(async () => {
+            report?.('Media respuesta');
+            vi.advanceTimersByTime(80);
+        });
+        await screen.findByText('Media respuesta');
+
+        await user.click(screen.getByTitle('Stop generating'));
+        await screen.findByTitle('Send message');
+
+        await user.type(screen.getByPlaceholderText('Write a message...'), 'second prompt');
+        await user.click(screen.getByTitle('Send message'));
+        await screen.findByText('second prompt');
+
+        await act(async () => { partialAiSave.resolve('stopped-ai-id'); });
+
+        expect(screen.getByText('first prompt')).toBeInTheDocument();
+        expect(screen.getByText('Media respuesta')).toBeInTheDocument();
+        expect(screen.getByText('second prompt')).toBeInTheDocument();
+
+        await act(async () => { resolvers[1]({ text: 'the second answer' }); });
+        await screen.findByText('the second answer');
+        vi.useRealTimers();
+    });
+
+    it('seals the stopped partial answer after save and reply even without a new user save', async () => {
+        vi.useFakeTimers({ shouldAdvanceTime: true });
+        const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+
+        let report: ((textSoFar: string) => void) | undefined;
+        api.fetchChatResponse.mockImplementation((...args: unknown[]) => {
+            report = args[7] as (textSoFar: string) => void;
+            const signal = args[4] as AbortSignal;
+            return new Promise((_resolve, reject) => {
+                signal.addEventListener('abort', () => {
+                    const error = new Error('Aborted');
+                    error.name = 'AbortError';
+                    reject(error);
+                });
+            });
+        });
+
+        const partialAiSave = deferred<string>();
+        api.saveMessageToServer.mockImplementation((_chatId, payload) => {
+            if (payload.sender === 'ai' && payload.stopped) {
+                return partialAiSave.promise;
+            }
+            return Promise.resolve('unused');
+        });
+
+        render(<App />);
+        await screen.findByText('A question 2');
+
+        const bubble = screen.getByText('A question 2').closest('[class*="messageWrapper"]') as HTMLElement;
+        await user.click(within(bubble).getByTitle('Edit message'));
+        await user.clear(within(bubble).getByRole('textbox'));
+        await user.type(within(bubble).getByRole('textbox'), 'A question 2 edited');
+        await user.click(within(bubble).getByTitle('Save and reply'));
+        await screen.findByText('Thinking...');
+
+        expect(api.saveMessageToServer).not.toHaveBeenCalledWith('chat-a', expect.objectContaining({
+            sender: 'user',
+        }));
+
+        await act(async () => {
+            report?.('Media respuesta');
+            vi.advanceTimersByTime(80);
+        });
+        vi.useRealTimers();
+        const userReal = userEvent.setup();
+        await screen.findByText('Media respuesta');
+
+        await userReal.click(screen.getByTitle('Stop generating'));
+        await screen.findByText('Media respuesta');
+
+        await act(async () => {
+            partialAiSave.resolve('stopped-partial-id');
+            await partialAiSave.promise;
+        });
+
+        api.deleteMessageFromServer.mockClear();
+
+        const stoppedBubble = screen.getByText('Media respuesta').closest('[class*="messageWrapper"]') as HTMLElement;
+        expect(within(stoppedBubble).getByTitle('Delete message')).not.toBeDisabled();
+
+        await act(async () => {
+            await userReal.click(within(stoppedBubble).getByTitle('Delete message'));
+        });
+
+        expect(api.deleteMessageFromServer).toHaveBeenCalledWith('chat-a', 'stopped-partial-id');
+    });
+});

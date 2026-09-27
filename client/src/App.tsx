@@ -1040,36 +1040,105 @@ export default function App() {
       options.onSuccess?.(response.text);
     } catch (error) {
       const err = error as Error;
-      // streamedText is filled by onChunk for the abort path; the catch block does not read it yet.
-      void streamedText;
 
       if (err.name === 'AbortError') {
-        // Abortar deja la conversación tal y como se envió, sin respuesta. El botón se
-        // libera ya mismo: lo único que puede seguir en vuelo es el guardado del mensaje de
-        // usuario, no la generación, que ya está cortada. Su _id se sella en cuanto llegue,
-        // parcheando el mensaje que comparte createdAt, no el objeto original: un edit
-        // in-place lo sustituye, y un segundo prompt nace con otra fecha.
+        // The button is released right away: nothing is still generating, only the user
+        // message may still be travelling to the server.
         if (abortControllersRef.current.get(chatId) === controller) {
           abortControllersRef.current.delete(chatId);
           setGeneratingChatIds(prev => prev.filter(id => id !== chatId));
         }
-        commitChatMessages(chatId, historyToSend);
-        pendingUserMessageId.catch(() => undefined).then((savedUserMessageId) => {
-          if (!savedUserMessageId) return;
-          const chat = chatListRef.current.find((item) => item.id === chatId);
-          if (!chat) return;
-          // By createdAt, not by object identity: an in-place edit replaces the
-          // object, and stamping only the original would leave the prompt without
-          // an _id and skip every later PATCH.
-          const patched = chat.messages.map((message) =>
-            message.role === 'user' &&
-            userMessage.createdAt &&
-            message.createdAt === userMessage.createdAt
-              ? { ...message, _id: savedUserMessageId }
-              : message
-          );
+
+        const partialText = streamedText.trim();
+
+        if (!partialText) {
+          // Nothing was written: exactly the behaviour before streaming existed. The
+          // conversation goes back to how it was sent, and the prompt's _id is stamped as
+          // soon as it lands, patching the message that shares createdAt — an in-place edit
+          // replaces the object, and a second prompt is born with another date.
+          commitChatMessages(chatId, historyToSend);
+          pendingUserMessageId.catch(() => undefined).then((savedUserMessageId) => {
+            if (!savedUserMessageId) return;
+            const chat = chatListRef.current.find((item) => item.id === chatId);
+            if (!chat) return;
+            const patched = chat.messages.map((message) =>
+              message.role === 'user' &&
+              userMessage.createdAt &&
+              message.createdAt === userMessage.createdAt
+                ? { ...message, _id: savedUserMessageId }
+                : message
+            );
+            commitChatMessages(chatId, patched);
+          });
+          return;
+        }
+
+        // Partial text: seal what is on screen from the live list before any await, the same
+        // way the empty path does — a second send is allowed again as soon as generating clears.
+        clearStreamingText(chatId);
+
+        const stoppedCreatedAt = new Date().toISOString();
+        const stoppedMessage: Message = {
+          role: "model",
+          parts: [{ text: partialText }],
+          createdAt: stoppedCreatedAt,
+          model: targetModel,
+          reasoningLevel: targetReasoning,
+          stopped: true,
+        };
+
+        const chatAtStop = chatListRef.current.find((item) => item.id === chatId);
+        if (chatAtStop) {
+          const messages = [...chatAtStop.messages];
+          for (let i = messages.length - 1; i >= 0; i--) {
+            if (messages[i].isTemporary && messages[i].role === 'model') {
+              messages[i] = stoppedMessage;
+              commitChatMessages(chatId, messages);
+              break;
+            }
+          }
+        }
+
+        const partialSavePromise = isAuthenticatedRef.current
+          ? saveMessageToServer(chatId, {
+              sender: 'ai',
+              content: partialText,
+              model: targetModel,
+              reasoningLevel: targetReasoning,
+              stopped: true,
+            }).catch(() => undefined)
+          : Promise.resolve(undefined);
+
+        void Promise.all([
+          pendingUserMessageId.catch(() => undefined),
+          partialSavePromise,
+        ]).then(([savedUserMessageId, stoppedMessageId]) => {
+          const liveChat = chatListRef.current.find((item) => item.id === chatId);
+          if (!liveChat) return;
+          const patched = liveChat.messages.map((message) => {
+            if (
+              savedUserMessageId &&
+              message.role === 'user' &&
+              userMessage.createdAt &&
+              message.createdAt === userMessage.createdAt
+            ) {
+              return { ...message, _id: savedUserMessageId };
+            }
+            if (
+              stoppedMessageId &&
+              message.role === 'model' &&
+              message.createdAt === stoppedCreatedAt &&
+              message.stopped
+            ) {
+              return { ...message, _id: stoppedMessageId };
+            }
+            return message;
+          });
           commitChatMessages(chatId, patched);
         });
+        // options.onSuccess is deliberately not called: a chat cut on its first message keeps
+        // the provisional title beforeRequest already wrote, instead of spending a model call
+        // on titling an answer the user just rejected.
         return;
       }
 
