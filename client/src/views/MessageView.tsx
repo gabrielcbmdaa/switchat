@@ -60,7 +60,6 @@ export default function MessageView({
     const prevMessagesRef = useRef<Message[]>([]);
     const prevMessagesLengthRef = useRef(messages.length);
     const hasScrolledRef = useRef(false);
-    const prevChatIdRef = useRef(chatId);
     // How tall the content was the last time the scroll effect ran. "Is the reader near the
     // bottom?" has to be asked about the page they were looking at, not the one that already
     // has the new batch painted in: see the effect below.
@@ -120,12 +119,6 @@ export default function MessageView({
         }
     };
     useEffect(() => {
-        // A finished answer replaces the temporary bubble with new objects, so the
-        // first message's identity changes without the reader having switched chats.
-        // Only a real chat change should force the view to the bottom.
-        const chatChanged = prevChatIdRef.current !== chatId;
-        prevChatIdRef.current = chatId;
-
         const container = containerRef.current;
         if (!container || messages.length === 0) {
             prevMessagesRef.current = messages;
@@ -175,7 +168,12 @@ export default function MessageView({
                 ? 'auto'
                 : ((hasScrolledRef.current && isSameChat && hasNewMessage) ? 'smooth' : 'auto');
 
-            if (chatChanged || hasNewMessage || (lastMessageGrew && isNearBottom)) {
+            // Not `!isSameChat`: on a chat's first exchange the user message is messages[0],
+            // and sealing the answer swaps it for a copy that carries its _id, so the first
+            // message's identity changes while the reader stays in the same chat. A real chat
+            // change needs no check here either: App mounts a new MessageView per chat
+            // (key={activeChatId}), and a first run always scrolls through hasNewMessage.
+            if (hasNewMessage || (lastMessageGrew && isNearBottom)) {
                 setTimeout(() => {
                     if (containerRef.current) {
                         containerRef.current.scrollTo({
