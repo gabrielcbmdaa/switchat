@@ -1745,3 +1745,66 @@ describe('stopping the answer half written', () => {
         expect(api.deleteMessageFromServer).toHaveBeenCalledWith('chat-a', 'stopped-partial-id');
     });
 });
+
+describe('asking for older messages', () => {
+    it('does not ask twice for the same page when the chat is reopened while it is on its way', async () => {
+        // jsdom lays nothing out: tell MessageView that chat A's first page fits on screen,
+        // which is what makes it ask for the page before it.
+        vi.spyOn(HTMLElement.prototype, 'scrollHeight', 'get').mockReturnValue(100);
+        vi.spyOn(HTMLElement.prototype, 'clientHeight', 'get').mockReturnValue(400);
+        const olderPage = deferred<Message[]>();
+        api.fetchChatMessagesFromServer.mockImplementation(
+            async (chatId: string, _limit?: number, before?: string) => {
+                if (before) return chatId === 'chat-a' ? olderPage.promise : [];
+                return chatId === 'chat-a' ? messagesA : messagesB;
+            }
+        );
+        const olderRequestsForA = () => api.fetchChatMessagesFromServer.mock.calls
+            .filter(([chatId, , before]) => chatId === 'chat-a' && before !== undefined)
+            .length;
+
+        render(<App />);
+        await screen.findByText('A question 1');
+        expect(olderRequestsForA()).toBe(1);
+
+        // Leaving and coming back remounts the view, which forgets it already asked.
+        await userEvent.click(screen.getByText('Chat B'));
+        await screen.findByText('B question 1');
+        await userEvent.click(screen.getByText('Chat A'));
+        await screen.findByText('A question 1');
+
+        expect(olderRequestsForA()).toBe(1);
+
+        await act(async () => { olderPage.resolve([]); });
+    });
+
+    it('asks again for an older page that failed to arrive', async () => {
+        vi.spyOn(HTMLElement.prototype, 'scrollHeight', 'get').mockReturnValue(100);
+        vi.spyOn(HTMLElement.prototype, 'clientHeight', 'get').mockReturnValue(400);
+        const failedPage = deferred<Message[] | null>();
+        api.fetchChatMessagesFromServer.mockImplementation(
+            async (chatId: string, _limit?: number, before?: string) => {
+                if (before) return chatId === 'chat-a' ? failedPage.promise : [];
+                return chatId === 'chat-a' ? messagesA : messagesB;
+            }
+        );
+        const olderRequestsForA = () => api.fetchChatMessagesFromServer.mock.calls
+            .filter(([chatId, , before]) => chatId === 'chat-a' && before !== undefined)
+            .length;
+
+        render(<App />);
+        await screen.findByText('A question 1');
+        expect(olderRequestsForA()).toBe(1);
+
+        // null is what fetchChatMessagesFromServer returns on a network error. It leaves
+        // hasMoreMap alone, so the chat may still ask, and the lock must not stop it.
+        await act(async () => { failedPage.resolve(null); });
+
+        await userEvent.click(screen.getByText('Chat B'));
+        await screen.findByText('B question 1');
+        await userEvent.click(screen.getByText('Chat A'));
+        await screen.findByText('A question 1');
+
+        expect(olderRequestsForA()).toBe(2);
+    });
+});

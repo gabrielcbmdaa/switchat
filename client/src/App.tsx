@@ -108,6 +108,11 @@ export default function App() {
   const streamingBufferRef = useRef<Map<string, string>>(new Map());
   const streamingTimerRef = useRef<Map<string, number>>(new Map());
   const abortControllersRef = useRef<Map<string, AbortController>>(new Map());
+  // One request for older messages per chat at a time. MessageView asks again whenever the
+  // page still fits, and a remount (switching to another chat and back) forgets that it
+  // already asked: two requests with the same cursor bring the same page, and both would be
+  // prepended.
+  const loadingOlderChatIdsRef = useRef<Set<string>>(new Set());
   // Chats cuya primera página está pedida y todavía no ha vuelto (ver el efecto de carga)
   const pendingFirstPageRef = useRef<Set<string>>(new Set());
   // Whether a template chat is already on its way to the server. Same reason as the ref
@@ -625,6 +630,7 @@ export default function App() {
 
   async function handleLoadMoreMessages(chatId: string) {
     if (!isAuthenticated) return;
+    if (loadingOlderChatIdsRef.current.has(chatId)) return;
 
     const chat = chatList.find(c => c.id === chatId);
     if (!chat || !chat.messages || chat.messages.length === 0) return;
@@ -632,21 +638,27 @@ export default function App() {
     const oldestMessage = chat.messages[0];
     const before = oldestMessage.createdAt;
 
-    const newMessages = await fetchChatMessagesFromServer(chatId, 6, before);
-    if (newMessages) {
-      setChatList(prevChats => prevChats.map(c => {
-        if (c.id === chatId) {
-          return {
-            ...c,
-            messages: [...newMessages, ...c.messages]
-          };
-        }
-        return c;
-      }));
+    loadingOlderChatIdsRef.current.add(chatId);
+    try {
+      const newMessages = await fetchChatMessagesFromServer(chatId, 6, before);
+      if (newMessages) {
+        setChatList(prevChats => prevChats.map(c => {
+          if (c.id === chatId) {
+            return {
+              ...c,
+              messages: [...newMessages, ...c.messages]
+            };
+          }
+          return c;
+        }));
 
-      if (newMessages.length < 6) {
-        setHasMoreMap(prev => ({ ...prev, [chatId]: false }));
+        if (newMessages.length < 6) {
+          setHasMoreMap(prev => ({ ...prev, [chatId]: false }));
+        }
       }
+    } finally {
+      // Released however the request ends: a failed page must not block the next attempt.
+      loadingOlderChatIdsRef.current.delete(chatId);
     }
   }
 
