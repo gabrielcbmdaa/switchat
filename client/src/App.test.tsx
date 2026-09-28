@@ -1319,7 +1319,10 @@ describe('starting a chat from a template', () => {
         await act(async () => { });
 
         expect(screen.getByText('What are you thinking about?')).toBeInTheDocument();
-        expect(screen.getByRole('button', { name: WELCOME_PILL })).toBeInTheDocument();
+        // findByRole, not getByRole: the subtitle above appears before the pills do (the
+        // pills wait for isNewChat), and on a slow runner getByRole lands in between. That is
+        // what failed the deploys of 2026-09-02 and 2026-09-28.
+        expect(await screen.findByRole('button', { name: WELCOME_PILL })).toBeInTheDocument();
         // Nothing was written, so no chat was born on its own. The pill is the only way in.
         expect(localStorage.getItem('chatList')).toBeNull();
     });
@@ -1329,7 +1332,7 @@ describe('starting a chat from a template', () => {
         render(<App />);
         await screen.findByText('What are you thinking about?');
 
-        await userEvent.click(screen.getByRole('button', { name: WELCOME_PILL }));
+        await userEvent.click(await screen.findByRole('button', { name: WELCOME_PILL }));
 
         const stored = JSON.parse(localStorage.getItem('chatList') ?? '[]');
         expect(stored).toHaveLength(1);
@@ -1343,7 +1346,7 @@ describe('starting a chat from a template', () => {
         render(<App />);
         await screen.findByText('What are you thinking about?');
 
-        await userEvent.click(screen.getByRole('button', { name: WELCOME_PILL }));
+        await userEvent.click(await screen.findByRole('button', { name: WELCOME_PILL }));
 
         const [chat, options] = api.saveChatToServer.mock.calls.at(-1) ?? [];
         // syncChat only seeds messages on a chat that has none: this call is the one chance.
@@ -1369,7 +1372,7 @@ describe('starting a chat from a template', () => {
         render(<App />);
         await screen.findByText('What are you thinking about?');
 
-        await userEvent.click(screen.getByRole('button', { name: 'English Tutor' }));
+        await userEvent.click(await screen.findByRole('button', { name: 'English Tutor' }));
 
         // The tutor arrives with exactly one message, so there is exactly one of these.
         await userEvent.click(await screen.findByTitle('Delete message'));
@@ -1391,7 +1394,7 @@ describe('starting a chat from a template', () => {
         render(<App />);
         await screen.findByText('What are you thinking about?');
 
-        const pill = screen.getByRole('button', { name: 'English Tutor' });
+        const pill = await screen.findByRole('button', { name: 'English Tutor' });
         await userEvent.click(pill);
         await userEvent.click(pill);
 
@@ -1410,7 +1413,7 @@ describe('starting a chat from a template', () => {
         render(<App />);
         await screen.findByText('What are you thinking about?');
 
-        await userEvent.click(screen.getByRole('button', { name: 'English Tutor' }));
+        await userEvent.click(await screen.findByRole('button', { name: 'English Tutor' }));
 
         expect(await screen.findByRole('status')).toHaveTextContent('Session expired');
         // And back to the signed-out mode, the way every other expiry in the app ends.
@@ -1425,7 +1428,7 @@ describe('starting a chat from a template', () => {
         await screen.findByText('What are you thinking about?');
 
         await userEvent.type(screen.getByPlaceholderText('Write a message...'), 'how do i say madrugar');
-        await userEvent.click(screen.getByRole('button', { name: 'English Tutor' }));
+        await userEvent.click(await screen.findByRole('button', { name: 'English Tutor' }));
 
         expect(await screen.findByDisplayValue('how do i say madrugar')).toBeInTheDocument();
     });
@@ -1439,7 +1442,7 @@ describe('starting a chat from a template', () => {
         await userEvent.click(screen.getByTitle('Account'));
         expect(screen.getByPlaceholderText('Your email')).toBeInTheDocument();
 
-        await userEvent.click(screen.getByRole('button', { name: 'English Tutor' }));
+        await userEvent.click(await screen.findByRole('button', { name: 'English Tutor' }));
 
         // A chat was born and nobody is looking at it: the panel stayed on Account.
         expect(screen.queryByPlaceholderText('Your email')).not.toBeInTheDocument();
@@ -1451,7 +1454,7 @@ describe('starting a chat from a template', () => {
         render(<App />);
         await screen.findByText('What are you thinking about?');
 
-        await userEvent.click(screen.getByRole('button', { name: WELCOME_PILL }));
+        await userEvent.click(await screen.findByRole('button', { name: WELCOME_PILL }));
 
         expect(await screen.findByRole('status')).toHaveTextContent('Could not create the chat.');
         // Still on the empty view: a chat the server rejected would vanish on the next reload.
