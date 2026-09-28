@@ -97,7 +97,22 @@ export default function App() {
   // chats a la vez — lo que solo es seguro desde que cada respuesta escribe únicamente el
   // suyo (ver commitChatMessages).
   const [generatingChatIds, setGeneratingChatIds] = useState<string[]>([]);
+  // The text arriving from the model, per chat. Deliberately NOT inside chatList: writing
+  // there goes through commitChatMessages, which persists to localStorage, and at one batch
+  // every 80 ms a ten second answer would serialise the whole chat list ~125 times for a
+  // text that is not final yet. Per chat and not global for the same reason
+  // generatingChatIds is a list: two chats can be answering at once.
+  const [streamingTextByChat, setStreamingTextByChat] = useState<Record<string, string>>({});
+  // What the last chunk said, and the timer that will flush it. The buffer lives in a ref so
+  // a chunk does not cost a render; only the flush does.
+  const streamingBufferRef = useRef<Map<string, string>>(new Map());
+  const streamingTimerRef = useRef<Map<string, number>>(new Map());
   const abortControllersRef = useRef<Map<string, AbortController>>(new Map());
+  // One request for older messages per chat at a time. MessageView asks again whenever the
+  // page still fits, and a remount (switching to another chat and back) forgets that it
+  // already asked: two requests with the same cursor bring the same page, and both would be
+  // prepended.
+  const loadingOlderChatIdsRef = useRef<Set<string>>(new Set());
   // Chats cuya primera página está pedida y todavía no ha vuelto (ver el efecto de carga)
   const pendingFirstPageRef = useRef<Set<string>>(new Set());
   // Whether a template chat is already on its way to the server. Same reason as the ref
@@ -430,6 +445,40 @@ export default function App() {
     temporaryMessageTimersRef.current.add(timer);
   }
 
+  // 80 ms: below what the eye reads as a jump, and it caps repaints at ~12 per second no
+  // matter how the provider chops the answer. It matters because MessageBubble re-parses the
+  // whole accumulated markdown on every repaint, not just the new piece.
+  const STREAM_FLUSH_MS = 80;
+
+  function queueStreamingText(chatId: string, textSoFar: string) {
+    streamingBufferRef.current.set(chatId, textSoFar);
+    // A timer already running will pick up whatever the buffer holds when it fires, so a
+    // second chunk inside the same window costs nothing.
+    if (streamingTimerRef.current.has(chatId)) return;
+
+    const timer = window.setTimeout(() => {
+      streamingTimerRef.current.delete(chatId);
+      const pending = streamingBufferRef.current.get(chatId);
+      if (pending === undefined) return;
+      setStreamingTextByChat((prev) => ({ ...prev, [chatId]: pending }));
+    }, STREAM_FLUSH_MS);
+
+    streamingTimerRef.current.set(chatId, timer);
+  }
+
+  function clearStreamingText(chatId: string) {
+    const timer = streamingTimerRef.current.get(chatId);
+    if (timer !== undefined) window.clearTimeout(timer);
+    streamingTimerRef.current.delete(chatId);
+    streamingBufferRef.current.delete(chatId);
+    setStreamingTextByChat((prev) => {
+      if (!(chatId in prev)) return prev;
+      const next = { ...prev };
+      delete next[chatId];
+      return next;
+    });
+  }
+
   useEffect(() => {
     if (activeLeftPanel !== null) {
       return initResizer('left');
@@ -581,6 +630,7 @@ export default function App() {
 
   async function handleLoadMoreMessages(chatId: string) {
     if (!isAuthenticated) return;
+    if (loadingOlderChatIdsRef.current.has(chatId)) return;
 
     const chat = chatList.find(c => c.id === chatId);
     if (!chat || !chat.messages || chat.messages.length === 0) return;
@@ -588,21 +638,27 @@ export default function App() {
     const oldestMessage = chat.messages[0];
     const before = oldestMessage.createdAt;
 
-    const newMessages = await fetchChatMessagesFromServer(chatId, 6, before);
-    if (newMessages) {
-      setChatList(prevChats => prevChats.map(c => {
-        if (c.id === chatId) {
-          return {
-            ...c,
-            messages: [...newMessages, ...c.messages]
-          };
-        }
-        return c;
-      }));
+    loadingOlderChatIdsRef.current.add(chatId);
+    try {
+      const newMessages = await fetchChatMessagesFromServer(chatId, 6, before);
+      if (newMessages) {
+        setChatList(prevChats => prevChats.map(c => {
+          if (c.id === chatId) {
+            return {
+              ...c,
+              messages: [...newMessages, ...c.messages]
+            };
+          }
+          return c;
+        }));
 
-      if (newMessages.length < 6) {
-        setHasMoreMap(prev => ({ ...prev, [chatId]: false }));
+        if (newMessages.length < 6) {
+          setHasMoreMap(prev => ({ ...prev, [chatId]: false }));
+        }
       }
+    } finally {
+      // Released however the request ends: a failed page must not block the next attempt.
+      loadingOlderChatIdsRef.current.delete(chatId);
     }
   }
 
@@ -942,6 +998,9 @@ export default function App() {
     // tuyo, y es beforeRequest quien lo materializa en Mongo. Vive fuera para que el catch
     // pueda sellar el _id aunque la generación acabe fallando o abortada.
     let pendingUserMessageId: Promise<string | undefined> = Promise.resolve(undefined);
+    // The last accumulated text, kept here and not read from the ref: the abort branch needs
+    // it, and a local variable cannot be emptied by another chat's cleanup.
+    let streamedText = '';
 
     try {
       await options.beforeRequest?.();
@@ -965,7 +1024,11 @@ export default function App() {
         targetChat?.systemPromptEnabled === false ? undefined : targetChat?.systemPrompt,
         controller.signal,
         isNotesEnabled(targetChat?.notesEnabled) ? targetChat?.notes : undefined,
-        isNotesEnabled(targetChat?.notesEnabled)
+        isNotesEnabled(targetChat?.notesEnabled),
+        (textSoFar) => {
+          streamedText = textSoFar;
+          queueStreamingText(chatId, textSoFar);
+        }
       );
 
       // Si el prompt no llegó a guardarse, este await relanza y no persistimos la respuesta.
@@ -991,32 +1054,103 @@ export default function App() {
       const err = error as Error;
 
       if (err.name === 'AbortError') {
-        // Abortar deja la conversación tal y como se envió, sin respuesta. El botón se
-        // libera ya mismo: lo único que puede seguir en vuelo es el guardado del mensaje de
-        // usuario, no la generación, que ya está cortada. Su _id se sella en cuanto llegue,
-        // parcheando el mensaje que comparte createdAt, no el objeto original: un edit
-        // in-place lo sustituye, y un segundo prompt nace con otra fecha.
+        // The button is released right away: nothing is still generating, only the user
+        // message may still be travelling to the server.
         if (abortControllersRef.current.get(chatId) === controller) {
           abortControllersRef.current.delete(chatId);
           setGeneratingChatIds(prev => prev.filter(id => id !== chatId));
         }
-        commitChatMessages(chatId, historyToSend);
-        pendingUserMessageId.catch(() => undefined).then((savedUserMessageId) => {
-          if (!savedUserMessageId) return;
-          const chat = chatListRef.current.find((item) => item.id === chatId);
-          if (!chat) return;
-          // By createdAt, not by object identity: an in-place edit replaces the
-          // object, and stamping only the original would leave the prompt without
-          // an _id and skip every later PATCH.
-          const patched = chat.messages.map((message) =>
-            message.role === 'user' &&
-            userMessage.createdAt &&
-            message.createdAt === userMessage.createdAt
-              ? { ...message, _id: savedUserMessageId }
-              : message
-          );
+
+        const partialText = streamedText.trim();
+
+        if (!partialText) {
+          // Nothing was written: exactly the behaviour before streaming existed. The
+          // conversation goes back to how it was sent, and the prompt's _id is stamped as
+          // soon as it lands, patching the message that shares createdAt — an in-place edit
+          // replaces the object, and a second prompt is born with another date.
+          commitChatMessages(chatId, historyToSend);
+          pendingUserMessageId.catch(() => undefined).then((savedUserMessageId) => {
+            if (!savedUserMessageId) return;
+            const chat = chatListRef.current.find((item) => item.id === chatId);
+            if (!chat) return;
+            const patched = chat.messages.map((message) =>
+              message.role === 'user' &&
+              userMessage.createdAt &&
+              message.createdAt === userMessage.createdAt
+                ? { ...message, _id: savedUserMessageId }
+                : message
+            );
+            commitChatMessages(chatId, patched);
+          });
+          return;
+        }
+
+        // Partial text: seal what is on screen from the live list before any await, the same
+        // way the empty path does — a second send is allowed again as soon as generating clears.
+        clearStreamingText(chatId);
+
+        const stoppedCreatedAt = new Date().toISOString();
+        const stoppedMessage: Message = {
+          role: "model",
+          parts: [{ text: partialText }],
+          createdAt: stoppedCreatedAt,
+          model: targetModel,
+          reasoningLevel: targetReasoning,
+          stopped: true,
+        };
+
+        const chatAtStop = chatListRef.current.find((item) => item.id === chatId);
+        if (chatAtStop) {
+          const messages = [...chatAtStop.messages];
+          for (let i = messages.length - 1; i >= 0; i--) {
+            if (messages[i].isTemporary && messages[i].role === 'model') {
+              messages[i] = stoppedMessage;
+              commitChatMessages(chatId, messages);
+              break;
+            }
+          }
+        }
+
+        const partialSavePromise = isAuthenticatedRef.current
+          ? saveMessageToServer(chatId, {
+              sender: 'ai',
+              content: partialText,
+              model: targetModel,
+              reasoningLevel: targetReasoning,
+              stopped: true,
+            }).catch(() => undefined)
+          : Promise.resolve(undefined);
+
+        void Promise.all([
+          pendingUserMessageId.catch(() => undefined),
+          partialSavePromise,
+        ]).then(([savedUserMessageId, stoppedMessageId]) => {
+          const liveChat = chatListRef.current.find((item) => item.id === chatId);
+          if (!liveChat) return;
+          const patched = liveChat.messages.map((message) => {
+            if (
+              savedUserMessageId &&
+              message.role === 'user' &&
+              userMessage.createdAt &&
+              message.createdAt === userMessage.createdAt
+            ) {
+              return { ...message, _id: savedUserMessageId };
+            }
+            if (
+              stoppedMessageId &&
+              message.role === 'model' &&
+              message.createdAt === stoppedCreatedAt &&
+              message.stopped
+            ) {
+              return { ...message, _id: stoppedMessageId };
+            }
+            return message;
+          });
           commitChatMessages(chatId, patched);
         });
+        // options.onSuccess is deliberately not called: a chat cut on its first message keeps
+        // the provisional title beforeRequest already wrote, instead of spending a model call
+        // on titling an answer the user just rejected.
         return;
       }
 
@@ -1054,6 +1188,9 @@ export default function App() {
         abortControllersRef.current.delete(chatId);
         setGeneratingChatIds(prev => prev.filter(id => id !== chatId));
       }
+      // All three endings pass through here — answer, Stop and error — so the drip state is
+      // cleaned in one place instead of three.
+      clearStreamingText(chatId);
     }
   }
 
@@ -1387,6 +1524,17 @@ export default function App() {
     );
   }
 
+  // The drip is painted by replacing the text of the temporary bubble, so it stays
+  // isTemporary: no buttons and no timestamp until it is a real message.
+  const streamingText = streamingTextByChat[activeChatId];
+  const messagesToRender = streamingText
+    ? (currentChat?.messages || []).map((message, index, all) =>
+        index === all.length - 1 && message.isTemporary && message.role === 'model'
+          ? { ...message, parts: [{ text: streamingText }] }
+          : message
+      )
+    : currentChat?.messages || [];
+
   return (
     <>
       {/* 1. Inyectamos los símbolos en el DOM */}
@@ -1443,7 +1591,7 @@ export default function App() {
           ) : (
             <MessageView
               key={activeChatId}
-              messages={currentChat?.messages || []}
+              messages={messagesToRender}
               chatId={activeChatId}
               isNewChat={isDraftChat}
               hasMoreMap={hasMoreMap}

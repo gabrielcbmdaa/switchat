@@ -192,3 +192,23 @@ describe('editing a user message', () => {
         expect(onSave).not.toHaveBeenCalled();
     });
 });
+
+describe('the copy button of a code block while the answer is still arriving', () => {
+    const codeAnswer = '```js\nconst a = 1;\n```';
+
+    it('paints the button on a finished answer', () => {
+        const { container } = renderBubble(answer({ parts: [{ text: codeAnswer }] }));
+
+        expect(container.querySelector('[data-copy-code]')).not.toBeNull();
+    });
+
+    // While streaming, MessageBubble rebuilds this HTML on every batch, so the <button>
+    // would be destroyed and recreated ~12 times a second, losing the "copied" mark and the
+    // timer that clears it. Nobody copies a block that is still being written.
+    it('does not paint it while the bubble is still temporary', () => {
+        const { container } = renderBubble(answer({ parts: [{ text: codeAnswer }], isTemporary: true }));
+
+        expect(container.querySelector('[data-copy-code]')).toBeNull();
+        expect(container.querySelector('pre code')).not.toBeNull();
+    });
+});

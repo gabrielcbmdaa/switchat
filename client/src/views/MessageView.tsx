@@ -13,7 +13,7 @@ interface MessageViewProps {
     isNewChat?: boolean;
     hasMoreMap: Record<string, boolean>;
     loadedChatIds: Record<string, boolean>;
-    onLoadMore: () => void;
+    onLoadMore: () => void | Promise<void>;
     onDeleteMessage: (messageIndex: number) => void;
     onRetryMessage: (messageIndex: number) => void;
     onSaveMessage?: (messageIndex: number, text: string) => void;
@@ -60,10 +60,15 @@ export default function MessageView({
     const prevMessagesRef = useRef<Message[]>([]);
     const prevMessagesLengthRef = useRef(messages.length);
     const hasScrolledRef = useRef(false);
+    // How tall the content was the last time the scroll effect ran. "Is the reader near the
+    // bottom?" has to be asked about the page they were looking at, not the one that already
+    // has the new batch painted in: see the effect below.
+    const lastRenderedHeightRef = useRef<number>(0);
 
-    const prevScrollHeightRef = useRef<number>(0);
-    const prevScrollTopRef = useRef<number>(0);
     const isLoadingMoreRef = useRef<boolean>(false);
+    // The first message on screen the last time the scroll effect ran. When it is still in
+    // the list but no longer first, older messages were added above it.
+    const prevFirstVisibleRef = useRef<Message | undefined>(undefined);
 
     // Incrementar visibleCount si llegan nuevos mensajes en el mismo chat (usuario escribe o responde Gemini)
     useEffect(() => {
@@ -89,15 +94,16 @@ export default function MessageView({
     // Función para solicitar más mensajes
     const loadMore = () => {
         if (!hasMoreMessages || isLoadingMoreRef.current) return;
-        const container = containerRef.current;
-        if (container) {
-            prevScrollHeightRef.current = container.scrollHeight;
-            prevScrollTopRef.current = container.scrollTop;
-            isLoadingMoreRef.current = true;
-        }
+        // Held while the request is out: without it every scroll event near the top, and
+        // every render while the page still fits, would ask again for the same page.
+        isLoadingMoreRef.current = true;
         if (token) {
-            // Online: ask the server for the page behind the cursor.
-            onLoadMore();
+            // Online: ask the server for the page behind the cursor. Released when the request
+            // settles, found or not, so a failed or empty page does not block the next try.
+            // Keeping the viewport no longer depends on this flag: see olderArrived below.
+            Promise.resolve(onLoadMore()).finally(() => {
+                isLoadingMoreRef.current = false;
+            });
         } else {
             // Offline: the next page is already in memory.
             setVisibleCount(prev => Math.min(prev + 6, messages.length));
@@ -116,20 +122,68 @@ export default function MessageView({
         const container = containerRef.current;
         if (!container || messages.length === 0) {
             prevMessagesRef.current = messages;
+            prevFirstVisibleRef.current = visibleMessages[0];
             return;
         }
         const prev = prevMessagesRef.current;
         const isSameChat = prev.length > 0 && prev[0] === messages[0];
-        if (isLoadingMoreRef.current) {
-            // Older messages were prepended. Keep the viewport on the same line.
-            const diff = container.scrollHeight - prevScrollHeightRef.current;
-            container.scrollTop = prevScrollTopRef.current + diff;
+        // Older messages were prepended when the message that used to open the list is still
+        // in it, just no longer first. Asked of the list itself, not of a flag set when the
+        // page was requested: while an answer is being written the next render is a
+        // streaming batch, not the page, and it used to consume that flag.
+        const prevFirstVisible = prevFirstVisibleRef.current;
+        const olderArrived = prevFirstVisible !== undefined && visibleMessages.indexOf(prevFirstVisible) > 0;
+        if (olderArrived) {
+            // The page landed above the message that used to open the list, so that message
+            // moved down by exactly what the page added. Read it from the page as it is now,
+            // not from a height saved at an earlier render: a panel opened or closed in between
+            // reflows the column with no render of ours, and a saved height then moved the
+            // reader by the difference (1911 px, measured on 2026-09-27). The children of the
+            // container are the bubbles, one per visible message, in order.
+            const oldFirst = container.children[visibleMessages.indexOf(prevFirstVisible!)] as HTMLElement | undefined;
+            const newFirst = container.children[0] as HTMLElement | undefined;
+            // No height-based fallback: it would be the stale formula this replaced. If the
+            // bubbles are not where they should be, leaving the scroll alone is the smaller error.
+            if (oldFirst && newFirst) {
+                container.scrollTop += oldFirst.offsetTop - newFirst.offsetTop;
+            }
+            // Offline the page is in memory and arrives synchronously: this is its release.
             isLoadingMoreRef.current = false;
         } else {
-            // A new chat, or a new message at the bottom, follows the end.
             const hasNewMessage = messages.length > prev.length;
-            const behavior = (hasScrolledRef.current && isSameChat && hasNewMessage) ? 'smooth' : 'auto';
-            if (!isSameChat || hasNewMessage) {
+            // The answer being written does not add a message: the last one grows inside, so
+            // its length is the only thing that moves. Without this the view stays where it
+            // was and the text grows below the fold.
+            const lastText = messages[messages.length - 1]?.parts[0]?.text ?? '';
+            const prevLastText = prev.length === messages.length
+                ? prev[prev.length - 1]?.parts[0]?.text ?? ''
+                : '';
+            const lastMessageGrew = isSameChat && !hasNewMessage && lastText.length > prevLastText.length;
+
+            // Only if the user was already near the bottom: someone who scrolled up to reread
+            // something should not be dragged down. Same 200 px threshold the prompt resizer
+            // uses below.
+            //
+            // Measured against the height BEFORE this batch. By the time this effect runs the
+            // new text is already in the DOM, so the current scrollHeight counts it as distance
+            // the reader travelled. With few, large chunks (one measured at ~308 px) a reader
+            // who never touched the scrollbar looked 300 px away and the view stopped following.
+            // New text only grows at the bottom, so scrollTop still says where they were.
+            const heightBefore = lastRenderedHeightRef.current || container.scrollHeight;
+            const isNearBottom = heightBefore - container.scrollTop - container.clientHeight <= 200;
+
+            // 'auto' while it is being written: a smooth scroll lasts longer than the 80 ms
+            // batch, so at ~12 batches per second each animation would cancel the previous one.
+            const behavior = lastMessageGrew
+                ? 'auto'
+                : ((hasScrolledRef.current && isSameChat && hasNewMessage) ? 'smooth' : 'auto');
+
+            // Not `!isSameChat`: on a chat's first exchange the user message is messages[0],
+            // and sealing the answer swaps it for a copy that carries its _id, so the first
+            // message's identity changes while the reader stays in the same chat. A real chat
+            // change needs no check here either: App mounts a new MessageView per chat
+            // (key={activeChatId}), and a first run always scrolls through hasNewMessage.
+            if (hasNewMessage || (lastMessageGrew && isNearBottom)) {
                 setTimeout(() => {
                     if (containerRef.current) {
                         containerRef.current.scrollTo({
@@ -142,6 +196,8 @@ export default function MessageView({
         }
         hasScrolledRef.current = true;
         prevMessagesRef.current = messages;
+        prevFirstVisibleRef.current = visibleMessages[0];
+        lastRenderedHeightRef.current = container.scrollHeight;
 
         // The scrollbar is the only gesture that asks for older messages, and it
         // only exists once the text overflows. A page of short messages never
@@ -159,6 +215,26 @@ export default function MessageView({
         // same page whenever the screen re-renders and the text still fits.
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [visibleMessages, chatId, messages, hasMoreMessages]);
+
+    // The saved height describes the page as the last render left it. When the column itself
+    // changes size (a panel opened or closed, the window resized) the text reflows with no
+    // render of ours and that height goes stale: a reader at the bottom then looks hundreds
+    // of pixels away, and the view stops following the answer.
+    //
+    // Observed as a border box on purpose. Window and panel changes resize it; a classic
+    // scrollbar appearing (the first batch that overflows) and the prompt's padding only
+    // change the content box. Those land in the same frame as a batch, before the scroll
+    // effect reads the saved height, and would save it with the batch already in: the bug of
+    // commit 3f63b39 again.
+    useEffect(() => {
+        const container = containerRef.current;
+        if (!container) return;
+        const observer = new ResizeObserver(() => {
+            lastRenderedHeightRef.current = container.scrollHeight;
+        });
+        observer.observe(container, { box: 'border-box' });
+        return () => observer.disconnect();
+    }, [showEmptyState]);
 
     // Callback que recibe la altura del PromptInput cada vez que cambia
     const handlePromptHeightChange = useCallback((height: number) => {
